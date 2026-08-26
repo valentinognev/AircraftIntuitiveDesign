@@ -1,5 +1,11 @@
 # Updates
 
+## 0.3.5 - dumps_jsonc comments on every key
+- `Python/src/aid/jsonc.py`: `dumps_jsonc(data, docs)` — pretty-print with `//` on every dict key via dotted DOCS lookup (NP→WG, NB→BD fallbacks)
+- `Python/src/aid/aircraft.py`: `save_jsonc(ac, path)`, `load_jsonc(path)` — write/read JSONC round-trip via `asdict` + `field_docs.DOCS`
+- `Python/src/aid/field_docs.py`: top-level section keys (WG, HT, …) and control derived fields (F.S, F.tau, F.l, F.x_ac, E.S, E.tau, R.S, R.tau)
+- `Python/tests/test_jsonc_comments_every_key.py`: Cessna save asserts every `:` line has `//`
+
 ## 0.3.4 - load_mat preserves 2-D airfoil DATA
 - `Python/src/aid/aircraft.py`: non-column 2-D arrays → nested lists (N×2 `DATA`); column vectors still flatten (ALSCHD)
 - `Python/tests/test_aircraft_load_mat.py`: asserts `WG.DATA` is 101×2 nested list

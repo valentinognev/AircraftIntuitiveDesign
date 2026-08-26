@@ -1,9 +1,12 @@
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
 import numpy as np
 from scipy.io import loadmat
 from scipy.io.matlab._mio5_params import mat_struct
+
+from aid import field_docs
+from aid.jsonc import dumps_jsonc, loads_jsonc
 
 
 @dataclass
@@ -58,6 +61,36 @@ def _convert_mat(obj):
         return bool(obj)
 
     return obj
+
+
+def _aircraft_from_dict(d: dict) -> Aircraft:
+    return Aircraft(
+        WG=d["WG"],
+        HT=d["HT"],
+        VT=d["VT"],
+        F=d["F"],
+        A=d["A"],
+        E=d["E"],
+        R=d["R"],
+        BD=d["BD"],
+        NP=d["NP"],
+        NB=d["NB"],
+        AERO=d["AERO"],
+        plot_cmp=d["plot_cmp"],
+        unit=d["unit"],
+        cg_data=d.get("cg_data"),
+    )
+
+
+def load_jsonc(path: Path) -> Aircraft:
+    return _aircraft_from_dict(loads_jsonc(path.read_text()))
+
+
+def save_jsonc(ac: Aircraft, path: Path) -> None:
+    data = asdict(ac)
+    if data.get("cg_data") is None:
+        data.pop("cg_data", None)
+    path.write_text(dumps_jsonc(data, field_docs.DOCS))
 
 
 def load_mat(path: Path) -> Aircraft:

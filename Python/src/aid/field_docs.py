@@ -94,6 +94,11 @@ def _controls(prefix: str, *, aileron: bool = False) -> dict[str, str]:
         docs[f"{prefix}.PHETEP"] = "trailing-edge angle (prime), rad"
         docs[f"{prefix}.TC"] = "thickness ratio"
         docs[f"{prefix}.CB"] = "balance chord fraction"
+        docs[f"{prefix}.S"] = "control surface area, ft²"
+        docs[f"{prefix}.tau"] = "control effectiveness factor"
+    if prefix == "F":
+        docs[f"{prefix}.x_ac"] = "flap aerodynamic center location, ft"
+        docs[f"{prefix}.l"] = "flap moment arm, ft"
     return docs
 
 
@@ -162,6 +167,15 @@ def _build_docs() -> dict[str, str]:
     docs.update(_aero())
     docs.update(
         {
+            "WG": "wing planform and aerodynamics",
+            "HT": "horizontal tail planform and aerodynamics",
+            "VT": "vertical tail planform and aerodynamics",
+            "F": "flap control surface",
+            "A": "aileron control surface",
+            "E": "elevator control surface",
+            "R": "rudder control surface",
+            "BD": "fuselage body geometry and derivatives",
+            "AERO": "flight conditions and reference data",
             "unit": "length unit (ft or in)",
             "plot_cmp": "component visibility [wing, HT, VT, body]",
             "cg_data": "optional CG calculation data",

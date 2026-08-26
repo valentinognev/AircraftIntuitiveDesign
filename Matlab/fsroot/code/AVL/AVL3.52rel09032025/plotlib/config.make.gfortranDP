@@ -51,9 +51,9 @@ CFLAGS0 = -O0 $(MARCH) $(DEFINE)
 AR = ar r
 RANLIB = ranlib 
 # directory for X libraries
-LINKLIB = -L/usr/X11R6/lib -lX11 
+LINKLIB = -L/usr/lib/x86_64-linux-gnu -lX11 
 # include directory for Xlib.h
-INCDIR = -I/opt/X11/include
+INCDIR = -I/usr/include
 WOBJ = Xwin2.o
 WSRC = xwin11
 

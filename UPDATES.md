@@ -1,5 +1,9 @@
 # Updates
 
+## 0.1.9 - plotlib gfortranDP Linux X11 paths
+- `plotlib/config.make.gfortranDP`: `LINKLIB`/`INCDIR` aligned with Task 7 Linux X11 (`/usr/lib/x86_64-linux-gnu`, `/usr/include`)
+- `Python/tests/test_avl_makefile_linux.py`: asserts gfortranDP plotlib template has no macOS X11 paths
+
 ## 0.1.8 - AVL plotlib gfortranDP build
 - `Python/tests/test_avl_plotlib.py`: asserts `plotlib/libPlt_gDP.a` (or `libPlt.a`) exists after local build
 - Built `plotlib/libPlt_gDP.a` via `make gfortranDP` (archive gitignored; reproduce locally)

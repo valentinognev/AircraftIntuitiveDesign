@@ -1,5 +1,9 @@
 # Updates
 
+## 0.3.21 - tornado lattice_setup
+- `Python/src/aid/tornado/lattice.py`: `lattice_setup(geo, state, mode)` — port `fLattice_setup2.m` (`geosetup15`, `wakesetup2`, `setrudder3`, `geometry19` + inlines); `COLLOC`/`VORTEX`/`N`/`XYZ`, `ref` lengths; test aliases `npan`/`X`/`Y`
+- `Python/tests/test_tornado_lattice.py`: Cessna mesh `("10","5")` asserts nonzero panels
+
 ## 0.3.20 - tornado_io MATLAB round and foil layout
 - `Python/src/aid/tornado_io.py`: `_matlab_round` for HT/VT/NP half-mesh (`round(2.5)→3`); varying-airfoil `x`/`z` columns are span stations; `geo.foil` indexed `[wing][partition][0|1]`
 - `Python/tests/test_tornado_io_cessna.py`: HT `nx=3`/`ny=5`, VT chord `nx=3` per partition

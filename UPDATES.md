@@ -1,5 +1,9 @@
 # Updates
 
+## 0.3.3 - aircraft.load_mat from MATLAB .mat
+- `Python/src/aid/aircraft.py`: `@dataclass Aircraft` + `load_mat(path)` — scipy loadmat, recursive mat_struct→dict, NP/NB empty doubles→None, field `i` preserved
+- `Python/tests/test_aircraft_load_mat.py`: Cessna gold asserts `unit`, `WG.CHRDR`, `AERO.ALSCHD`
+
 ## 0.3.2 - JSONC comment stripper loads_jsonc
 - `Python/src/aid/jsonc.py`: `loads_jsonc(text)` — line-oriented `//` stripper respecting quoted strings, then `json.loads`
 - `Python/tests/test_jsonc_loads.py`: asserts WG/unit fields parse from JSONC sample with inline comments

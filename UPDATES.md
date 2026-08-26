@@ -1,5 +1,9 @@
 # Updates
 
+## 0.3.19 - tornado_io geo/state builder
+- `Python/src/aid/tornado_io.py`: `tornado_io(ac, mesh)` — port `Tornado_IO.m` `Write_Geometry` + flight state (`AS`, `rho`, mid-`ALSCHD` alpha); `plot_cmp` component flags; zero-deflection empty CS
+- `Python/tests/test_tornado_io_cessna.py`: Cessna 172 mesh `("10","5")` asserts `geo.c[0,0]==2`, `state.betha==0`, `AS>0`
+
 ## 0.3.18 - datcom_run subprocess runner
 - `Python/src/aid/datcom_run.py`: `run_datcom(ac, workdir)` — `write_for005`, `datcom_wrapper` subprocess (`check=True`, `timeout=120`), `parse_for006`
 - `Python/tests/test_datcom_run_cessna.py`: Cessna 172 end-to-end CL vs MATLAB `datcom.json` gold (atol 1e-6)

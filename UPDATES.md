@@ -1,5 +1,9 @@
 # Updates
 
+## 0.3.11 - datcom_io write FLTCON namelist
+- `Python/src/aid/datcom_io.py`: `write_fltcon(ac, lines)` — `$FLTCON` block from `DATCOM_IO.m` (NALPHA/ALSCHD wrap at 10, NALT/ALT, NMACH/MACH, WT, LOOP=2.0)
+- `Python/tests/test_datcom_fltcon.py`: Cessna 172 asserts `$FLTCON`, MACH, ALSCHD endpoints
+
 ## 0.3.10 - drag.py CD0 port
 - `Python/src/aid/drag.py`: `drag(pt, unit, atm, wg_sref)` — planform and fuselage CD0 from `Drag.m`; Reynolds from `atm["Re"]` or `D*MACH*a/V` (MACH default 0.03)
 - `Python/tests/test_drag_cessna.py`: Cessna 172 wing CD0 vs `.mat` gold; ALT via `np.asarray` reshape (scalar squeezed from loadmat)

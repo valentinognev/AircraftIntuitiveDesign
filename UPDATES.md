@@ -1,5 +1,9 @@
 # Updates
 
+## 0.3.8 - geometry.py linear taper branch
+- `Python/src/aid/geometry.py`: `geometry(pt, angl, type)` — single linear taper from `Geometry.m` else branch; sweep/MAC block; break-span raises (Task 30)
+- `Python/tests/test_geometry_cessna_linear.py`: Cessna 172 gold `S=24`, `cbar=2`, `AR=6`
+
 ## 0.3.7 - atmosphere.py ISA port
 - `Python/src/aid/atmosphere.py`: `atmosphere(h_ft)` — piecewise theta/delta/sigma from `Atmosphere.m`, keys `T,P,D,V,a`
 - `Python/tests/test_atmosphere.py`: sea-level ISA asserts `T≈518.69`, speed of sound, `D>0`

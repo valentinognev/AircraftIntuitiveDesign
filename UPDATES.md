@@ -1,5 +1,9 @@
 # Updates
 
+## 0.3.4 - load_mat preserves 2-D airfoil DATA
+- `Python/src/aid/aircraft.py`: non-column 2-D arrays → nested lists (N×2 `DATA`); column vectors still flatten (ALSCHD)
+- `Python/tests/test_aircraft_load_mat.py`: asserts `WG.DATA` is 101×2 nested list
+
 ## 0.3.3 - aircraft.load_mat from MATLAB .mat
 - `Python/src/aid/aircraft.py`: `@dataclass Aircraft` + `load_mat(path)` — scipy loadmat, recursive mat_struct→dict, NP/NB empty doubles→None, field `i` preserved
 - `Python/tests/test_aircraft_load_mat.py`: Cessna gold asserts `unit`, `WG.CHRDR`, `AERO.ALSCHD`

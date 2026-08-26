@@ -10,3 +10,7 @@ def test_load_mat_cessna():
     assert ac.unit == "ft"
     assert abs(ac.WG["CHRDR"] - 2.0) < 1e-9
     assert list(ac.AERO["ALSCHD"]) == [-4, 0, 4, 8, 12]
+    data = ac.WG["DATA"]
+    assert isinstance(data, list) and isinstance(data[0], list)
+    assert len(data) == 101
+    assert len(data[0]) == 2

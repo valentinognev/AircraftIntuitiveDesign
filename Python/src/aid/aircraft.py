@@ -43,6 +43,8 @@ def _convert_mat(obj):
             return [_convert_mat(x) for x in obj]
         if obj.ndim == 2 and obj.shape[1] == 1:
             return [_convert_mat(x) for x in obj.flat]
+        if obj.ndim == 2:
+            return [[_convert_mat(x) for x in row] for row in obj]
         return [_convert_mat(x) for x in obj.flat]
 
     if isinstance(obj, bytes):

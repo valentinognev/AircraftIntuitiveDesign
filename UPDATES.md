@@ -1,5 +1,8 @@
 # Updates
 
+## 0.1.4 - DATCOM smoke BODY fix and coefficient asserts
+- `test_datcom_wrapper_smoke.py`: circular `$BODY` uses X+R only; tapered wing with SSPNE; assert coefficient table header in for006.dat
+
 ## 0.1.3 - DATCOM wrapper smoke test
 - `Python/tests/test_datcom_wrapper_smoke.py`: runs `./datcom` with minimal namelist; asserts `for006.dat` contains CASEID and is >200 bytes
 

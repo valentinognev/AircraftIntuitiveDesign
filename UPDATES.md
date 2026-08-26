@@ -1,5 +1,9 @@
 # Updates
 
+## 0.3.17 - datcom_parse for006 stability tables
+- `Python/src/aid/datcom_parse.py`: `parse_for006(text)` — static-stability table (`ALPHA`/`CD`/`CL`/`CM`/derivatives), flight `mach`/`alt`; ND sentinel `99999` for blank `CYB`/`CNB`
+- `Python/tests/test_datcom_parse_gold.py`: Cessna 172 `datcom.out` vs MATLAB `datcom.json` gold for `alpha` and `cl`
+
 ## 0.3.16 - datcom_io write_for005 orchestrator
 - `Python/src/aid/datcom_io.py`: `write_for005(ac, path, *, unit)` — assembles full for005 (DIM IN when inches, CASEID, FLTCON/OPTINS/SYNTHS/BODY, NACA-W/H/V + WGPLNF/HTPLNF/VTPLNF, controls, PLOT/NEXT CASE); `naca_ht_line`, `naca_vt_line` helpers
 - `Python/tests/test_datcom_writer_cessna.py`: Cessna 172 full-file assert CASEID, $FLTCON, $WGPLNF, NACA-W-4-2412, PLOT/NEXT CASE

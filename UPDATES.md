@@ -1,5 +1,9 @@
 # Updates
 
+## 0.3.27 - avl_parse find_value
+- `Python/src/aid/avl_parse.py`: `find_value(lines, name, area="")` — port `findValue.m`; substring scan, first parseable float after keyword; 0-based line index; optional `(start, end)` area tuple
+- `Python/tests/test_avl_find_value.py`: SAMPLE `"CLa"` → `4.5123`, `ln == 1`
+
 ## 0.3.26 - tornado coeff_create3
 - `Python/src/aid/tornado/coeff.py`: `coeff_create(results, lattice, state, ref, geo)` — port `coeff_create3.m` + inlines `tarea`, `fSonicCP`; body-to-wind `B2WTransform`; `delta=0.0001` derivatives; `FORCE`/`MOMENTS` shape `(n_deriv, 3)`
 - `Python/tests/test_tornado_cessna_coeff.py`: Cessna mesh `("10","5")` asserts `CL` vs MATLAB `tornado.json` gold (`rtol=1e-4`, `atol=1e-5`)

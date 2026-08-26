@@ -1,5 +1,9 @@
 # Updates
 
+## 0.3.10 - drag.py CD0 port
+- `Python/src/aid/drag.py`: `drag(pt, unit, atm, wg_sref)` — planform and fuselage CD0 from `Drag.m`; Reynolds from `atm["Re"]` or `D*MACH*a/V` (MACH default 0.03)
+- `Python/tests/test_drag_cessna.py`: Cessna 172 wing CD0 vs `.mat` gold; ALT via `np.asarray` reshape (scalar squeezed from loadmat)
+
 ## 0.3.9 - geometry.py break-span branch
 - `Python/src/aid/geometry.py`: break-span branch from `Geometry.m` lines 5–67 — segmented `S`/`AR`/`cbar`/`TR`, equivalent taper via quadratic (`b_quad` not span), weighted sweep/dihedral, tip/break locations
 - `Python/tests/test_geometry_break_span.py`: weighted `cbar` and total `S` asserts for kinked planform

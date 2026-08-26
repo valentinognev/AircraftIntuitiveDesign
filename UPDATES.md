@@ -1,5 +1,8 @@
 # Updates
 
+## 0.1.3 - DATCOM wrapper smoke test
+- `Python/tests/test_datcom_wrapper_smoke.py`: runs `./datcom` with minimal namelist; asserts `for006.dat` contains CASEID and is >200 bytes
+
 ## 0.1.2 - DATCOM stdin wrapper script
 - `Matlab/fsroot/code/DATCOM/datcom`: bash wrapper pipes `for005.dat` to `datcom.bin`, copies `datcom.out` → `for006.dat`
 - `.gitignore`: stop ignoring wrapper; still ignore `datcom.bin`

@@ -1,7 +1,7 @@
 function run_aid_batch(model_name, solver)
 %RUN_AID_BATCH  Gold solver dump for one aircraft .mat
 % model_name e.g. 'Cessna 172' (no extension)
-% solver 'datcom' | 'tornado' | (future: 'avl', 'all')
+% solver 'datcom' | 'tornado' | 'avl' | (future: 'all')
 if nargin < 1, model_name = 'Cessna 172'; end
 if nargin < 2, solver = 'datcom'; end
 switch lower(solver)
@@ -9,6 +9,8 @@ switch lower(solver)
         run_datcom_gold(model_name);
     case 'tornado'
         run_tornado_gold(model_name);
+    case 'avl'
+        run_avl_gold(model_name);
     otherwise
         error('not implemented');
 end
@@ -146,6 +148,82 @@ end
 write_json(status_path, status);
 close(hf);
 fprintf('batch %s tornado=%s\n', model_name, status.tornado);
+end
+
+function run_avl_gold(model_name)
+set(0,'DefaultFigureVisible','off');
+this = fileparts(mfilename('fullpath'));
+addpath(this, fullfile(this,'Tornado'), fullfile(this,'AVL'));
+global lib_path WG HT VT F A E R BD NP NB AERO Results cmp opt ATM AC
+lib_path = [this filesep];
+assignin('base','lib_path',lib_path); %#ok<NASGU>
+
+root = fileparts(fileparts(fileparts(this))); % AircraftIntuitiveDesign
+out_dir = fullfile(root,'Results','matlab',model_name);
+if ~exist(out_dir,'dir'), mkdir(out_dir); end
+
+S = load(fullfile(this,'Models',[model_name,'.mat']));
+WG=S.WG; HT=S.HT; VT=S.VT; F=S.F; A=S.A; E=S.E; R=S.R; BD=S.BD;
+NP=S.NP; NB=S.NB; AERO=S.AERO;
+if ~isfield(S,'unit'), unit='ft'; else, unit=S.unit; end
+Results = cell(1,4);
+ATM = Atmosphere(AERO.ALT(1));
+ATM.Q = 0.5*ATM.D*(AERO.MACH(1)*ATM.a)^2;
+AC = struct('alpha',AERO.ALSCHD(max(1,ceil(end/2))),'CD0',0);
+if isfield(WG,'CD0'), AC.CD0 = WG.CD0; end
+
+hf = figure('Visible','off','HandleVisibility','off');
+cmp = gobjects(1,8); %#ok<NASGU>
+for i=1:8
+    cmp(i) = uicontrol(hf,'Style','checkbox','Value',1,'Visible','off');
+end
+if isfield(S,'plot_cmp')
+    for i=1:min(4,numel(S.plot_cmp)), set(cmp(i),'Value',S.plot_cmp(i)); end
+end
+opt = gobjects(1,17);
+for i=1:17
+    opt(i) = uimenu(hf,'Label','x','Checked','off','Visible','off');
+end
+set(opt(1),'UserData',repmat({'0'},3,10));
+set(opt(9),'UserData',[0.5,0.9]);
+set(opt(14),'Checked',onoff(strcmp(unit,'in')));
+
+status_path = fullfile(out_dir,'status.json');
+if isfile(status_path)
+    status = jsondecode(fileread(status_path));
+else
+    status = struct();
+end
+status.error = normalize_errors(status);
+status.error = status.error(~cellfun(@(s) strncmp(s,'avl: ',5), status.error));
+status.avl = 'failed';
+
+try
+    mesh = {'10','10'};
+    [geo,state] = Tornado_IO(mesh);
+    avl_run = fullfile(this,'AVL','run');
+    st_old = fullfile(avl_run,'geometry.st');
+    sb_old = fullfile(avl_run,'geometry.sb');
+    if isfile(st_old), delete(st_old); end
+    if isfile(sb_old), delete(sb_old); end
+    avl_path = AVL_IO(mesh,geo,state,false);
+    stfile = fullfile(avl_path,'geometry.st');
+    if exist(stfile,'file')
+        Results{4} = parseST(stfile);
+        status.avl = 'ok';
+        write_json(fullfile(out_dir,'avl.json'), Results{4});
+        copyfile(stfile, fullfile(out_dir,'geometry.st'));
+        copyfile(fullfile(avl_path,'geometry.avl'), fullfile(out_dir,'geometry.avl'));
+    else
+        error('geometry.st not found in %s', avl_path);
+    end
+catch ME
+    status.error{end+1} = ['avl: ' ME.message];
+end
+
+write_json(status_path, status);
+close(hf);
+fprintf('batch %s avl=%s\n', model_name, status.avl);
 end
 
 function errs = normalize_errors(status)

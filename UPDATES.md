@@ -1,5 +1,11 @@
 # Updates
 
+## 0.1.21 - MATLAB gold AVL dump for Cessna 172
+- `Matlab/fsroot/code/run_aid_batch.m`: `run_avl_gold` — mesh `{'10','10'}`, `Tornado_IO`/`AVL_IO(...,false)`/`parseST`, merges `status.json` (preserves `datcom`/`tornado: ok`); deletes stale `geometry.st`/`.sb` before run
+- `Matlab/fsroot/code/AVL_IO.m`: IYsym/IZsym/Zsym line uses `%d %d %.1f` (AVL 3.52 rejects `0.0 0.0 0.0`)
+- `Python/tests/test_matlab_gold_cessna_avl.py`: asserts `avl: ok`, `CLa` in `avl.json`, `geometry.st` present
+- Gold run: `run_aid_batch('Cessna 172','avl')` → `Results/matlab/Cessna 172/avl.json` (gitignored)
+
 ## 0.1.20 - MATLAB gold Tornado dump for Cessna 172
 - `Matlab/fsroot/code/run_aid_batch.m`: `run_tornado_gold` — mesh `{'10','5'}`, `Tornado_IO`/`fLattice_setup2(geo,state,0)`/`solver`/`coeff_create3`, merges `status.json` (preserves `datcom: ok`)
 - `Matlab/fsroot/code/Tornado/fLattice_setup2.m`, `coeff_create3.m`: R2025b `size()` loop-index fixes (`numel` / `size(...,1)`)

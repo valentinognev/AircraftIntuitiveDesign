@@ -55,7 +55,7 @@ fprintf(fid,'%.6f\n',AERO.MACH);
 
 %Moments of Inertia
 fprintf(fid,'\n#IYsym IZsym Zsym\n');
-fprintf(fid,'%.1f %.1f %.1f\n',0,0,0); %Symmetry
+fprintf(fid,'%d %d %.1f\n',0,0,0); %Symmetry (IYsym/IZsym must be integer for AVL 3.52)
 
 %Reference Dimensions
 fprintf(fid,'\n#Sref Cref Bref\n');

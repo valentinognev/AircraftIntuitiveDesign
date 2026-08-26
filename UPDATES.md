@@ -1,5 +1,10 @@
 # Updates
 
+## 0.2.0 - MATLAB gold Results/matlab for all 23 models
+- `run_aid_batch_all.m`: batch driver over `Models/*.mat`; per-model `try/catch`; skip when `status.json` already has all three solver fields; writes `Results/matlab/_summary.json`
+- `Python/tests/test_matlab_batch_all.py`: asserts 23 summary rows and per-model `status.json`
+- Gold batch: 23/23 attempted; primary four honest (Cessna/DA20/Learjet three-way `ok`; Navion datcom `failed`, tornado+avl `ok`)
+
 ## 0.1.24 - Primary gold test expects Navion DATCOM failed
 - `Python/tests/test_matlab_gold_primary.py`: per-aircraft `EXPECTED` map; Navion `datcom: failed` (Linux binary exit 139), tornado/avl `ok`; DA20-C1 and Learjet 23 all three `ok`
 

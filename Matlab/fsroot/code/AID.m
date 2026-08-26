@@ -1591,7 +1591,7 @@ elseif strcmp(action,'save')%%%%%%%%%%%%%%%%%% SAVE %%%%%%%%%%%%%%%%%%%%%%%
                 type 'for005.dat'
             end
             setenv('DYLD_LIBRARY_PATH', '/usr/local/bin:/opt/local/lib:')
-            system('./datcom.osx');
+            system('./datcom');
             if check_io
                 type 'for006.dat'
             end

@@ -1,5 +1,9 @@
 # Updates
 
+## 0.1.13 - AID.m Linux DATCOM wrapper
+- `Matlab/fsroot/code/AID.m`: non-Windows DATCOM branch calls `system('./datcom')` instead of `./datcom.osx`
+- `Python/tests/test_aid_datcom_patch.py`: asserts Linux branch uses wrapper, not macOS binary
+
 ## 0.1.12 - AVL batch quit smoke
 - `Python/tests/test_avl_smoke.py`: runs `avl` with stdin `PLOP\ng\n\nQuit\n`; asserts exit 0 within 30s (Task 10 binary; no X11 fix needed)
 

@@ -48,6 +48,8 @@ def _lookup_doc(path_parts: list[str], docs: dict) -> str:
 
 
 def _json_scalar(value) -> str:
+    if isinstance(value, float) and (value != value or value in (float("inf"), float("-inf"))):
+        return "null"
     return json.dumps(value)
 
 

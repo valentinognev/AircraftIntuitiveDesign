@@ -1,0 +1,484 @@
+{
+    "WG": { // wing planform and aerodynamics
+        "CHRDR": 96, // Root Chord, ft (DATCOM CHRDR)
+        "CHRDBP": 56.95, // Break Chord, ft (DATCOM CHRDBP)
+        "CHRDTP": 11.49, // Tip Chord, ft (DATCOM CHRDTP)
+        "SSPN": 39.03, // Semi-Span, ft (DATCOM SSPN)
+        "SSPNOP": 14.03, // Break Span, ft (DATCOM SSPNOP; stored from root)
+        "SAVSI": 0, // Inboard Sweep, deg (DATCOM SAVSI)
+        "SAVSO": 0, // Outboard Sweep, deg (DATCOM SAVSO)
+        "CHSTAT": 1, // Sweep Reference, LE–TE fraction (0=LE, 1=TE)
+        "DHDADI": 3.5, // Inboard Dihedral, deg (DATCOM DHDADI)
+        "DHDADO": 0, // Outboard Dihedral, deg (DATCOM DHDADO)
+        "TC": 0.12, // Thickness, chord fraction (DATCOM TC)
+        "TWISTA": 0, // Washout, deg (DATCOM TWISTA)
+        "i": 0, // Incidence, deg (DATCOM ALIW/ALIH via SYNTHS)
+        "X": 12, // Position, X, ft
+        "Y": 0, // Position, Y, ft
+        "Z": -2.66, // Position, Z, ft
+        "NACA": ["2412", "2412"], // airfoil id (NACA string cell)
+        "DATA": [ // airfoil xy (cell of N×2 from NACA_Panel_Maker)
+            [1.0, -0.0012511196549127173],
+            [0.9990133642141358, -0.0013227952862647349],
+            [0.9960573506572389, -0.0015372282022684414],
+            [0.9911436253643444, -0.00189262004261189],
+            [0.9842915805643155, -0.002386069021572991],
+            [0.9755282581475768, -0.003013682250728552],
+            [0.9648882429441257, -0.0037707381961727907],
+            [0.9524135262330097, -0.004651853891215268],
+            [0.9381533400219317, -0.005651173684734935],
+            [0.9221639627510074, -0.006762519593388293],
+            [0.9045084971874737, -0.007979545416378457],
+            [0.8852566213878945, -0.00929580931047203],
+            [0.8644843137107057, -0.010704815538075138],
+            [0.8422735529643444, -0.012199971524923988],
+            [0.8187119948743449, -0.013774487707672976],
+            [0.7938926261462365, -0.015421196454819553],
+            [0.7679133974894985, -0.017132318843349335],
+            [0.7408768370508577, -0.018899174551690233],
+            [0.7128896457825363, -0.020711866480461548],
+            [0.6840622763423388, -0.022558950895632025],
+            [0.6545084971874735, -0.02442713037348219],
+            [0.6243449435824274, -0.02630098454166933],
+            [0.5936906572928623, -0.0281627646433727],
+            [0.5626666167821521, -0.029992281471492906],
+            [0.5313952597646567, -0.03176691754014106],
+            [0.49999999999999994, -0.033461735502317014],
+            [0.46860474023534326, -0.035049757638143185],
+            [0.43733338321784776, -0.0365023344841125],
+            [0.40630934270713764, -0.037789684367217385],
+            [0.37565505641757263, -0.03892953195158369],
+            [0.3454915028125263, -0.03996709445767386],
+            [0.31593772365766093, -0.04086534333216799],
+            [0.28711035421746367, -0.0415864293865066],
+            [0.2591231629491424, -0.04209348827004671],
+            [0.23208660251050173, -0.04235157923683555],
+            [0.20610737385376338, -0.04232857090354235],
+            [0.18128800512565513, -0.04199585374113898],
+            [0.15772644703565564, -0.04132887138081156],
+            [0.13551568628929422, -0.04030757660636011],
+            [0.11474337861210537, -0.03891646854696853],
+            [0.09549150281252627, -0.037144637786034565],
+            [0.07783603724899246, -0.03498551484353316],
+            [0.06184665997806821, -0.03243637508014307],
+            [0.04758647376699021, -0.02949806729071864],
+            [0.03511175705587427, -0.026174324485806418],
+            [0.024471741852423234, -0.022470810752724155],
+            [0.015708419435684462, -0.01839589444335844],
+            [0.00885637463565564, -0.013960234657379163],
+            [0.003942649342761062, -0.009180235461498619],
+            [0.0009866357858642205, -0.004081260113720743],
+            [0.0, 0.0],
+            [0.0009866357858642205, 0.007342868562110574],
+            [0.003942649342761062, 0.012853367439554392],
+            [0.00885637463565564, 0.018434401268083468],
+            [0.015708419435684462, 0.02401871690530677],
+            [0.024471741852423234, 0.029563471812580493],
+            [0.03511175705587427, 0.03502812035133926],
+            [0.04758647376699021, 0.04036974541410024],
+            [0.06184665997806821, 0.045543359644622125],
+            [0.07783603724899246, 0.05050233605735908],
+            [0.09549150281252627, 0.055199571369316094],
+            [0.11474337861210537, 0.05958890149313974],
+            [0.13551568628929422, 0.06362587594139259],
+            [0.15772644703565564, 0.06726886365524165],
+            [0.18128800512565513, 0.07048002861023585],
+            [0.20610737385376338, 0.0732260804497169],
+            [0.23208660251050173, 0.0754788067397532],
+            [0.2591231629491424, 0.07721559567785757],
+            [0.28711035421746367, 0.0784197457595402],
+            [0.31593772365766093, 0.07908060404733314],
+            [0.3454915028125263, 0.07919361157426497],
+            [0.37565505641757263, 0.07876021608705981],
+            [0.40630934270713764, 0.0777884271277488],
+            [0.43733338321784776, 0.07636989792982427],
+            [0.46860474023534326, 0.07457347605760015],
+            [0.49999999999999994, 0.07242482542036824],
+            [0.5313952597646567, 0.06995199457724717],
+            [0.5626666167821521, 0.06718497134406762],
+            [0.5936906572928623, 0.06415527630960348],
+            [0.6243449435824274, 0.06089564734276646],
+            [0.6545084971874735, 0.057439773151414734],
+            [0.6840622763423388, 0.053822080991884964],
+            [0.7128896457825363, 0.05007759698729834],
+            [0.7408768370508577, 0.046241860939607284],
+            [0.7679133974894985, 0.04235085471635601],
+            [0.7938926261462365, 0.03844092577413791],
+            [0.8187119948743449, 0.034548715045117764],
+            [0.8422735529643444, 0.030711080105020813],
+            [0.8644843137107057, 0.026964938345645117],
+            [0.8852566213878945, 0.023347045463865804],
+            [0.9045084971874737, 0.01989375332719348],
+            [0.9221639627510074, 0.01664064443713323],
+            [0.9381533400219317, 0.013622142669382607],
+            [0.9524135262330097, 0.010871023468379565],
+            [0.9648882429441257, 0.008417939887829766],
+            [0.9755282581475768, 0.006290875418704206],
+            [0.9842915805643155, 0.004514617267653047],
+            [0.9911436253643444, 0.003110260098165818],
+            [0.9960573506572389, 0.0020946911697038847],
+            [0.9990133642141358, 0.0014803192893914478],
+            [1.0, 0.0012746849074440239]
+        ],
+        "xmac": 29.45444201454003, // X-position of MAC leading edge, ft
+        "cbar": [78.13665685954015, 39.25266023767777, 60.88686645984191], // Mean Aerodynamic Chord, ft
+        "SSPNE": 35.410000000000004, // effective semi-span for DATCOM, ft
+        "a0": 6.6463104235175505, // lift-curve slope per rad
+        "alpha0": -2.11, // zero-lift angle of attack, deg
+        "Cm_ac": -0.06, // pitching moment about aerodynamic center
+        "b": 78.06, // Span (full wingspan), ft
+        "TR": [0.5932291666666667, 0.20175592625109745, 0.09003799771177957], // Taper Ratio
+        "S": [2145.8884999999996, 1711.0, 3856.8884999999996], // Planform Area, ft²
+        "AR": [0.36691729323308275, 1.461133839859731, 1.578805850974586], // Aspect Ratio
+        "gamma": 1.2581347681270816, // effective dihedral, deg
+        "Xtip": 96.50999999999996, // tip X location, ft
+        "Xbrk": 51.04999999999997, // break X location, ft
+        "Zbrk": -1.8034889903259583, // break Z location, ft
+        "Ztip": -1.8034889903259583, // tip Z location, ft
+        "swp": [ // sweep at LE/0.25c/0.5c/TE, deg
+            [70.23750125338238, 61.192109268991004, 64.44362988239124],
+            [64.40353045788032, 53.74944078253522, 57.38654412416235],
+            [54.30026277792313, 42.27711101163494, 45.97009074583764],
+            [-7.63333123551244e-14, 1.2722218725854067e-14, -1.2802311963264201]
+        ],
+        "ymac": 14.084636253680383, // Y-position of MAC, ft
+        "CD0": 0.007977813115664699, // parasite drag coefficient
+        "a": 0.03510084611889663, // lift-curve slope (effective)
+        "alpha0L": -2.11, // zero-lift angle adjusted for twist, deg
+        "Cm": -0.010357606965157423, // pitching moment coefficient
+        "x_ac": 0.3705591987582635, // aerodynamic center location (fraction MAC)
+        "CL0": 0.07406278531087188, // lift coefficient at zero alpha
+        "e": 0.9900990099009901, // Oswald efficiency factor
+        "K": 0.08037324626140716, // induced drag factor (1/(π·e·AR))
+        "CM0": -0.01933054037752949 // pitching moment at zero alpha
+    },
+    "HT": { // horizontal tail planform and aerodynamics
+        "CHRDR": 13.47, // Root Chord, ft (DATCOM CHRDR)
+        "CHRDBP": 13.47, // Break Chord, ft (DATCOM CHRDBP)
+        "CHRDTP": 5, // Tip Chord, ft (DATCOM CHRDTP)
+        "SSPN": 1, // Semi-Span, ft (DATCOM SSPN)
+        "SSPNOP": 0, // Break Span, ft (DATCOM SSPNOP; stored from root)
+        "SAVSI": 0, // Inboard Sweep, deg (DATCOM SAVSI)
+        "SAVSO": 0, // Outboard Sweep, deg (DATCOM SAVSO)
+        "CHSTAT": 1, // Sweep Reference, LE–TE fraction (0=LE, 1=TE)
+        "DHDADI": 0, // Inboard Dihedral, deg (DATCOM DHDADI)
+        "DHDADO": 0, // Outboard Dihedral, deg (DATCOM DHDADO)
+        "TC": 0.12, // Thickness, chord fraction (DATCOM TC)
+        "TWISTA": 0, // Washout, deg (DATCOM TWISTA)
+        "i": 0, // Incidence, deg (DATCOM ALIW/ALIH via SYNTHS)
+        "X": 0, // Position, X, ft
+        "Y": 0, // Position, Y, ft
+        "Z": 0, // Position, Z, ft
+        "NACA": "0012", // airfoil id (NACA string cell)
+        "DATA": [ // airfoil xy (cell of N×2 from NACA_Panel_Maker)
+            [1.0, -0.0012599999999999777],
+            [0.9960573506572389, -0.0018118371277783879],
+            [0.9842915805643155, -0.003442840965494731],
+            [0.9648882429441257, -0.006081980160695289],
+            [0.9381533400219317, -0.0096189916581292],
+            [0.9045084971874737, -0.013914314661670292],
+            [0.8644843137107057, -0.018809431958906164],
+            [0.8187119948743449, -0.024135245914900114],
+            [0.7679133974894985, -0.02971672950196278],
+            [0.7128896457825363, -0.03537351771108092],
+            [0.6545084971874735, -0.040917399202218895],
+            [0.5936906572928623, -0.04614868573022908],
+            [0.5313952597646567, -0.050854327788883276],
+            [0.46860474023534326, -0.05481018195124673],
+            [0.40630934270713764, -0.057789055905447535],
+            [0.3454915028125263, -0.05957470913877112],
+            [0.28711035421746367, -0.059980011135468886],
+            [0.23208660251050173, -0.05886641296676168],
+            [0.18128800512565513, -0.05616022249250573],
+            [0.13551568628929422, -0.051862517324683756],
+            [0.09549150281252627, -0.046048919169128205],
+            [0.06184665997806821, -0.03885853491147251],
+            [0.03511175705587427, -0.030472823339797124],
+            [0.015708419435684462, -0.021087779973285405],
+            [0.003942649342761062, -0.0108831076893902],
+            [0.0, -0.0],
+            [0.003942649342761062, 0.0108831076893902],
+            [0.015708419435684462, 0.021087779973285405],
+            [0.03511175705587427, 0.030472823339797124],
+            [0.06184665997806821, 0.03885853491147251],
+            [0.09549150281252627, 0.046048919169128205],
+            [0.13551568628929422, 0.051862517324683756],
+            [0.18128800512565513, 0.05616022249250573],
+            [0.23208660251050173, 0.05886641296676168],
+            [0.28711035421746367, 0.059980011135468886],
+            [0.3454915028125263, 0.05957470913877112],
+            [0.40630934270713764, 0.057789055905447535],
+            [0.46860474023534326, 0.05481018195124673],
+            [0.5313952597646567, 0.050854327788883276],
+            [0.5936906572928623, 0.04614868573022908],
+            [0.6545084971874735, 0.040917399202218895],
+            [0.7128896457825363, 0.03537351771108092],
+            [0.7679133974894985, 0.02971672950196278],
+            [0.8187119948743449, 0.024135245914900114],
+            [0.8644843137107057, 0.018809431958906164],
+            [0.9045084971874737, 0.013914314661670292],
+            [0.9381533400219317, 0.0096189916581292],
+            [0.9648882429441257, 0.006081980160695289],
+            [0.9842915805643155, 0.003442840965494731],
+            [0.9960573506572389, 0.0018118371277783879],
+            [1.0, 0.0012599999999999777]
+        ],
+        "SSPNE": -8.34, // effective semi-span for DATCOM, ft
+        "a0": 6.703606203030633, // lift-curve slope per rad
+        "alpha0": 0, // zero-lift angle of attack, deg
+        "Cm_ac": -0.0055, // pitching moment about aerodynamic center
+        "b": 2, // Span (full wingspan), ft
+        "cbar": 9.235, // Mean Aerodynamic Chord, ft
+        "TR": 0.3711952487008166, // Taper Ratio
+        "S": 18.47, // Planform Area, ft²
+        "AR": 0.2165674066053059, // Aspect Ratio
+        "gamma": 0, // effective dihedral, deg
+        "Xtip": 8.469999999999997, // tip X location, ft
+        "Xbrk": 0, // break X location, ft
+        "Zbrk": 0, // break Z location, ft
+        "Ztip": 0, // tip Z location, ft
+        "swp": [83.26661536994546, 81.05400696366995, 76.71424360798567, -3.053332494204976e-13], // sweep at LE/0.25c/0.5c/TE, deg
+        "ymac": 0.42356975275221076, // Y-position of MAC, ft
+        "xmac": 3.587635805811224, // X-position of MAC leading edge, ft
+        "CD0": 5.1264951581986076e-05, // parasite drag coefficient
+        "a": 0.005673110539390426, // lift-curve slope (effective)
+        "alpha0L": 0, // zero-lift angle adjusted for twist, deg
+        "Cm": -5.459514999759815e-05, // pitching moment coefficient
+        "x_ac": 0.22250413114590514, // aerodynamic center location (fraction MAC)
+        "dwash": 0.5, // downwash gradient
+        "eta": 0.9, // tail efficiency factor
+        "l": -50.99753854305634, // tail arm length, ft
+        "V": -0.0040110253127246046, // tail volume coefficient
+        "CL0": -2.5795623312310643e-05, // lift coefficient at zero alpha
+        "CM0": -2.1605862981623056e-05 // pitching moment at zero alpha
+    },
+    "VT": { // vertical tail planform and aerodynamics
+        "CHRDR": 26.6, // Root Chord, ft (DATCOM CHRDR)
+        "CHRDBP": 13.47, // Break Chord, ft (DATCOM CHRDBP)
+        "CHRDTP": 9.04, // Tip Chord, ft (DATCOM CHRDTP)
+        "SSPN": 34.64, // Semi-Span, ft (DATCOM SSPN)
+        "SSPNOP": 0, // Break Span, ft (DATCOM SSPNOP; stored from root)
+        "SAVSI": 45, // Inboard Sweep, deg (DATCOM SAVSI)
+        "SAVSO": 0, // Outboard Sweep, deg (DATCOM SAVSO)
+        "CHSTAT": 0, // Sweep Reference, LE–TE fraction (0=LE, 1=TE)
+        "DHDADI": 0, // Inboard Dihedral, deg (DATCOM DHDADI)
+        "DHDADO": 0, // Outboard Dihedral, deg (DATCOM DHDADO)
+        "TC": 0.12, // Thickness, chord fraction (DATCOM TC)
+        "TWISTA": 0, // Washout, deg (DATCOM TWISTA)
+        "i": 0, // Incidence, deg (DATCOM ALIW/ALIH via SYNTHS)
+        "X": 83.73, // Position, X, ft
+        "Y": 0, // Position, Y, ft
+        "Z": 5.17, // Position, Z, ft
+        "NACA": "0012", // airfoil id (NACA string cell)
+        "DATA": [ // airfoil xy (cell of N×2 from NACA_Panel_Maker)
+            [1.0, -0.0012599999999999777],
+            [0.9960573506572389, -0.0018118371277783879],
+            [0.9842915805643155, -0.003442840965494731],
+            [0.9648882429441257, -0.006081980160695289],
+            [0.9381533400219317, -0.0096189916581292],
+            [0.9045084971874737, -0.013914314661670292],
+            [0.8644843137107057, -0.018809431958906164],
+            [0.8187119948743449, -0.024135245914900114],
+            [0.7679133974894985, -0.02971672950196278],
+            [0.7128896457825363, -0.03537351771108092],
+            [0.6545084971874735, -0.040917399202218895],
+            [0.5936906572928623, -0.04614868573022908],
+            [0.5313952597646567, -0.050854327788883276],
+            [0.46860474023534326, -0.05481018195124673],
+            [0.40630934270713764, -0.057789055905447535],
+            [0.3454915028125263, -0.05957470913877112],
+            [0.28711035421746367, -0.059980011135468886],
+            [0.23208660251050173, -0.05886641296676168],
+            [0.18128800512565513, -0.05616022249250573],
+            [0.13551568628929422, -0.051862517324683756],
+            [0.09549150281252627, -0.046048919169128205],
+            [0.06184665997806821, -0.03885853491147251],
+            [0.03511175705587427, -0.030472823339797124],
+            [0.015708419435684462, -0.021087779973285405],
+            [0.003942649342761062, -0.0108831076893902],
+            [0.0, -0.0],
+            [0.003942649342761062, 0.0108831076893902],
+            [0.015708419435684462, 0.021087779973285405],
+            [0.03511175705587427, 0.030472823339797124],
+            [0.06184665997806821, 0.03885853491147251],
+            [0.09549150281252627, 0.046048919169128205],
+            [0.13551568628929422, 0.051862517324683756],
+            [0.18128800512565513, 0.05616022249250573],
+            [0.23208660251050173, 0.05886641296676168],
+            [0.28711035421746367, 0.059980011135468886],
+            [0.3454915028125263, 0.05957470913877112],
+            [0.40630934270713764, 0.057789055905447535],
+            [0.46860474023534326, 0.05481018195124673],
+            [0.5313952597646567, 0.050854327788883276],
+            [0.5936906572928623, 0.04614868573022908],
+            [0.6545084971874735, 0.040917399202218895],
+            [0.7128896457825363, 0.03537351771108092],
+            [0.7679133974894985, 0.02971672950196278],
+            [0.8187119948743449, 0.024135245914900114],
+            [0.8644843137107057, 0.018809431958906164],
+            [0.9045084971874737, 0.013914314661670292],
+            [0.9381533400219317, 0.0096189916581292],
+            [0.9648882429441257, 0.006081980160695289],
+            [0.9842915805643155, 0.003442840965494731],
+            [0.9960573506572389, 0.0018118371277783879],
+            [1.0, 0.0012599999999999777]
+        ],
+        "SSPNE": 25.3, // effective semi-span for DATCOM, ft
+        "b": 34.64, // Span (full wingspan), ft
+        "cbar": 17.82, // Mean Aerodynamic Chord, ft
+        "TR": 0.33984962406015035, // Taper Ratio
+        "S": 617.2848, // Planform Area, ft²
+        "AR": 3.8877665544332207, // Aspect Ratio
+        "gamma": 0, // effective dihedral, deg
+        "Xtip": 118.37, // tip X location, ft
+        "Xbrk": 83.73, // break X location, ft
+        "Zbrk": 0, // break Z location, ft
+        "Ztip": 0, // tip Z location, ft
+        "swp": [45.0, 41.129668972184575, 36.7426563718813, 26.24659713623451], // sweep at LE/0.25c/0.5c/TE, deg
+        "ymac": 28.950901608679388, // Y-position of MAC, ft
+        "xmac": 28.950901608679388, // X-position of MAC leading edge, ft
+        "CD0": 0.0015404926417698034, // parasite drag coefficient
+        "l": 59.40194646475076, // tail arm length, ft
+        "V": 0.12403547264233969, // tail volume coefficient
+        "AReff": -35.91633143190496, // effective aspect ratio
+        "hp": 31.04090160867939, // horizontal tail height parameter
+        "lp": 60.49590160867939, // horizontal tail length parameter
+        "h": 33.0862575750963, // vertical tail height parameter
+        "k": 0.75, // vertical tail volume parameter
+        "a": 0.06467533803977496, // lift-curve slope (effective)
+        "swash": 0.9480883914014296 // spanwise downwash distribution
+    },
+    "F": { // flap control surface
+        "FTYPE": 1, // flap type (DATCOM $SYMFLP)
+        "PHETE": 0.003, // trailing-edge angle, rad
+        "PHETEP": 0.002, // trailing-edge angle (prime), rad
+        "TC": 0.22, // thickness ratio
+        "CB": 0.3, // balance chord fraction
+        "SPANFI": 8.982, // Inboard Span, ft
+        "SPANFO": 26.945, // Outboard Span, ft
+        "CHRDFI": 8.982, // Inboard Chord, ft
+        "CHRDFO": 8.982, // Outboard Chord, ft
+        "DELTA": 0, // Deflection, deg
+        "S": 161.34366599999998, // control surface area, ft²
+        "tau": 0.12021913797508521, // control effectiveness factor
+        "x_ac": 51.90486645984191, // flap aerodynamic center location, ft
+        "l": 51.655460325672145 // flap moment arm, ft
+    },
+    "A": { // aileron control surface
+        "STYPE": 1, // aileron type (DATCOM $ASYFLP)
+        "SPANFI": 26.945, // Inboard Span, ft
+        "SPANFO": 39.03, // Outboard Span, ft
+        "CHRDFI": 4.491, // Inboard Chord, ft
+        "CHRDFO": 4.491, // Outboard Chord, ft
+        "DELTAL": 0, // left aileron deflection, deg
+        "DELTAR": 0, // right aileron deflection, deg
+        "Kb": [0.18405613944889332, 0.15997971881514528, 0.15310883324200042] // aileron effectiveness factor
+    },
+    "E": { // elevator control surface
+        "FTYPE": 1, // flap type (DATCOM $SYMFLP)
+        "PHETE": 0.003, // trailing-edge angle, rad
+        "PHETEP": 0.002, // trailing-edge angle (prime), rad
+        "TC": 0.22, // thickness ratio
+        "CB": 0.3, // balance chord fraction
+        "SPANFI": 8.982, // Inboard Span, ft
+        "SPANFO": 1, // Outboard Span, ft
+        "CHRDFI": 4.491, // Inboard Chord, ft
+        "CHRDFO": 4.491, // Outboard Chord, ft
+        "DELTA": 0, // Deflection, deg
+        "S": -35.847162, // control surface area, ft²
+        "tau": -101.13571875489252 // control effectiveness factor
+    },
+    "R": { // rudder control surface
+        "SPANFI": 1, // Inboard Span, ft
+        "SPANFO": 26.945, // Outboard Span, ft
+        "CHRDFI": 4.4908, // Inboard Chord, ft
+        "CHRDFO": 4.4908, // Outboard Chord, ft
+        "DELTA": 0, // Deflection, deg
+        "S": 116.513806, // control surface area, ft²
+        "tau": -0.21244534937897694 // control effectiveness factor
+    },
+    "BD": { // fuselage body geometry and derivatives
+        "NX": 11, // number of body stations
+        "X": [0.0, 1.1, 2.92, 12.85, 16.08, 19.31, 23.15, 55.13, 76.07, 97.0, 107.78], // longitudinal station position, ft
+        "ZU": [0.0, 2.029861648829538, 3.78, 7.87, 10.07, 11.98, 12.59, 13.34, 13.34, 13.34, 13.34], // upper body coordinate, ft
+        "ZL": [-0.63, -2.6009076825688116, -3.46, -4.8, -5.35, -5.34, -5.34, -5.34, -5.34, -5.34, -5.34], // lower body coordinate, ft
+        "R": [0.32, 2.5975601134177775, 3.62, 6.33, 7.71, 8.66, 8.96, 9.34, 9.34, 9.34, 9.34], // body half-width, ft
+        "S": [0.0, 12.94442457564735, 44.888332471552395, 194.58051002612567, 318.57288887800763, 450.88263428026863, 497.9678824944762, 559.0640056251638, 559.0640056251638, 559.0640056251638, 559.0640056251638], // cross-section area, ft²
+        "N": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], // station index array
+        "P": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], // station shape parameter
+        "CD0": 0.004459855639319164, // body parasite drag coefficient
+        "CMa": 0.002000148613472862, // body pitching-moment slope
+        "dk": 0.8600485625485628, // body drag increment
+        "CM0": 0, // body pitching moment at zero alpha
+        "CNB": -0.0025264132996871093, // body yawing-moment due to sideslip
+        "ITYPE": 1 // body type code
+    },
+    "NP": [ // extra planform cell array (wing 2, HT 2, VT 2, propeller)
+        null,
+        null,
+        null,
+        []
+    ],
+    "NB": [ // extra body cell array (body 2, body 3)
+        {
+            "NX": 7, // number of body stations
+            "ITYPE": 1, // body type code
+            "X0": -50, // body origin, X, ft
+            "Y0": 0, // body origin, Y, ft
+            "Z0": -24, // body origin, Z, ft
+            "X": [0.0, 3.59, 18.2, 34.84, 49.31, 95.29, 160.0], // longitudinal station position, ft
+            "ZU": [0.44, 4.67, 12.14, 16.92, 18.17, 18.52, 18.52], // upper body coordinate, ft
+            "ZL": [-0.44, -5.39, -12.14, -16.92, -18.17, -18.52, -18.52], // lower body coordinate, ft
+            "R": [0.44, 5.03, 12.14, 16.92, 18.17, 18.52, 18.52], // body half-width, ft
+            "P": [1, 1, 1, 1, 1, 1, 1], // station shape parameter
+            "S": [0.61, 68.56, 463.01, 899.4, 1037.19, 1077.54, 1077.54], // cross-section area, ft²
+            "N": [1, 2, 3, 4, 5, 6, 7], // station index array
+            "CD0": 0.016143557555333164 // body parasite drag coefficient
+        },
+        {
+            "NX": 7, // number of body stations
+            "ITYPE": 1, // body type code
+            "X0": 23, // body origin, X, ft
+            "Y0": 25, // body origin, Y, ft
+            "Z0": -22, // body origin, Z, ft
+            "X": [0.0, 3.41, 7.09, 25.31, 66.64, 83.3, 100.0], // longitudinal station position, ft
+            "ZU": [0.29, 5.21, 6.72, 7.01, 7.3, 7.3, 7.59], // upper body coordinate, ft
+            "ZL": [-0.29, -5.21, -6.72, -7.01, -7.3, -7.3, -7.59], // lower body coordinate, ft
+            "R": [0.29, 5.21, 6.72, 7.01, 7.3, 7.3, 7.59], // body half-width, ft
+            "P": [1, 1, 1, 1, 1, 1, 1], // station shape parameter
+            "S": [], // cross-section area, ft²
+            "N": [1, 2, 3, 4, 5, 6, 7], // station index array
+            "CD0": 0.006296822144102063 // body parasite drag coefficient
+        }
+    ],
+    "AERO": { // flight conditions and reference data
+        "ALSCHD": [-4, 0, 4, 8, 12, 16], // Angle(s) of Attack, deg
+        "ALT": 0, // Altitude, ft
+        "MACH": 0.09, // Mach Number
+        "WT": 250, // Weight, lb
+        "XCG": 56.64, // CG Location, X, ft
+        "ZCG": 3.08, // CG Location, Z, ft
+        "XI": 100, // Inertia, X, slug·ft²
+        "YI": 100, // Inertia, Y, slug·ft²
+        "XW": 12, // wing apex X offset for DATCOM SYNTHS, ft
+        "YW": 0, // wing apex Y offset for DATCOM SYNTHS, ft
+        "ZW": -2.66, // wing apex Z offset for DATCOM SYNTHS, ft
+        "ALIW": 0, // wing incidence for DATCOM SYNTHS, deg
+        "XH": 0, // horizontal-tail apex X offset, ft
+        "YH": 0, // horizontal-tail apex Y offset, ft
+        "ZH": 0, // horizontal-tail apex Z offset, ft
+        "ALIH": 0, // horizontal-tail incidence, deg
+        "XV": 83.73, // vertical-tail apex X offset, ft
+        "YV": 0, // vertical-tail apex Y offset, ft
+        "ZV": 5.17, // vertical-tail apex Z offset, ft
+        "NALPHA": 6, // number of angle-of-attack points (DATCOM)
+        "NALT": 1, // number of altitude points (DATCOM)
+        "NMACH": 1, // number of Mach points (DATCOM)
+        "LOOP": 2, // DATCOM loop flag
+        "SREF": 3856.89, // reference area, ft² (DATCOM OPTINS)
+        "CBARR": 60.89, // reference mean chord, ft (DATCOM OPTINS)
+        "BLREF": 78.06 // reference span, ft (DATCOM OPTINS)
+    },
+    "plot_cmp": [1, 1, 1, 1], // component visibility [wing, HT, VT, body]
+    "unit": "ft" // length unit (ft or in)
+}

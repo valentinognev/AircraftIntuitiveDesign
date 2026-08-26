@@ -110,6 +110,6 @@ def load_mat(path: Path) -> Aircraft:
         NB=_convert_mat(raw["NB"]),
         AERO=_convert_mat(raw["AERO"]),
         plot_cmp=_convert_mat(raw["plot_cmp"]),
-        unit=_convert_mat(raw["unit"]),
+        unit=_convert_mat(raw["unit"]) if "unit" in raw else "ft",
         cg_data=cg_data,
     )

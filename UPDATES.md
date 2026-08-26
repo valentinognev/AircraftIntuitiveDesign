@@ -1,5 +1,13 @@
 # Updates
 
+## 0.3.6 - mat_to_jsonc all 23 models
+- `Python/scripts/mat_to_jsonc.py`: batch `.mat` → `Python/models/*.jsonc` via `load_mat`/`save_jsonc`
+- `Python/models/*.jsonc`: 23 aircraft JSONC source models (incl. `Cessna 172.jsonc`)
+- `Python/tests/test_mat_to_jsonc_all.py`: asserts 23 `.mat` ↔ 23 `.jsonc`
+- `Python/src/aid/jsonc.py`: serialize NaN/Inf as JSON `null` for valid comment-stripped parse
+- `Python/src/aid/aircraft.py`: default missing `unit` to `"ft"` (matches `run_aid_batch.m`)
+- `Python/src/aid/field_docs.py`: TYPE, e0, CL, XCG/ZCG/WT, spanwise.*, BD X0/Y0/Z0/d_eq
+
 ## 0.3.5 - dumps_jsonc comments on every key
 - `Python/src/aid/jsonc.py`: `dumps_jsonc(data, docs)` — pretty-print with `//` on every dict key via dotted DOCS lookup (NP→WG, NB→BD fallbacks)
 - `Python/src/aid/aircraft.py`: `save_jsonc(ac, path)`, `load_jsonc(path)` — write/read JSONC round-trip via `asdict` + `field_docs.DOCS`

@@ -49,9 +49,7 @@ def _slope2(foil) -> tuple[np.ndarray, np.ndarray]:
         data = np.asarray(foil, dtype=float)
         nx = int(math.ceil(data.shape[0] / 2))
         if data.shape[0] % 2:
-            pad = data[nx : nx + 1, :]
-            data = np.vstack([data[: nx + 1], pad, data[nx + 1 :]])
-            nx = int(math.ceil(data.shape[0] / 2))
+            data = np.insert(data, nx, data[nx - 1], axis=0)
         x = np.flip(data[:nx, 0])
         zu = data[-nx:, 1]
         zl = np.flip(data[:nx, 1])
@@ -670,8 +668,8 @@ def _setrudder3(rudder: int, deflection: float, lattice: dict, geo: dict) -> dic
     colloc = lattice["COLLOC"]
     n_arr = lattice["N"]
 
-    a1 = xyz[t_start + nx - 1, 0]
-    b1 = xyz[t_start + nx - 1, 1]
+    a1 = xyz[t_start + nx - 1, 0].copy()
+    b1 = xyz[t_start + nx - 1, 1].copy()
     a2 = np.array([xyz[t_start + nx - 1, 1, 0], -xyz[t_start + nx - 1, 1, 1], xyz[t_start + nx - 1, 1, 2]])
     b2 = np.array([xyz[t_start + nx - 1, 0, 0], -xyz[t_start + nx - 1, 0, 1], xyz[t_start + nx - 1, 0, 2]])
 
@@ -700,7 +698,8 @@ def _setrudder3(rudder: int, deflection: float, lattice: dict, geo: dict) -> dic
                 p2 = _trot3(h_hat, r_vec, def_val)
                 vortex[rad2 - 1, col] = p2 + b
 
-    for i in range(s_span, s_span * ny * (1 + int(geo["symetric"][wing])), s_span):
+    sym_factor = 1 + int(geo["symetric"][wing])
+    for i in range(s_span, s_span * ny * sym_factor + 1, s_span):
         for j in range(fnx):
             ii = i - fnx
             rad1 = t_start + ii + j - 1

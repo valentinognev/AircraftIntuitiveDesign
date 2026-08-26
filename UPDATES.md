@@ -1,5 +1,9 @@
 # Updates
 
+## 0.3.22 - tornado lattice_setup review fixes
+- `Python/src/aid/tornado/lattice.py`: `_slope2` TYPE 3 odd pad `np.insert(data, nx, data[nx-1])` (MATLAB row NX duplicate); `_setrudder3` inclusive spanwise strip loop; hinge `a1`/`b1` `.copy()`
+- `Python/tests/test_tornado_lattice.py`: `test_slope2_odd_pad_cessna_zu` for 101-point Cessna foil
+
 ## 0.3.21 - tornado lattice_setup
 - `Python/src/aid/tornado/lattice.py`: `lattice_setup(geo, state, mode)` — port `fLattice_setup2.m` (`geosetup15`, `wakesetup2`, `setrudder3`, `geometry19` + inlines); `COLLOC`/`VORTEX`/`N`/`XYZ`, `ref` lengths; test aliases `npan`/`X`/`Y`
 - `Python/tests/test_tornado_lattice.py`: Cessna mesh `("10","5")` asserts nonzero panels

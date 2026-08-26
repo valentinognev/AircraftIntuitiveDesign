@@ -1,5 +1,9 @@
 # Updates
 
+## 0.3.28 - avl_parse parse_st
+- `Python/src/aid/avl_parse.py`: `parse_st(path)` — port `parseST.m`; case-insensitive stability-axis header; bounded `find_value` scan for CLa…Cnr, `Xnp`→`NP`; `surface=[]`
+- `Python/tests/test_avl_parse_st_gold.py`: Cessna `geometry.st` asserts `CLa`/`Cma` vs MATLAB `avl.json` gold (atol 1e-6)
+
 ## 0.3.27 - avl_parse find_value
 - `Python/src/aid/avl_parse.py`: `find_value(lines, name, area="")` — port `findValue.m`; substring scan, first parseable float after keyword; 0-based line index; optional `(start, end)` area tuple
 - `Python/tests/test_avl_find_value.py`: SAMPLE `"CLa"` → `4.5123`, `ln == 1`

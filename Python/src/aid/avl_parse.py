@@ -1,5 +1,7 @@
 """Parse AVL text output (stability derivatives, run cases, etc.)."""
 
+from pathlib import Path
+
 
 def find_value(
     lines: list[str],
@@ -49,3 +51,57 @@ def find_value(
                 continue
 
     return 0.0, 0
+
+
+def _find_in_area(lines: list[str], name: str, area: tuple[int, int]) -> float:
+    value, _ = find_value(lines, name, area)
+    return value
+
+
+def parse_st(path: Path) -> dict:
+    """Parse AVL stability-derivative section from a ``.st`` output file.
+
+    Port of ``parseST.m``. Locates ``Stability-axis derivatives...`` (case
+    insensitive), then extracts stability derivatives and neutral point via
+    ``find_value``. Control-surface deflection derivatives are not parsed here
+    (``surface`` is always ``[]`` until ``parseRunCaseHeader`` is ported).
+    """
+    lines = path.read_text().splitlines()
+    area_end = len(lines) - 1
+
+    for i, line in enumerate(lines):
+        if "stability-axis derivatives" not in line.lower():
+            continue
+
+        area = (i, area_end)
+        return {
+            "CLa": _find_in_area(lines, "CLa =", area),
+            "CYa": _find_in_area(lines, "CYa =", area),
+            "Cla": _find_in_area(lines, "Cla =", area),
+            "Cma": _find_in_area(lines, "Cma =", area),
+            "Cna": _find_in_area(lines, "Cna =", area),
+            "CLb": _find_in_area(lines, "CLb =", area),
+            "CYb": _find_in_area(lines, "CYb =", area),
+            "Clb": _find_in_area(lines, "Clb =", area),
+            "Cmb": _find_in_area(lines, "Cmb =", area),
+            "Cnb": _find_in_area(lines, "Cnb =", area),
+            "CLp": _find_in_area(lines, "CLp =", area),
+            "CYp": _find_in_area(lines, "CYp =", area),
+            "Clp": _find_in_area(lines, "Clp =", area),
+            "Cmp": _find_in_area(lines, "Cmp =", area),
+            "Cnp": _find_in_area(lines, "Cnp =", area),
+            "CLq": _find_in_area(lines, "CLq =", area),
+            "CYq": _find_in_area(lines, "CYq =", area),
+            "Clq": _find_in_area(lines, "Clq =", area),
+            "Cmq": _find_in_area(lines, "Cmq =", area),
+            "Cnq": _find_in_area(lines, "Cnq =", area),
+            "CLr": _find_in_area(lines, "CLr =", area),
+            "CYr": _find_in_area(lines, "CYr =", area),
+            "Clr": _find_in_area(lines, "Clr =", area),
+            "Cmr": _find_in_area(lines, "Cmr =", area),
+            "Cnr": _find_in_area(lines, "Cnr =", area),
+            "NP": _find_in_area(lines, "Xnp =", area),
+            "surface": [],
+        }
+
+    return {"surface": []}

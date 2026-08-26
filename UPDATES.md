@@ -1,5 +1,9 @@
 # Updates
 
+## 0.3.18 - datcom_run subprocess runner
+- `Python/src/aid/datcom_run.py`: `run_datcom(ac, workdir)` — `write_for005`, `datcom_wrapper` subprocess (`check=True`, `timeout=120`), `parse_for006`
+- `Python/tests/test_datcom_run_cessna.py`: Cessna 172 end-to-end CL vs MATLAB `datcom.json` gold (atol 1e-6)
+
 ## 0.3.17 - datcom_parse for006 stability tables
 - `Python/src/aid/datcom_parse.py`: `parse_for006(text)` — static-stability table (`ALPHA`/`CD`/`CL`/`CM`/derivatives), flight `mach`/`alt`; ND sentinel `99999` for blank `CYB`/`CNB`
 - `Python/tests/test_datcom_parse_gold.py`: Cessna 172 `datcom.out` vs MATLAB `datcom.json` gold for `alpha` and `cl`

@@ -1,5 +1,9 @@
 # Updates
 
+## 0.3.12 - datcom_io write OPTINS and SYNTHS
+- `Python/src/aid/datcom_io.py`: `write_optins(ac, lines)` — `$OPTINS` from `WG.S/cbar/b` (last element for list S/cbar); `write_synths(ac, lines)` — DATCOM-safe `$SYNTHS` (no YW/YH, keeps YV) from `AERO`, `WG`, `HT`, `VT`
+- `Python/tests/test_datcom_synths.py`: Cessna 172 asserts `$OPTINS` SREF=24 and `$SYNTHS` XCG=2.94
+
 ## 0.3.11 - datcom_io write FLTCON namelist
 - `Python/src/aid/datcom_io.py`: `write_fltcon(ac, lines)` — `$FLTCON` block from `DATCOM_IO.m` (NALPHA/ALSCHD wrap at 10, NALT/ALT, NMACH/MACH, WT, LOOP=2.0)
 - `Python/tests/test_datcom_fltcon.py`: Cessna 172 asserts `$FLTCON`, MACH, ALSCHD endpoints

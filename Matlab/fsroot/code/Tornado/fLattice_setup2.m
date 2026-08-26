@@ -139,7 +139,7 @@ CHORDS=[];
 loopsperwing=geo.nelem;
 noofloops=loopsperwing;
 temp=0;
-noofwings=size(loopsperwing');
+noofwings=numel(loopsperwing);
 
 for s=1:noofwings			%Intermediate variable setuploop
 	CHORDS(s,1)=geo.c(s);   %calculating chords of first element
@@ -868,7 +868,7 @@ function [normal]=normals4(colloc,vortex,C_Slope)
 %					MATLAB 5.2 std fcns							
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 N=[];
-step=size(colloc);
+step=size(colloc,1);
 [d e f]=size(vortex);
 a=e/2;
 b=a+1;

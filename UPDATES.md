@@ -1,5 +1,11 @@
 # Updates
 
+## 0.1.20 - MATLAB gold Tornado dump for Cessna 172
+- `Matlab/fsroot/code/run_aid_batch.m`: `run_tornado_gold` — mesh `{'10','5'}`, `Tornado_IO`/`fLattice_setup2(geo,state,0)`/`solver`/`coeff_create3`, merges `status.json` (preserves `datcom: ok`)
+- `Matlab/fsroot/code/Tornado/fLattice_setup2.m`, `coeff_create3.m`: R2025b `size()` loop-index fixes (`numel` / `size(...,1)`)
+- `Python/tests/test_matlab_gold_cessna_tornado.py`: asserts `tornado: ok` and `CL`/`CD`/`Cm` in `tornado.json`
+- Gold run: `run_aid_batch('Cessna 172','tornado')` → `Results/matlab/Cessna 172/tornado.json` (gitignored)
+
 ## 0.1.19 - DATCOM_IO batch DATCOM-safe SYNTHS
 - `Matlab/fsroot/code/DATCOM_IO.m`: `$SYNTHS` branch matches `'batch'` as well as `'DATCOM'` (no YW/YH)
 - `Matlab/fsroot/code/run_aid_batch.m`: `run_datcom_gold` calls `DATCOM_IO(...,'batch',...)` per plan

@@ -336,7 +336,7 @@ for i=1:lemma(1)
 	end
 end
 
-lemma3=size(p);							%Total number of ystations for all wings;
+lemma3=size(p,1);							%Total number of ystations for all wings;
 
 for i=1:lemma3								
       SF(i)=sum(FPM(1:p(i)));		    %Moving beginning of FPM into SF

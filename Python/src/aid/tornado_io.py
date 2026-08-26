@@ -18,6 +18,11 @@ def _first(val) -> float:
     return float(np.asarray(val).reshape(-1)[0])
 
 
+def _matlab_round(x: float) -> int:
+    """Half-up round matching MATLAB for positive values."""
+    return int(math.floor(x + 0.5))
+
+
 def _has_deflection(obj: dict, key: str) -> bool:
     val = obj.get(key, 0)
     if isinstance(val, (list, tuple)):
@@ -242,7 +247,7 @@ def write_geometry(
     geo["TW"].append(tw)
 
     data = pt["DATA"]
-    foil_wing: list[list] = [[None] * n for _ in range(2)]
+    foil_wing: list[list] = [[None, None] for _ in range(n)]
     if _is_varying_airfoil(data):
         data1 = np.asarray(data[0], dtype=float)
         data2 = np.asarray(data[1], dtype=float)
@@ -259,18 +264,19 @@ def write_geometry(
             data2 = np.insert(data2, le, data2[le - 1], axis=0)
         x1, z1 = data1[:, 0], data1[:, 1]
         x2, z2 = data2[:, 0], data2[:, 1]
-        x = x1 + (x2 - x1) * eta[:, np.newaxis] ** m[1]
-        z = z1 + (z2 - z1) * eta[:, np.newaxis] ** m[1]
+        eta_pow = eta[np.newaxis, :] ** m[1]
+        x = x1[:, np.newaxis] + (x2 - x1)[:, np.newaxis] * eta_pow
+        z = z1[:, np.newaxis] + (z2 - z1)[:, np.newaxis] * eta_pow
         foil_wing[0][0] = np.column_stack([x[:, 0], z[:, 0]])
-        foil_wing[1][0] = np.column_stack([x[:, 1], z[:, 1]])
+        foil_wing[0][1] = np.column_stack([x[:, 1], z[:, 1]])
         for i in range(1, n):
-            foil_wing[0][i] = np.column_stack([x[:, i], z[:, i]])
-            foil_wing[1][i] = np.column_stack([x[:, i + 1], z[:, i + 1]])
+            foil_wing[i][0] = np.column_stack([x[:, i], z[:, i]])
+            foil_wing[i][1] = np.column_stack([x[:, i + 1], z[:, i + 1]])
     else:
         foil_coords = np.asarray(data, dtype=float)
         for j in range(n):
-            foil_wing[0][j] = foil_coords
-            foil_wing[1][j] = foil_coords
+            foil_wing[j][0] = foil_coords
+            foil_wing[j][1] = foil_coords
     geo["foil"].append(foil_wing)
 
     fnx_row = np.zeros(n)
@@ -385,7 +391,12 @@ def tornado_io(ac: Aircraft, mesh: tuple[str, str]) -> tuple[dict, dict]:
         if geo is None:
             geo = _init_geo(ac.AERO)
         geo = write_geometry(
-            ac.HT, cs, round(ni / 2), round(nj / 2), (1, 1), geo
+            ac.HT,
+            cs,
+            _matlab_round(ni / 2),
+            _matlab_round(nj / 2),
+            (1, 1),
+            geo,
         )
 
     if _cmp_enabled(cmp, 2):
@@ -395,7 +406,13 @@ def tornado_io(ac: Aircraft, mesh: tuple[str, str]) -> tuple[dict, dict]:
         if geo is None:
             geo = _init_geo(ac.AERO)
         geo = write_geometry(
-            ac.VT, cs, round(ni / 2), round(nj / 2), (1, 1), geo, type="v"
+            ac.VT,
+            cs,
+            _matlab_round(ni / 2),
+            _matlab_round(nj / 2),
+            (1, 1),
+            geo,
+            type="v",
         )
 
     np_types = ("h", "h", "v", "v")
@@ -407,8 +424,8 @@ def tornado_io(ac: Aircraft, mesh: tuple[str, str]) -> tuple[dict, dict]:
             geo = write_geometry(
                 np_pt,
                 [],
-                round(ni / 2),
-                round(nj / 2),
+                _matlab_round(ni / 2),
+                _matlab_round(nj / 2),
                 (1, 1),
                 geo,
                 type=np_types[i],

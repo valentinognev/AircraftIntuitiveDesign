@@ -1,5 +1,9 @@
 # Updates
 
+## 0.3.20 - tornado_io MATLAB round and foil layout
+- `Python/src/aid/tornado_io.py`: `_matlab_round` for HT/VT/NP half-mesh (`round(2.5)→3`); varying-airfoil `x`/`z` columns are span stations; `geo.foil` indexed `[wing][partition][0|1]`
+- `Python/tests/test_tornado_io_cessna.py`: HT `nx=3`/`ny=5`, VT chord `nx=3` per partition
+
 ## 0.3.19 - tornado_io geo/state builder
 - `Python/src/aid/tornado_io.py`: `tornado_io(ac, mesh)` — port `Tornado_IO.m` `Write_Geometry` + flight state (`AS`, `rho`, mid-`ALSCHD` alpha); `plot_cmp` component flags; zero-deflection empty CS
 - `Python/tests/test_tornado_io_cessna.py`: Cessna 172 mesh `("10","5")` asserts `geo.c[0,0]==2`, `state.betha==0`, `AS>0`

@@ -10,3 +10,7 @@ def test_tornado_io_cessna_mesh_10_5():
     assert float(geo["c"][0, 0]) == 2.0
     assert state["betha"] == 0.0
     assert state["AS"] > 0
+    assert float(geo["nx"][1, 0]) == 3.0
+    assert float(geo["ny"][1, 0]) == 5.0
+    assert float(geo["nx"][2, 0]) == 3.0
+    assert float(geo["nx"][2, 1]) == 3.0

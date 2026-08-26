@@ -1,5 +1,10 @@
 # Updates
 
+## 0.1.18 - MATLAB gold DATCOM dump for Cessna 172
+- `Matlab/fsroot/code/run_aid_batch.m`: `run_datcom_gold` — load `.mat`, hidden `cmp`/`opt` stubs, `DATCOM_IO`/`./datcom`/`datcomimport`, JSON to `Results/matlab/<model>/`
+- `Python/tests/test_matlab_gold_cessna_datcom.py`: asserts `status.json` `datcom: ok` and coefficient fields in `datcom.json`
+- Gold run: `run_aid_batch('Cessna 172','datcom')` → `Results/matlab/Cessna 172/` (gitignored)
+
 ## 0.1.17 - run_aid_batch JSON strip helpers
 - `Matlab/fsroot/code/run_aid_batch.m`: stub main (`error('not implemented')`); local helpers `onoff`, `write_json`, `strip_datcom`, `strip_tornado`
 - `Python/tests/test_run_aid_batch_helpers.py`: asserts file exists and helper function declarations present

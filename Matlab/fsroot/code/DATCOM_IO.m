@@ -542,7 +542,9 @@ if strcmp(type,'case')
     %Y=VT.Z; VT.Z=VT.Y; VT.Y=Y;
     
     %Check if Just Running Wing
-    if max(abs([F.DELTA,A.DELTAL])) && strcmp(choice,'DATCOM')
+    if strcmp(choice,'batch')
+        owg = 'no thanks, I would not like to run a wing-only case';
+    elseif max(abs([F.DELTA,A.DELTAL])) && strcmp(choice,'DATCOM')
         owg = questdlg('Run wing-only case to evaluate flaps/ailerons?');
     else
         owg = 'no thanks, I would not like to run a wing-only case';
@@ -552,7 +554,9 @@ if strcmp(type,'case')
     cg_data = get(opt(1),'UserData'); cg_check = 0;
     for i=1:length(cg_data), cg_check = cg_check + eval(cg_data{3,i}); end
     if cg_check
-        if strcmp(choice,'DATCOM')
+        if strcmp(choice,'batch')
+            cg_calc=0;
+        elseif strcmp(choice,'DATCOM')
             prompt = ['CG data will not '...
                 'be written to DATCOM input file. Continue anyway?'];
             go = questdlg(prompt,'Run DATCOM');

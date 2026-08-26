@@ -1,5 +1,9 @@
 # Updates
 
+## 0.1.15 - DATCOM_IO batch dialog defaults
+- `Matlab/fsroot/code/DATCOM_IO.m`: `Write_DATCOM` skips `questdlg` when `choice=='batch'`; default `owg`, `cg_calc=0`
+- `Python/tests/test_datcom_io_batch.py`: asserts explicit `strcmp(choice,'batch')` guard in DATCOM_IO.m
+
 ## 0.1.14 - AVL_IO.m Linux binary
 - `Matlab/fsroot/code/AVL_IO.m`: else-branch calls `./avl` (Task 10 binary); removed macOS `DYLD_LIBRARY_PATH` setenv
 - `Python/tests/test_avl_io_patch.py`: asserts `./avl` invocation, no `avl3.35` in file

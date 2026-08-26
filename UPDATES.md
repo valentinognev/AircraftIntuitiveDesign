@@ -1,5 +1,9 @@
 # Updates
 
+## 0.3.7 - atmosphere.py ISA port
+- `Python/src/aid/atmosphere.py`: `atmosphere(h_ft)` — piecewise theta/delta/sigma from `Atmosphere.m`, keys `T,P,D,V,a`
+- `Python/tests/test_atmosphere.py`: sea-level ISA asserts `T≈518.69`, speed of sound, `D>0`
+
 ## 0.3.6 - mat_to_jsonc all 23 models
 - `Python/scripts/mat_to_jsonc.py`: batch `.mat` → `Python/models/*.jsonc` via `load_mat`/`save_jsonc`
 - `Python/models/*.jsonc`: 23 aircraft JSONC source models (incl. `Cessna 172.jsonc`)

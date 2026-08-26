@@ -1,5 +1,9 @@
 # Updates
 
+## 0.3.24 - tornado ISAtmosphere
+- `Python/src/aid/tornado/isa.py`: `isa_atmosphere(alt)` — port `ISAtmosphere.m` SI table interpolation (m); returns `rho`, `a`, `p`, `mu`; SSL/out-of-range fallback
+- `Python/tests/test_tornado_isa.py`: sea-level `rho > 0`
+
 ## 0.3.23 - tornado set_boundary
 - `Python/src/aid/tornado/boundary.py`: `set_boundary(lattice, geo, state)` — port `setboundary5.m` (steady + FD columns α/β/P/Q/R, flap columns via `lattice_setup`); attaches `RHS` shape `(6+n_flaps, npan)` (= MATLAB `bc.T` for solver)
 - `Python/tests/test_tornado_boundary.py`: Cessna mesh `("10","5")` asserts `RHS`/`rhs` key present

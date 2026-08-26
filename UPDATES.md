@@ -1,5 +1,9 @@
 # Updates
 
+## 0.3.30 - avl_io write geometry.avl
+- `Python/src/aid/avl_io.py`: `write_avl_geometry(ac, geo, state, run_dir, ni, nj)` — port `AVL_IO.m` `Write_Input`/`Write_Surface`; `geometry.avl` header (MACH, IYsym/IZsym, Sref/Cref/Bref, XCG/ZCG, CDp); cap `nwing` at 3; cosine mesh when `nelem>=4`; `AFILE` side files (`WG.1`, …); flap/aileron controls
+- `Python/tests/test_avl_write_geometry.py`: Cessna mesh `("10","10")` asserts `geometry.avl` with `SURFACE`/`SECTION`
+
 ## 0.3.29 - avl_parse parseSB and parseRunCaseHeader
 - `Python/src/aid/avl_parse.py`: `parse_run_case_header(path)` — port `parseRunCaseHeader.m`; case-insensitive `Run case:`; alpha/beta/Mach/rates/totals; surfaces after `e =` (`line+2`, letter names, angle after `=`)
 - `Python/src/aid/avl_parse.py`: `parse_sb(path)` — port `parseSB.m`; case-insensitive geometry-axis header; CXu…Cnr; surface CXdN…CndN from header surfaces

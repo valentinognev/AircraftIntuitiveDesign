@@ -1,5 +1,10 @@
 # Updates
 
+## 0.3.29 - avl_parse parseSB and parseRunCaseHeader
+- `Python/src/aid/avl_parse.py`: `parse_run_case_header(path)` — port `parseRunCaseHeader.m`; case-insensitive `Run case:`; alpha/beta/Mach/rates/totals; surfaces after `e =` (`line+2`, letter names, angle after `=`)
+- `Python/src/aid/avl_parse.py`: `parse_sb(path)` — port `parseSB.m`; case-insensitive geometry-axis header; CXu…Cnr; surface CXdN…CndN from header surfaces
+- `Python/tests/test_avl_parse_sb.py`: gold `geometry.sb` smoke test (skips when file absent)
+
 ## 0.3.28 - avl_parse parse_st
 - `Python/src/aid/avl_parse.py`: `parse_st(path)` — port `parseST.m`; case-insensitive stability-axis header; bounded `find_value` scan for CLa…Cnr, `Xnp`→`NP`; `surface=[]`
 - `Python/tests/test_avl_parse_st_gold.py`: Cessna `geometry.st` asserts `CLa`/`Cma` vs MATLAB `avl.json` gold (atol 1e-6)

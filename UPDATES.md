@@ -1,5 +1,10 @@
 # Updates
 
+## 0.1.7 - AVL Makefile Linux X11 path
+- `bin/Makefile.gfortranDP`: `PLTLIB` uses `-L/usr/lib/x86_64-linux-gnu -lX11` instead of macOS `/opt/X11`
+- `plotlib/config.make`: `LINKLIB`/`INCDIR` pointed at Linux X11 lib and headers
+- `Python/tests/test_avl_makefile_linux.py`: asserts no `/opt/X11` in gfortranDP makefile
+
 ## 0.1.6 - MATLAB gold scalar check for Cessna 172.mat
 - `Python/tests/test_cessna_mat_gold.py`: loads `Models/Cessna 172.mat` via MATLAB `-batch`, asserts WG/AERO gold scalars
 

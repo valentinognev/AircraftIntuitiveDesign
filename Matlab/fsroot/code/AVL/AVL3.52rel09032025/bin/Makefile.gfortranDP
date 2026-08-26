@@ -78,7 +78,7 @@ MBITS =
 LFLG =
 
 # graphics system libraries (X11 libs and path)
-PLTLIB = -L/opt/X11/lib -lX11
+PLTLIB = -L/usr/lib/x86_64-linux-gnu -lX11
 
 SECOND = second_g77.f
 

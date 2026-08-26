@@ -1,5 +1,9 @@
 # Updates
 
+## 0.3.23 - tornado set_boundary
+- `Python/src/aid/tornado/boundary.py`: `set_boundary(lattice, geo, state)` — port `setboundary5.m` (steady + FD columns α/β/P/Q/R, flap columns via `lattice_setup`); attaches `RHS` shape `(6+n_flaps, npan)` (= MATLAB `bc.T` for solver)
+- `Python/tests/test_tornado_boundary.py`: Cessna mesh `("10","5")` asserts `RHS`/`rhs` key present
+
 ## 0.3.22 - tornado lattice_setup review fixes
 - `Python/src/aid/tornado/lattice.py`: `_slope2` TYPE 3 odd pad `np.insert(data, nx, data[nx-1])` (MATLAB row NX duplicate); `_setrudder3` inclusive spanwise strip loop; hinge `a1`/`b1` `.copy()`
 - `Python/tests/test_tornado_lattice.py`: `test_slope2_odd_pad_cessna_zu` for 101-point Cessna foil

@@ -1,5 +1,8 @@
 # Updates
 
+## 0.1.12 - AVL batch quit smoke
+- `Python/tests/test_avl_smoke.py`: runs `avl` with stdin `PLOP\ng\n\nQuit\n`; asserts exit 0 within 30s (Task 10 binary; no X11 fix needed)
+
 ## 0.1.11 - AVL 3.52 binary install
 - `Python/tests/test_avl_binary.py`: asserts `AVL/run/avl` exists and is executable
 - Built `AVL3.52rel09032025/bin/avl` via `make -f Makefile.gfortranDP avl`, copied to `AVL/run/avl` (binary gitignored; reproduce locally)

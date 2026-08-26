@@ -22,7 +22,6 @@ Results/
 *.elf
 
 # Named solver binaries (no extension)
-Matlab/fsroot/code/DATCOM/datcom
 Matlab/fsroot/code/DATCOM/datcom.bin
 Matlab/fsroot/code/AVL/run/avl
 Matlab/fsroot/code/AVL/run/avl3.35

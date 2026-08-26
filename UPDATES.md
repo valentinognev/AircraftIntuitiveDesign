@@ -1,5 +1,10 @@
 # Updates
 
+## 0.1.2 - DATCOM stdin wrapper script
+- `Matlab/fsroot/code/DATCOM/datcom`: bash wrapper pipes `for005.dat` to `datcom.bin`, copies `datcom.out` → `for006.dat`
+- `.gitignore`: stop ignoring wrapper; still ignore `datcom.bin`
+- `Python/tests/test_datcom_wrapper.py`: asserts wrapper exists, references inputs/outputs, is executable
+
 ## 0.1.1 - DATCOM binary compile test
 - `Python/tests/test_datcom_binary.py`: asserts `Matlab/fsroot/code/DATCOM/datcom.bin` exists and is executable (build locally from `../datcom/datcom.f` via gfortran)
 

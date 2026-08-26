@@ -1,5 +1,10 @@
 # Updates
 
+## 0.3.26 - tornado coeff_create3
+- `Python/src/aid/tornado/coeff.py`: `coeff_create(results, lattice, state, ref, geo)` — port `coeff_create3.m` + inlines `tarea`, `fSonicCP`; body-to-wind `B2WTransform`; `delta=0.0001` derivatives; `FORCE`/`MOMENTS` shape `(n_deriv, 3)`
+- `Python/tests/test_tornado_cessna_coeff.py`: Cessna mesh `("10","5")` asserts `CL` vs MATLAB `tornado.json` gold (`rtol=1e-4`, `atol=1e-5`)
+- `Python/src/aid/tornado_io.py`: `_cmp_enabled` — indices beyond `plot_cmp` default enabled (MATLAB batch `cmp(5:8)` Value=1); restores NP wing in Tornado geo (`npan=178`, CL parity)
+
 ## 0.3.25 - tornado solver
 - `Python/src/aid/tornado/solver.py`: `solve(state, geo, lattice)` — port `solver.m` + nested `fastdw`/`mega`; `numpy.linalg.solve(w2, RHS.T)`; no waitbar; `pgcorr==1` via `isa_atmosphere`; returns `gamma`, `F`, `FORCE`, `M`, `MOMENTS`, `dwcond`
 - `Python/tests/test_tornado_solver_gamma.py`: Cessna mesh `("10","5")` asserts finite `gamma`

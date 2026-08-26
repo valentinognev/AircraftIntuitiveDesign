@@ -353,8 +353,9 @@ def _build_state(ac: Aircraft, atm: dict) -> dict:
 
 
 def _cmp_enabled(plot_cmp: list, index: int) -> bool:
+    # MATLAB batch/run_aid_batch: cmp(1:4) from plot_cmp; cmp(5:8) default Value=1
     if index >= len(plot_cmp):
-        return False
+        return True
     return bool(plot_cmp[index])
 
 

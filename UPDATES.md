@@ -1,5 +1,9 @@
 # Updates
 
+## 0.3.16 - datcom_io write_for005 orchestrator
+- `Python/src/aid/datcom_io.py`: `write_for005(ac, path, *, unit)` — assembles full for005 (DIM IN when inches, CASEID, FLTCON/OPTINS/SYNTHS/BODY, NACA-W/H/V + WGPLNF/HTPLNF/VTPLNF, controls, PLOT/NEXT CASE); `naca_ht_line`, `naca_vt_line` helpers
+- `Python/tests/test_datcom_writer_cessna.py`: Cessna 172 full-file assert CASEID, $FLTCON, $WGPLNF, NACA-W-4-2412, PLOT/NEXT CASE
+
 ## 0.3.15 - datcom_io write controls SYMFLP ASYFLP
 - `Python/src/aid/datcom_io.py`: `write_symflp(pt, lines)` — `$SYMFLP` (9 RF fields, wrap after 4th, NDELTA/DELTA); `write_asyflp(pt, lines)` — `$ASYFLP` (5 RC fields, NDELTA/DELTAL/DELTAR); `write_controls(ac, lines)` — flap/aileron/elevator when deflections nonzero; skip elevator when `E.SPANFI<0.01` (DA20 batch)
 - `Python/tests/test_datcom_controls.py`: Cessna 172 zero-deflection must not crash; no `PLOT`

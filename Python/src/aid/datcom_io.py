@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import numpy as np
 
 from aid.aircraft import Aircraft
@@ -122,12 +124,25 @@ def write_body(ac: Aircraft, lines: list) -> None:
     lines.append("".join(parts))
 
 
-def naca_wing_line(ac: Aircraft) -> str:
-    """Return NACA-W card string from WG.NACA matching DATCOM_IO.m."""
-    naca = ac.WG["NACA"]
+def _naca_card(prefix: str, naca) -> str:
     if isinstance(naca, (list, tuple)):
         naca = naca[0]
-    return f"NACA-W-{len(naca)}-{naca}"
+    return f"NACA-{prefix}-{len(naca)}-{naca}"
+
+
+def naca_wing_line(ac: Aircraft) -> str:
+    """Return NACA-W card string from WG.NACA matching DATCOM_IO.m."""
+    return _naca_card("W", ac.WG["NACA"])
+
+
+def naca_ht_line(ac: Aircraft) -> str:
+    """Return NACA-H card string from HT.NACA matching DATCOM_IO.m."""
+    return _naca_card("H", ac.HT["NACA"])
+
+
+def naca_vt_line(ac: Aircraft) -> str:
+    """Return NACA-V card string from VT.NACA matching DATCOM_IO.m."""
+    return _naca_card("V", ac.VT["NACA"])
 
 
 _WGPLNF_RP = (
@@ -234,3 +249,25 @@ def write_controls(ac: Aircraft, lines: list) -> None:
     e = ac.E
     if _has_nonzero(e.get("DELTA", 0)) and float(e.get("SPANFI", 0)) >= 0.01:
         write_symflp(e, lines)
+
+
+def write_for005(ac: Aircraft, path: Path, *, unit: str) -> None:
+    """Assemble and write a full DATCOM for005 input file matching DATCOM_IO.m."""
+    lines: list[str] = []
+    if unit == "in":
+        lines.append("DIM IN")
+    lines.append(f"CASEID {path.stem}")
+    write_fltcon(ac, lines)
+    write_optins(ac, lines)
+    write_synths(ac, lines)
+    write_body(ac, lines)
+    lines.append(naca_wing_line(ac))
+    write_wgplnf(ac.WG, lines)
+    lines.append(naca_ht_line(ac))
+    write_wgplnf(ac.HT, lines, label="HTPLNF")
+    lines.append(naca_vt_line(ac))
+    write_wgplnf(ac.VT, lines, label="VTPLNF")
+    write_controls(ac, lines)
+    lines.append("PLOT")
+    lines.append("NEXT CASE")
+    path.write_text("\n".join(lines))

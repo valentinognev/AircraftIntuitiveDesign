@@ -55,7 +55,7 @@ status = struct('datcom','failed','error',{{}});
 try
     cd(fullfile(this,'DATCOM'));
     delete('*.dat');
-    DATCOM_IO('for005.dat','case','DATCOM',false,unit);
+    DATCOM_IO('for005.dat','case','batch',false,unit);
     [st,cmdout] = system('./datcom'); %#ok<ASGLU>
     if exist('for005.dat','file'), copyfile('for005.dat',fullfile(out_dir,'for005.dat')); end
     if exist('datcom.out','file'), copyfile('datcom.out',fullfile(out_dir,'datcom.out')); end

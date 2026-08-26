@@ -1,5 +1,10 @@
 # Updates
 
+## 0.1.19 - DATCOM_IO batch DATCOM-safe SYNTHS
+- `Matlab/fsroot/code/DATCOM_IO.m`: `$SYNTHS` branch matches `'batch'` as well as `'DATCOM'` (no YW/YH)
+- `Matlab/fsroot/code/run_aid_batch.m`: `run_datcom_gold` calls `DATCOM_IO(...,'batch',...)` per plan
+- `Python/tests/test_datcom_io_batch.py`: asserts batch uses DATCOM-safe SYNTHS condition
+
 ## 0.1.18 - MATLAB gold DATCOM dump for Cessna 172
 - `Matlab/fsroot/code/run_aid_batch.m`: `run_datcom_gold` — load `.mat`, hidden `cmp`/`opt` stubs, `DATCOM_IO`/`./datcom`/`datcomimport`, JSON to `Results/matlab/<model>/`
 - `Python/tests/test_matlab_gold_cessna_datcom.py`: asserts `status.json` `datcom: ok` and coefficient fields in `datcom.json`

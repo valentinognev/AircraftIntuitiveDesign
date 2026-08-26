@@ -624,7 +624,7 @@ if strcmp(type,'case')
         WG.S(end),WG.cbar(end),WG.b);
     
     %Write Synthesis Parameters (SYNTHS)
-    if strcmp(choice,'DATCOM') %DATCOM can't read YW and YH
+    if strcmp(choice,'DATCOM') || strcmp(choice,'batch') %DATCOM can't read YW and YH
         fprintf(fid,'\n $SYNTHS XCG=%.2f,ZCG=%0.2f,XW=%0.2f,ZW=%0.2f,',...
             AERO.XCG,AERO.ZCG,WG.X,WG.Z);
         fprintf(fid,'ALIW=%.2f,\n  XH=%0.2f,ZH=%0.2f,',WG.i,HT.X,HT.Z);

@@ -1,5 +1,9 @@
 # Updates
 
+## 0.1.5 - Decode URL-encoded model .mat filenames
+- Renamed 12 `Models/*.mat` files (`%20` → space) via `urllib.parse.unquote`
+- `Python/tests/test_model_filenames.py`: asserts 23 models, no `%20` in names
+
 ## 0.1.4 - DATCOM smoke BODY fix and coefficient asserts
 - `test_datcom_wrapper_smoke.py`: circular `$BODY` uses X+R only; tapered wing with SSPNE; assert coefficient table header in for006.dat
 

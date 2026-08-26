@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-set -uo pipefail
+set -euo pipefail
 DIR="$(cd "$(dirname "$0")" && pwd)"
 BIN="$DIR/datcom.bin"
 if [[ ! -f for005.dat ]]; then
   echo "DATCOM wrapper: for005.dat not found in $(pwd)" >&2
   exit 2
 fi
-printf 'for005.dat\n' | "$BIN" || true
+printf 'for005.dat\n' | "$BIN"
 if [[ -f datcom.out ]]; then
   cp -f datcom.out for006.dat
 else

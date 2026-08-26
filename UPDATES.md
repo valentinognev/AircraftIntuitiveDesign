@@ -1,5 +1,13 @@
 # Updates
 
+## 0.1.23 - Honest primary gold status and usable coefficients
+- `run_aid_batch.m`: `gold_datcom_ok`/`gold_tornado_ok` reject ND (`99999`) and empty/NaN; record `datcom: binary exit N` on crash; delete stale JSON on failure
+- `DATCOM/datcom`: restored `set -e` (no `|| true` on segfault)
+- `DATCOM_IO.m`: skip batch elevator `SYMFLP` when `E.SPANFI<0.01`; body write uses local `body` struct (no global `BD` mutation); `write_namelist_array` capped at 12+6
+- `fLattice_setup2.m`: sanitize NaN/`<=0` `geo.T` before chord extrapolation (fixes Navion/DA20 Tornado NaN lattice)
+- `AVL_IO.m`: cosine spacing only when `geo.nelem(k)>=4` (not all multi-section); retains tip NaN/degenerate-section fixes
+- Navion DATCOM: `failed` (binary exit 139 segfault); DA20-C1 and Learjet 23 all three `ok` with finite coefficients
+
 ## 0.1.22 - MATLAB gold primary aircraft (Navion, DA20, Learjet)
 - `run_aid_batch.m`: default `solver='all'` runs DATCOM+Tornado+AVL sequentially; per-solver dispatch preserved
 - `DATCOM/datcom`: copy `datcom.out` even when `datcom.bin` segfaults (Navion)

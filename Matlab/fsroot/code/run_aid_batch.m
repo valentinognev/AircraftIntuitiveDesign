@@ -67,15 +67,24 @@ try
     delete('*.dat');
     DATCOM_IO('for005.dat','case','batch',false,unit);
     [st,cmdout] = system('./datcom'); %#ok<ASGLU>
+    if st ~= 0
+        status.error{end+1} = sprintf('datcom: binary exit %d', st);
+    end
     if exist('for005.dat','file'), copyfile('for005.dat',fullfile(out_dir,'for005.dat')); end
     if exist('datcom.out','file'), copyfile('datcom.out',fullfile(out_dir,'datcom.out')); end
-    if exist('for006.dat','file') && exist('datcomimport','file')
+    datcom_json = fullfile(out_dir,'datcom.json');
+    if st == 0 && exist('for006.dat','file') && exist('datcomimport','file')
         Results{1} = datcomimport('for006.dat',true);
         if iscell(Results{1}), Results{1}=Results{1}{1}; end
-        if isfield(Results{1},'cl')
+        if gold_datcom_ok(Results{1})
             status.datcom = 'ok';
-            write_json(fullfile(out_dir,'datcom.json'), strip_datcom(Results{1}));
+            write_json(datcom_json, strip_datcom(Results{1}));
+        else
+            status.error{end+1} = 'datcom: no finite coefficients (missing or ND)';
+            if isfile(datcom_json), delete(datcom_json); end
         end
+    elseif isfile(datcom_json)
+        delete(datcom_json);
     end
 catch ME
     status.error{end+1} = ['datcom: ' ME.message];
@@ -145,8 +154,14 @@ try
     end
     tres = coeff_create3(tres,lattice,state,ref,geo);
     Results{3} = tres;
-    status.tornado = 'ok';
-    write_json(fullfile(out_dir,'tornado.json'), strip_tornado(tres));
+    if gold_tornado_ok(tres)
+        status.tornado = 'ok';
+        write_json(fullfile(out_dir,'tornado.json'), strip_tornado(tres));
+    else
+        status.error{end+1} = 'tornado: non-finite or empty CL/CD/Cm';
+        tjson = fullfile(out_dir,'tornado.json');
+        if isfile(tjson), delete(tjson); end
+    end
 catch ME
     status.error{end+1} = ['tornado: ' ME.message];
 end
@@ -269,4 +284,23 @@ D = struct();
 for i=1:numel(keep)
     if isfield(S,keep{i}), D.(keep{i}) = S.(keep{i}); end
 end
+end
+
+function ok = gold_datcom_ok(S)
+ok = false;
+if ~isstruct(S) || ~isfield(S,'cl'), return; end
+cl = S.cl(:);
+if isempty(cl) || ~all(isfinite(cl)), return; end
+if all(abs(cl) >= 99998), return; end
+ok = true;
+end
+
+function ok = gold_tornado_ok(S)
+need = {'CL','CD','Cm'};
+for i = 1:numel(need)
+    if ~isfield(S,need{i}), return; end
+    v = S.(need{i});
+    if isempty(v) || ~isnumeric(v) || ~all(isfinite(v(:))), return; end
+end
+ok = true;
 end

@@ -103,8 +103,8 @@ function Write_Surface(fid,label,cs,geo,k,ni,nj)
 %Surface
 fprintf(fid,'\n#======================================================\n');
 fprintf(fid,'SURFACE\n%s\n',label);
-if geo.nelem(k) > 1
-    fprintf(fid,'%d %.1f %d %.1f\n',ni,1,nj,-2); %multi-section: cosine spacing
+if geo.nelem(k) >= 4
+    fprintf(fid,'%d %.1f %d %.1f\n',ni,1,nj,-2); %many sections: cosine spacing
 elseif geo.nelem(k)==nj-1
     fprintf(fid,'%d %.1f %d %.1f\n',ni,1,nj,-2); %match cosine spacing
 else

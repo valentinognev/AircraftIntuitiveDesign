@@ -641,32 +641,34 @@ if strcmp(type,'case')
     
     %Save Body Parameters (BODY)
     if get(cmp(4),'Value')
-        body_max = 18; % DATCOM namelist allows 12 + 6 values per array line
-        if BD.NX > body_max
-            idx = round(linspace(1, BD.NX, body_max));
-            BD.X = BD.X(idx); BD.ZU = BD.ZU(idx); BD.ZL = BD.ZL(idx);
-            BD.R = BD.R(idx); BD.P = BD.P(idx); BD.S = BD.S(idx);
-            BD.NX = body_max;
+        body = struct('NX', BD.NX, 'X', BD.X, 'ZU', BD.ZU, 'ZL', BD.ZL, ...
+            'R', BD.R, 'P', BD.P, 'S', BD.S);
+        body_max = 18; % DATCOM namelist: one 12-value line + one 6-value continuation
+        if body.NX > body_max
+            idx = round(linspace(1, body.NX, body_max));
+            body.X = body.X(idx); body.ZU = body.ZU(idx); body.ZL = body.ZL(idx);
+            body.R = body.R(idx); body.P = body.P(idx); body.S = body.S(idx);
+            body.NX = body_max;
         end
         lim = 12;
-        fprintf(fid,'\n $BODY NX=%.1f,ITYPE=1.0,',BD.NX);
+        fprintf(fid,'\n $BODY NX=%.1f,ITYPE=1.0,',body.NX);
         if cg_calc, fprintf(fid,'\n  XCG=%.2f,ZCG=%.2f,WT=%.2f,',...
                 BD.XCG,BD.ZCG,BD.WT); end
-        if min(BD.S)<0.01, precision='%.3f,'; else, precision = '%.2f,';end
-        if BD.NX<=lim
-            write_namelist_array(fid, 'X', BD.X, '%.2f,');
-            write_namelist_array(fid, 'ZU', BD.ZU, '%.2f,');
-            write_namelist_array(fid, 'ZL', BD.ZL, '%.2f,');
-            write_namelist_array(fid, 'R', BD.R, '%.2f,');
-            write_namelist_array(fid, 'P', BD.P, '%.2f,');
-            write_namelist_array(fid, 'S', BD.S, precision);
+        if min(body.S)<0.01, precision='%.3f,'; else, precision = '%.2f,';end
+        if body.NX<=lim
+            write_namelist_array(fid, 'X', body.X, '%.2f,');
+            write_namelist_array(fid, 'ZU', body.ZU, '%.2f,');
+            write_namelist_array(fid, 'ZL', body.ZL, '%.2f,');
+            write_namelist_array(fid, 'R', body.R, '%.2f,');
+            write_namelist_array(fid, 'P', body.P, '%.2f,');
+            write_namelist_array(fid, 'S', body.S, precision);
         else
-            write_namelist_array(fid, 'X', BD.X, '%.2f,');
-            write_namelist_array(fid, 'ZU', BD.ZU, '%.2f,');
-            write_namelist_array(fid, 'ZL', BD.ZL, '%.2f,');
-            write_namelist_array(fid, 'R', BD.R, '%.2f,');
-            write_namelist_array(fid, 'P', BD.P, '%.2f,');
-            write_namelist_array(fid, 'S', BD.S, precision);
+            write_namelist_array(fid, 'X', body.X, '%.2f,');
+            write_namelist_array(fid, 'ZU', body.ZU, '%.2f,');
+            write_namelist_array(fid, 'ZL', body.ZL, '%.2f,');
+            write_namelist_array(fid, 'R', body.R, '%.2f,');
+            write_namelist_array(fid, 'P', body.P, '%.2f,');
+            write_namelist_array(fid, 'S', body.S, precision);
         end
     end
     fprintf(fid,'$\n');
@@ -829,15 +831,17 @@ if strcmp(type,'case')
         fprintf(fid,'$\n');
         
         %Write Elevator Parameters (SYMFLP)
-        fprintf(fid,' $SYMFLP ');
-        for i=1:length(RF)
-            fprintf(fid,'%s=%.3f,',RF{i},E.(RF{i}));
-            if i==4 && length(RF)>i, fprintf(fid,'\n  '); end
+        if ~(strcmp(choice,'batch') && E.SPANFI < 0.01)
+            fprintf(fid,' $SYMFLP ');
+            for i=1:length(RF)
+                fprintf(fid,'%s=%.3f,',RF{i},E.(RF{i}));
+                if i==4 && length(RF)>i, fprintf(fid,'\n  '); end
+            end
+            fprintf(fid,'\n  NDELTA=%0.1f,',length(E.DELTA));
+            if length(E.DELTA)>10, warndlg('Limit to 10 deflection angles'),end
+            fprintf(fid,'DELTA=');     fprintf(fid,'%.1f,',E.DELTA);
+            fprintf(fid,'$\n');
         end
-        fprintf(fid,'\n  NDELTA=%0.1f,',length(E.DELTA));
-        if length(E.DELTA)>10, warndlg('Limit to 10 deflection angles'),end
-        fprintf(fid,'DELTA=');     fprintf(fid,'%.1f,',E.DELTA);
-        fprintf(fid,'$\n');
     end
     
     %Finish and Close
@@ -944,17 +948,21 @@ end
 
 function write_namelist_array(fid, name, vals, fmt)
 first_lim = 12;
-cont_lim = 6;
-i = 1;
+cont_lim = 6; % DATCOM allows one continuation line per array (12+6 max)
 n = numel(vals);
+if n > first_lim + cont_lim
+    idx = round(linspace(1, n, first_lim + cont_lim));
+    vals = vals(idx);
+    n = numel(vals);
+end
+i = 1;
 fprintf(fid,'\n  %s=', name);
 chunk = vals(i:min(i+first_lim-1,n));
 fprintf(fid, fmt, chunk);
 i = i + numel(chunk);
-while i <= n
+if i <= n
     fprintf(fid,'\n  ');
     chunk = vals(i:min(i+cont_lim-1,n));
     fprintf(fid, fmt, chunk);
-    i = i + numel(chunk);
 end
 end

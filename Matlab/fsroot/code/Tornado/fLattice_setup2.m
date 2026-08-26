@@ -153,7 +153,9 @@ for s=1:noofwings
 	for t=1:(noofloops(s))
       %Chord loop, generating chords for wing sections.
       %And startingpoints for partition-quads
-      
+      if isnan(geo.T(s,t)) || geo.T(s,t) <= 0
+          geo.T(s,t) = 1;
+      end
       CHORDS(s,t+1)=CHORDS(s,t)*geo.T(s,t);	%calculating
       									    %element root-chord
             

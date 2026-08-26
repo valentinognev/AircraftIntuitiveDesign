@@ -1,0 +1,16 @@
+LOAD geometry.avl
+0
+PLOP
+g
+
+OPER
+c1
+v 30.6220
+
+x
+st
+geometry.st
+sb
+geometry.sb
+
+Quit

@@ -1,0 +1,133 @@
+# Track source and aircraft input data only.
+# Ignore executables, objects, PDFs, solver output, and Results.
+
+# --- Results ---
+Results/
+**/Results/
+
+# --- PDFs ---
+*.pdf
+
+# --- Executables and compiled binaries ---
+*.exe
+*.osx
+*.bin
+*.dll
+*.so
+*.dylib
+*.mex*
+*.out
+*.app
+*.x
+*.elf
+
+# Named solver binaries (no extension)
+Matlab/fsroot/code/DATCOM/datcom
+Matlab/fsroot/code/DATCOM/datcom.bin
+Matlab/fsroot/code/AVL/run/avl
+Matlab/fsroot/code/AVL/run/avl3.35
+Matlab/fsroot/code/AVL/examples/bin/
+Matlab/fsroot/code/AVL/AVL3.52rel09032025/bin/avl
+Matlab/fsroot/code/AVL/AVL3.52rel09032025/binw32/
+Matlab/fsroot/code/NACA456/naca456
+Matlab/fsroot/code/NACA456/naca456.lnx
+Matlab/fsroot/code/NACA456/naca456.mac
+
+# --- Object files, static libs, Fortran modules ---
+*.o
+*.obj
+*.a
+*.lib
+*.mod
+*.smod
+*.lo
+*.la
+*.d
+*.pyc
+
+# --- DATCOM / Fortran runtime output ---
+**/for006.dat
+**/for013.dat
+**/for014.dat
+**/datcom.out
+**/fort.*
+Matlab/fsroot/code/DATCOM/for005.dat
+
+# --- AVL generated output (keep .avl/.run/.dat/.mass inputs) ---
+*.st
+*.sb
+*.eig
+*.ftnchek
+Matlab/fsroot/code/AVL/run/geometry.st
+Matlab/fsroot/code/AVL/run/geometry.sb
+Matlab/fsroot/code/AVL/run/WG.*
+Matlab/fsroot/code/AVL/run/HT.*
+Matlab/fsroot/code/AVL/run/VT.*
+Matlab/fsroot/code/AVL/run/Planform*
+
+# --- NACA456 generated ---
+Matlab/fsroot/code/NACA456/naca.out
+Matlab/fsroot/code/NACA456/naca.dbg
+Matlab/fsroot/code/NACA456/naca.gnu
+
+# --- Images (not solver input) ---
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+*.tif
+*.tiff
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+.eggs/
+*.whl
+
+# --- MATLAB session / codegen ---
+*.asv
+*.m~
+slprj/
+codegen/
+*.slxc
+*.autosave
+
+# --- MATLAB App Compiler packaging (keep fsroot/code source) ---
+Matlab/metadata/
+Matlab/_rels/
+Matlab/[[]Content_Types].xml
+Matlab/fsroot/Documents/
+
+# --- IDE project files ---
+.cproject
+.project
+.settings/
+
+# --- OS / editor ---
+.DS_Store
+._*
+Thumbs.db
+*~
+*.swp
+*.swo
+.#*
+.idea/
+.vscode/
+
+# --- Agent scratch ---
+.superpowers/
+.worktrees/
+worktrees/

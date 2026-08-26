@@ -1,5 +1,9 @@
 # Updates
 
+## 0.1.10 - AVL eispack gfortran build
+- `Python/tests/test_avl_eispack.py`: asserts `eispack/libeispack.a` (or `*.a`) exists after local build
+- Built `eispack/libeispack.a` via `make -f Makefile.gfortran` (archive gitignored; reproduce locally)
+
 ## 0.1.9 - plotlib gfortranDP Linux X11 paths
 - `plotlib/config.make.gfortranDP`: `LINKLIB`/`INCDIR` aligned with Task 7 Linux X11 (`/usr/lib/x86_64-linux-gnu`, `/usr/include`)
 - `Python/tests/test_avl_makefile_linux.py`: asserts gfortranDP plotlib template has no macOS X11 paths

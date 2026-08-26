@@ -18,3 +18,6 @@ def avl_bin() -> Path:
 
 def results_dir() -> Path:
     return repo_root() / "Results"
+
+def models_dir() -> Path:
+    return repo_root() / "Python" / "models"

@@ -1,5 +1,9 @@
 # Updates
 
+## 0.3.0 - aid.paths models_dir
+- `Python/src/aid/paths.py`: `models_dir()` → `repo_root() / "Python" / "models"`
+- `Python/tests/test_paths.py`: `test_paths_resolve` asserts path helpers including `models_dir().name == "models"`
+
 ## 0.2.0 - MATLAB gold Results/matlab for all 23 models
 - `run_aid_batch_all.m`: batch driver over `Models/*.mat`; per-model `try/catch`; skip when `status.json` already has all three solver fields; writes `Results/matlab/_summary.json`
 - `Python/tests/test_matlab_batch_all.py`: asserts 23 summary rows and per-model `status.json`

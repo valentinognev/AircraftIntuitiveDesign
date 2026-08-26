@@ -1,5 +1,9 @@
 # Updates
 
+## 0.1.11 - AVL 3.52 binary install
+- `Python/tests/test_avl_binary.py`: asserts `AVL/run/avl` exists and is executable
+- Built `AVL3.52rel09032025/bin/avl` via `make -f Makefile.gfortranDP avl`, copied to `AVL/run/avl` (binary gitignored; reproduce locally)
+
 ## 0.1.10 - AVL eispack gfortran build
 - `Python/tests/test_avl_eispack.py`: asserts `eispack/libeispack.a` (or `*.a`) exists after local build
 - Built `eispack/libeispack.a` via `make -f Makefile.gfortran` (archive gitignored; reproduce locally)

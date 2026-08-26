@@ -1,5 +1,8 @@
 # Updates
 
+## 0.1.6 - MATLAB gold scalar check for Cessna 172.mat
+- `Python/tests/test_cessna_mat_gold.py`: loads `Models/Cessna 172.mat` via MATLAB `-batch`, asserts WG/AERO gold scalars
+
 ## 0.1.5 - Decode URL-encoded model .mat filenames
 - Renamed 12 `Models/*.mat` files (`%20` → space) via `urllib.parse.unquote`
 - `Python/tests/test_model_filenames.py`: asserts 23 models, no `%20` in names

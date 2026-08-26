@@ -1,5 +1,9 @@
 # Updates
 
+## 0.3.9 - geometry.py break-span branch
+- `Python/src/aid/geometry.py`: break-span branch from `Geometry.m` lines 5–67 — segmented `S`/`AR`/`cbar`/`TR`, equivalent taper via quadratic (`b_quad` not span), weighted sweep/dihedral, tip/break locations
+- `Python/tests/test_geometry_break_span.py`: weighted `cbar` and total `S` asserts for kinked planform
+
 ## 0.3.8 - geometry.py linear taper branch
 - `Python/src/aid/geometry.py`: `geometry(pt, angl, type)` — single linear taper from `Geometry.m` else branch; sweep/MAC block; break-span raises (Task 30)
 - `Python/tests/test_geometry_cessna_linear.py`: Cessna 172 gold `S=24`, `cbar=2`, `AR=6`

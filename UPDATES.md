@@ -1,5 +1,13 @@
 # Updates
 
+## 0.1.22 - MATLAB gold primary aircraft (Navion, DA20, Learjet)
+- `run_aid_batch.m`: default `solver='all'` runs DATCOM+Tornado+AVL sequentially; per-solver dispatch preserved
+- `DATCOM/datcom`: copy `datcom.out` even when `datcom.bin` segfaults (Navion)
+- `DATCOM_IO.m`: `$BODY` arrays chunked 12+6 (max 18 stations; decimate longer bodies); `write_namelist_array` helper
+- `AVL_IO.m`: scalar `WG.S(end)` refs; NaN tip chord fallback; cosine spacing for multi-section wings; skip degenerate tip sections; empty `.st` guard
+- `Python/tests/test_matlab_gold_primary.py`: asserts Navion, DA20-C1, Learjet 23 all three `ok` in `status.json`
+- Gold runs: `run_aid_batch('Navion')` etc. → `Results/matlab/<model>/` (gitignored)
+
 ## 0.1.21 - MATLAB gold AVL dump for Cessna 172
 - `Matlab/fsroot/code/run_aid_batch.m`: `run_avl_gold` — mesh `{'10','10'}`, `Tornado_IO`/`AVL_IO(...,false)`/`parseST`, merges `status.json` (preserves `datcom`/`tornado: ok`); deletes stale `geometry.st`/`.sb` before run
 - `Matlab/fsroot/code/AVL_IO.m`: IYsym/IZsym/Zsym line uses `%d %d %.1f` (AVL 3.52 rejects `0.0 0.0 0.0`)

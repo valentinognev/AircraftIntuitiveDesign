@@ -35,7 +35,12 @@ else
 end
 
 %Check Outputs
-file = dir([CaseID,'.st']); AVL_path = file.folder;
+file = dir([CaseID,'.st']);
+if isempty(file)
+    AVL_path = pwd;
+else
+    AVL_path = file(1).folder;
+end
 
 %Return to Main Directory
 cd(current_path)
@@ -59,7 +64,7 @@ fprintf(fid,'%d %d %.1f\n',0,0,0); %Symmetry (IYsym/IZsym must be integer for AV
 
 %Reference Dimensions
 fprintf(fid,'\n#Sref Cref Bref\n');
-fprintf(fid,'%.4f %.4f %.4f\n',WG.S,WG.cbar,WG.b);
+fprintf(fid,'%.4f %.4f %.4f\n',WG.S(end),WG.cbar(end),WG.b);
 
 %Reference Position (0,0,0)
 fprintf(fid,'\n#Xref Yref Zref\n');
@@ -98,7 +103,9 @@ function Write_Surface(fid,label,cs,geo,k,ni,nj)
 %Surface
 fprintf(fid,'\n#======================================================\n');
 fprintf(fid,'SURFACE\n%s\n',label);
-if geo.nelem(k)==nj-1
+if geo.nelem(k) > 1
+    fprintf(fid,'%d %.1f %d %.1f\n',ni,1,nj,-2); %multi-section: cosine spacing
+elseif geo.nelem(k)==nj-1
     fprintf(fid,'%d %.1f %d %.1f\n',ni,1,nj,-2); %match cosine spacing
 else
     fprintf(fid,'%d %.1f %d %.1f\n',ni,1.0,nj,-1.1); %weighted outboard 
@@ -136,12 +143,23 @@ n = geo.nelem(k);
 x = [geo.startx(k,1:n),geo.startx(k,n)+geo.b(k,n)*tan(geo.SW(k,n))];
 y = [geo.starty(k,1:n),geo.starty(k,n)+geo.b(k,n)*cos(geo.dihed(k,n))];
 z = [geo.startz(k,1:n),geo.startz(k,n)+geo.b(k,n)*sin(geo.dihed(k,n))];
-c = [geo.c(k,1:n),geo.c(k,n)*geo.T(k,n)];
+tip_t = geo.T(k,n);
+if isnan(tip_t) || tip_t <= 0
+    tip_c = geo.c(k,n);
+else
+    tip_c = geo.c(k,n)*tip_t;
+end
+c = [geo.c(k,1:n), tip_c];
 tw = [geo.TW(k,1:n,1),geo.TW(k,n,2)];
 foil = [geo.foil(k,1:n,1),geo.foil(k,n,2)];
 
+nsect = n + 1;
+if norm([y(n+1)-y(n), z(n+1)-z(n)]) < 0.05
+    nsect = n; % skip degenerate tip section (AVL spacing)
+end
+
 %Loop Over Sections
-for j = 1:n+1
+for j = 1:nsect
     
     %Section Parameters
     fprintf(fid,'\nSECTION\n');

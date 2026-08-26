@@ -641,31 +641,32 @@ if strcmp(type,'case')
     
     %Save Body Parameters (BODY)
     if get(cmp(4),'Value')
+        body_max = 18; % DATCOM namelist allows 12 + 6 values per array line
+        if BD.NX > body_max
+            idx = round(linspace(1, BD.NX, body_max));
+            BD.X = BD.X(idx); BD.ZU = BD.ZU(idx); BD.ZL = BD.ZL(idx);
+            BD.R = BD.R(idx); BD.P = BD.P(idx); BD.S = BD.S(idx);
+            BD.NX = body_max;
+        end
         lim = 12;
         fprintf(fid,'\n $BODY NX=%.1f,ITYPE=1.0,',BD.NX);
         if cg_calc, fprintf(fid,'\n  XCG=%.2f,ZCG=%.2f,WT=%.2f,',...
                 BD.XCG,BD.ZCG,BD.WT); end
         if min(BD.S)<0.01, precision='%.3f,'; else, precision = '%.2f,';end
         if BD.NX<=lim
-            fprintf(fid,'\n  X=');  fprintf(fid,'%.2f,',BD.X);
-            fprintf(fid,'\n  ZU='); fprintf(fid,'%.2f,',BD.ZU);
-            fprintf(fid,'\n  ZL='); fprintf(fid,'%.2f,',BD.ZL);
-            fprintf(fid,'\n  R=');  fprintf(fid,'%.2f,',BD.R);
-            fprintf(fid,'\n  P=');  fprintf(fid,'%.2f,',BD.P);
-            fprintf(fid,'\n  S=');  fprintf(fid,precision,BD.S);
-        else %trim to 80 characters
-            fprintf(fid,'\n  X=');  fprintf(fid,'%.2f,',BD.X(1:lim));
-            fprintf(fid,'\n  ');    fprintf(fid,'%.2f,',BD.X(lim+1:end));
-            fprintf(fid,'\n  ZU='); fprintf(fid,'%.2f,',BD.ZU(1:lim));
-            fprintf(fid,'\n  ');    fprintf(fid,'%.2f,',BD.ZU(lim+1:end));
-            fprintf(fid,'\n  ZL='); fprintf(fid,'%.2f,',BD.ZL(1:lim));
-            fprintf(fid,'\n  ');    fprintf(fid,'%.2f,',BD.ZL(lim+1:end));
-            fprintf(fid,'\n  R=');  fprintf(fid,'%.2f,',BD.R(1:lim));
-            fprintf(fid,'\n  ');    fprintf(fid,'%.2f,',BD.R(lim+1:end));
-            fprintf(fid,'\n  P=');  fprintf(fid,'%.2f,',BD.P(1:lim));
-            fprintf(fid,'\n  ');    fprintf(fid,'%.2f,',BD.P(lim+1:end));
-            fprintf(fid,'\n  S=');  fprintf(fid,precision,BD.S(1:lim));
-            fprintf(fid,'\n  ');    fprintf(fid,precision,BD.S(lim+1:end));
+            write_namelist_array(fid, 'X', BD.X, '%.2f,');
+            write_namelist_array(fid, 'ZU', BD.ZU, '%.2f,');
+            write_namelist_array(fid, 'ZL', BD.ZL, '%.2f,');
+            write_namelist_array(fid, 'R', BD.R, '%.2f,');
+            write_namelist_array(fid, 'P', BD.P, '%.2f,');
+            write_namelist_array(fid, 'S', BD.S, precision);
+        else
+            write_namelist_array(fid, 'X', BD.X, '%.2f,');
+            write_namelist_array(fid, 'ZU', BD.ZU, '%.2f,');
+            write_namelist_array(fid, 'ZL', BD.ZL, '%.2f,');
+            write_namelist_array(fid, 'R', BD.R, '%.2f,');
+            write_namelist_array(fid, 'P', BD.P, '%.2f,');
+            write_namelist_array(fid, 'S', BD.S, precision);
         end
     end
     fprintf(fid,'$\n');
@@ -938,5 +939,22 @@ elseif strcmp(type,'parts')
     %Update
     AID(0,0,'update')
     
+end
+end
+
+function write_namelist_array(fid, name, vals, fmt)
+first_lim = 12;
+cont_lim = 6;
+i = 1;
+n = numel(vals);
+fprintf(fid,'\n  %s=', name);
+chunk = vals(i:min(i+first_lim-1,n));
+fprintf(fid, fmt, chunk);
+i = i + numel(chunk);
+while i <= n
+    fprintf(fid,'\n  ');
+    chunk = vals(i:min(i+cont_lim-1,n));
+    fprintf(fid, fmt, chunk);
+    i = i + numel(chunk);
 end
 end

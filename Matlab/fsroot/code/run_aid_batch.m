@@ -1,18 +1,24 @@
 function run_aid_batch(model_name, solver)
 %RUN_AID_BATCH  Gold solver dump for one aircraft .mat
 % model_name e.g. 'Cessna 172' (no extension)
-% solver 'datcom' | 'tornado' | 'avl' | (future: 'all')
+% solver 'datcom' | 'tornado' | 'avl' | 'all' (default: all three)
 if nargin < 1, model_name = 'Cessna 172'; end
-if nargin < 2, solver = 'datcom'; end
-switch lower(solver)
-    case 'datcom'
-        run_datcom_gold(model_name);
-    case 'tornado'
-        run_tornado_gold(model_name);
-    case 'avl'
-        run_avl_gold(model_name);
-    otherwise
-        error('not implemented');
+if nargin < 2, solver = 'all'; end
+if strcmpi(solver, 'all')
+    run_datcom_gold(model_name);
+    run_tornado_gold(model_name);
+    run_avl_gold(model_name);
+else
+    switch lower(solver)
+        case 'datcom'
+            run_datcom_gold(model_name);
+        case 'tornado'
+            run_tornado_gold(model_name);
+        case 'avl'
+            run_avl_gold(model_name);
+        otherwise
+            error('unknown solver: %s', solver);
+    end
 end
 end
 

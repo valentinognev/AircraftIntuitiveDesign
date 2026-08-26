@@ -1,5 +1,9 @@
 # Updates
 
+## 0.1.17 - run_aid_batch JSON strip helpers
+- `Matlab/fsroot/code/run_aid_batch.m`: stub main (`error('not implemented')`); local helpers `onoff`, `write_json`, `strip_datcom`, `strip_tornado`
+- `Python/tests/test_run_aid_batch_helpers.py`: asserts file exists and helper function declarations present
+
 ## 0.1.16 - AID.m Tornado NP batch default
 - `Matlab/fsroot/code/AID.m`: NP `questdlg` skipped when `choice=='batch'`; default `np='No'`
 - `Python/tests/test_aid_tornado_batch_np.py`: asserts batch guard around NP estimate dialog

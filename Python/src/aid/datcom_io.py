@@ -17,6 +17,24 @@ def _fmt_values(values, fmt):
     return "".join(fmt % v for v in values)
 
 
+def _write_namelist_array(parts, name, vals, fmt):
+    """Append one DATCOM namelist array (12 + 6 continuation) matching write_namelist_array."""
+    first_lim = 12
+    cont_lim = 6
+    arr = np.asarray(vals, dtype=float).reshape(-1)
+    n = arr.size
+    if n > first_lim + cont_lim:
+        idx = np.round(np.linspace(0, n - 1, first_lim + cont_lim)).astype(int)
+        arr = arr[idx]
+        n = arr.size
+    parts.append(f"\n  {name}=")
+    chunk_end = min(first_lim, n)
+    parts.append(_fmt_values(arr[:chunk_end], fmt))
+    if chunk_end < n:
+        parts.append("\n  ")
+        parts.append(_fmt_values(arr[chunk_end : chunk_end + cont_lim], fmt))
+
+
 def write_fltcon(ac: Aircraft, lines: list) -> None:
     """Append DATCOM $FLTCON namelist lines matching DATCOM_IO.m."""
     aero = ac.AERO
@@ -66,3 +84,47 @@ def write_synths(ac: Aircraft, lines: list) -> None:
         f"ZV={vt['Z']:.2f},VERTUP=.TRUE.$",
     ]
     lines.append("".join(parts))
+
+
+def write_body(ac: Aircraft, lines: list) -> None:
+    """Append DATCOM $BODY namelist from BD matching DATCOM_IO.m."""
+    bd = ac.BD
+    body = {
+        "NX": float(bd["NX"]),
+        "X": _as_list(bd["X"]),
+        "ZU": _as_list(bd["ZU"]),
+        "ZL": _as_list(bd["ZL"]),
+        "R": _as_list(bd["R"]),
+        "P": _as_list(bd["P"]),
+        "S": _as_list(bd["S"]),
+    }
+    body_max = 18
+    if body["NX"] > body_max:
+        idx = np.round(np.linspace(0, int(body["NX"]) - 1, body_max)).astype(int)
+        for key in ("X", "ZU", "ZL", "R", "P", "S"):
+            body[key] = np.asarray(body[key], dtype=float)[idx].tolist()
+        body["NX"] = body_max
+
+    s_arr = np.asarray(body["S"], dtype=float)
+    precision = "%.3f," if np.min(s_arr) < 0.01 else "%.2f,"
+
+    parts = [f" $BODY NX={body['NX']:.1f},ITYPE=1.0,"]
+    for name, fmt in (
+        ("X", "%.2f,"),
+        ("ZU", "%.2f,"),
+        ("ZL", "%.2f,"),
+        ("R", "%.2f,"),
+        ("P", "%.2f,"),
+        ("S", precision),
+    ):
+        _write_namelist_array(parts, name, body[name], fmt)
+    parts.append("$")
+    lines.append("".join(parts))
+
+
+def naca_wing_line(ac: Aircraft) -> str:
+    """Return NACA-W card string from WG.NACA matching DATCOM_IO.m."""
+    naca = ac.WG["NACA"]
+    if isinstance(naca, (list, tuple)):
+        naca = naca[0]
+    return f"NACA-W-{len(naca)}-{naca}"

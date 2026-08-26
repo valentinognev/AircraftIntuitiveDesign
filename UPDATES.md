@@ -1,5 +1,9 @@
 # Updates
 
+## 0.3.13 - datcom_io write BODY and NACA-W
+- `Python/src/aid/datcom_io.py`: `write_body(ac, lines)` — `$BODY` from `BD` (NX cap 18 linspace downsample, 12+6 array lines, S precision from min(S)); `naca_wing_line(ac)` — `NACA-W-{len}-{code}` from first `WG.NACA`; shared `_write_namelist_array` helper
+- `Python/tests/test_datcom_body.py`: Cessna 172 asserts `$BODY` and `NACA-W-4-2412`
+
 ## 0.3.12 - datcom_io write OPTINS and SYNTHS
 - `Python/src/aid/datcom_io.py`: `write_optins(ac, lines)` — `$OPTINS` from `WG.S/cbar/b` (last element for list S/cbar); `write_synths(ac, lines)` — DATCOM-safe `$SYNTHS` (no YW/YH, keeps YV) from `AERO`, `WG`, `HT`, `VT`
 - `Python/tests/test_datcom_synths.py`: Cessna 172 asserts `$OPTINS` SREF=24 and `$SYNTHS` XCG=2.94

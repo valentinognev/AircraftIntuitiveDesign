@@ -1,5 +1,9 @@
 # Updates
 
+## 0.3.2 - JSONC comment stripper loads_jsonc
+- `Python/src/aid/jsonc.py`: `loads_jsonc(text)` — line-oriented `//` stripper respecting quoted strings, then `json.loads`
+- `Python/tests/test_jsonc_loads.py`: asserts WG/unit fields parse from JSONC sample with inline comments
+
 ## 0.3.1 - JSONC field documentation catalog
 - `Python/src/aid/field_docs.py`: `DOCS` dict (248 dotted paths) from spec §6.1–6.4 and `Initialize_GUI.m` labels; WG/HT/VT derived keys (`S`, `cbar`, `AR`, …)
 - `Python/tests/test_field_docs.py`: asserts Cessna wing/aero keys including `"Root Chord"` in `DOCS["WG.CHRDR"]`

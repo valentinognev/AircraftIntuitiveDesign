@@ -1795,7 +1795,11 @@ elseif strcmp(action,'save')%%%%%%%%%%%%%%%%%% SAVE %%%%%%%%%%%%%%%%%%%%%%%
         end
         
         %Static Margin
-        np = questdlg('Estimate Neutral Point?','Iterate to Find NP');
+        if ~strcmp(choice,'batch')
+            np = questdlg('Estimate Neutral Point?','Iterate to Find NP');
+        else
+            np = 'No';
+        end
         if strcmp(np,'Yes')
             [output,~]=fFindstaticmargin(geo,state);
             Results{3}.N0 = output.ac;

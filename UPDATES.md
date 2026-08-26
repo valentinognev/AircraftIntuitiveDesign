@@ -1,5 +1,9 @@
 # Updates
 
+## 0.1.16 - AID.m Tornado NP batch default
+- `Matlab/fsroot/code/AID.m`: NP `questdlg` skipped when `choice=='batch'`; default `np='No'`
+- `Python/tests/test_aid_tornado_batch_np.py`: asserts batch guard around NP estimate dialog
+
 ## 0.1.15 - DATCOM_IO batch dialog defaults
 - `Matlab/fsroot/code/DATCOM_IO.m`: `Write_DATCOM` skips `questdlg` when `choice=='batch'`; default `owg`, `cg_calc=0`
 - `Python/tests/test_datcom_io_batch.py`: asserts explicit `strcmp(choice,'batch')` guard in DATCOM_IO.m

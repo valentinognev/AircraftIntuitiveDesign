@@ -1,5 +1,8 @@
 # Updates
 
+## 0.1.24 - Primary gold test expects Navion DATCOM failed
+- `Python/tests/test_matlab_gold_primary.py`: per-aircraft `EXPECTED` map; Navion `datcom: failed` (Linux binary exit 139), tornado/avl `ok`; DA20-C1 and Learjet 23 all three `ok`
+
 ## 0.1.23 - Honest primary gold status and usable coefficients
 - `run_aid_batch.m`: `gold_datcom_ok`/`gold_tornado_ok` reject ND (`99999`) and empty/NaN; record `datcom: binary exit N` on crash; delete stale JSON on failure
 - `DATCOM/datcom`: restored `set -e` (no `|| true` on segfault)

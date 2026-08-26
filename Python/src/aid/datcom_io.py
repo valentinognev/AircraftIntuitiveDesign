@@ -128,3 +128,39 @@ def naca_wing_line(ac: Aircraft) -> str:
     if isinstance(naca, (list, tuple)):
         naca = naca[0]
     return f"NACA-W-{len(naca)}-{naca}"
+
+
+_WGPLNF_RP = (
+    "CHRDR",
+    "CHRDBP",
+    "CHRDTP",
+    "SSPN",
+    "SSPNE",
+    "SSPNOP",
+    "SAVSI",
+    "SAVSO",
+    "CHSTAT",
+    "DHDADI",
+    "DHDADO",
+)
+
+
+def _planform_field(pt, key: str) -> float:
+    if key == "SSPNOP":
+        sspnop = float(pt.get("SSPNOP", 0.0))
+        if sspnop:
+            return float(pt.get("SSPN", 0.0)) - sspnop
+        return 0.0
+    return float(pt.get(key, 0.0))
+
+
+def write_wgplnf(pt, lines: list, label: str = "") -> None:
+    """Append DATCOM $WGPLNF planform namelist matching DATCOM_IO.m."""
+    name = label or "WGPLNF"
+    parts = [f" ${name} "]
+    for i, key in enumerate(_WGPLNF_RP, start=1):
+        parts.append(f"{key}={_planform_field(pt, key):.2f},")
+        if i % 4 == 0:
+            parts.append("\n  ")
+    parts.append("TYPE=1.0$")
+    lines.append("".join(parts))

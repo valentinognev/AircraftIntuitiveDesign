@@ -1,5 +1,9 @@
 # Updates
 
+## 0.3.14 - datcom_io write WGPLNF wing
+- `Python/src/aid/datcom_io.py`: `write_wgplnf(pt, lines, label='')` — `$WGPLNF` planform namelist (11 RP fields, 4-per-line wrap, TYPE=1.0$); optional `label` for HT/VT; SSPNOP span-from-tip conversion without mutating `pt`
+- `Python/tests/test_datcom_wgplnf.py`: Cessna 172 asserts `$WGPLNF`, CHRDR=2, SSPN=6
+
 ## 0.3.13 - datcom_io write BODY and NACA-W
 - `Python/src/aid/datcom_io.py`: `write_body(ac, lines)` — `$BODY` from `BD` (NX cap 18 linspace downsample, 12+6 array lines, S precision from min(S)); `naca_wing_line(ac)` — `NACA-W-{len}-{code}` from first `WG.NACA`; shared `_write_namelist_array` helper
 - `Python/tests/test_datcom_body.py`: Cessna 172 asserts `$BODY` and `NACA-W-4-2412`

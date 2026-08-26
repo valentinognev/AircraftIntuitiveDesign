@@ -1,5 +1,9 @@
 # Updates
 
+## 0.3.15 - datcom_io write controls SYMFLP ASYFLP
+- `Python/src/aid/datcom_io.py`: `write_symflp(pt, lines)` — `$SYMFLP` (9 RF fields, wrap after 4th, NDELTA/DELTA); `write_asyflp(pt, lines)` — `$ASYFLP` (5 RC fields, NDELTA/DELTAL/DELTAR); `write_controls(ac, lines)` — flap/aileron/elevator when deflections nonzero; skip elevator when `E.SPANFI<0.01` (DA20 batch)
+- `Python/tests/test_datcom_controls.py`: Cessna 172 zero-deflection must not crash; no `PLOT`
+
 ## 0.3.14 - datcom_io write WGPLNF wing
 - `Python/src/aid/datcom_io.py`: `write_wgplnf(pt, lines, label='')` — `$WGPLNF` planform namelist (11 RP fields, 4-per-line wrap, TYPE=1.0$); optional `label` for HT/VT; SSPNOP span-from-tip conversion without mutating `pt`
 - `Python/tests/test_datcom_wgplnf.py`: Cessna 172 asserts `$WGPLNF`, CHRDR=2, SSPN=6

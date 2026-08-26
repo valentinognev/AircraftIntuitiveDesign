@@ -164,3 +164,73 @@ def write_wgplnf(pt, lines: list, label: str = "") -> None:
             parts.append("\n  ")
     parts.append("TYPE=1.0$")
     lines.append("".join(parts))
+
+
+_SYMFLP_RF = (
+    "SPANFI",
+    "SPANFO",
+    "CHRDFI",
+    "CHRDFO",
+    "FTYPE",
+    "PHETE",
+    "PHETEP",
+    "TC",
+    "CB",
+)
+
+_ASYFLP_RC = (
+    "SPANFI",
+    "SPANFO",
+    "CHRDFI",
+    "CHRDFO",
+    "STYPE",
+)
+
+
+def _has_nonzero(vals) -> bool:
+    arr = np.asarray(vals, dtype=float).reshape(-1)
+    return bool(np.any(arr != 0))
+
+
+def write_symflp(pt: dict, lines: list) -> None:
+    """Append DATCOM $SYMFLP namelist matching DATCOM_IO.m."""
+    parts = [" $SYMFLP "]
+    for i, key in enumerate(_SYMFLP_RF, start=1):
+        parts.append(f"{key}={float(pt[key]):.3f},")
+        if i == 4 and len(_SYMFLP_RF) > i:
+            parts.append("\n  ")
+    delta = _as_list(pt["DELTA"])
+    parts.append(f"\n  NDELTA={len(delta):.1f},")
+    parts.append("DELTA=")
+    parts.append(_fmt_values(delta, "%.1f,"))
+    parts.append("$")
+    lines.append("".join(parts))
+
+
+def write_asyflp(pt: dict, lines: list) -> None:
+    """Append DATCOM $ASYFLP namelist matching DATCOM_IO.m."""
+    parts = [" $ASYFLP "]
+    for i, key in enumerate(_ASYFLP_RC, start=1):
+        parts.append(f"{key}={float(pt[key]):.3f},")
+        if i == 4 and len(_ASYFLP_RC) > i:
+            parts.append("\n  ")
+    deltal = _as_list(pt["DELTAL"])
+    deltar = _as_list(pt["DELTAR"])
+    parts.append(f"NDELTA={len(deltal):.1f},")
+    parts.append("\n  DELTAL=")
+    parts.append(_fmt_values(deltal, "%.1f,"))
+    parts.append("\n  DELTAR=")
+    parts.append(_fmt_values(deltar, "%.1f,"))
+    parts.append("$")
+    lines.append("".join(parts))
+
+
+def write_controls(ac: Aircraft, lines: list) -> None:
+    """Append control namelists when deflections are nonzero (batch, not wing-only)."""
+    if _has_nonzero(ac.F.get("DELTA", 0)):
+        write_symflp(ac.F, lines)
+    if _has_nonzero(ac.A.get("DELTAL", 0)) or _has_nonzero(ac.A.get("DELTAR", 0)):
+        write_asyflp(ac.A, lines)
+    e = ac.E
+    if _has_nonzero(e.get("DELTA", 0)) and float(e.get("SPANFI", 0)) >= 0.01:
+        write_symflp(e, lines)

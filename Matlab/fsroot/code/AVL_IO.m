@@ -31,8 +31,7 @@ else
       	type([CaseID,'.avl'])
         type([CaseID,'.run'])
     end
-    setenv('DYLD_LIBRARY_PATH', '/usr/local/bin:/opt/local/lib:')
-    system(['./avl3.35',' < ',CaseID,'.run']);
+    system(['./avl',' < ',CaseID,'.run']);
 end
 
 %Check Outputs

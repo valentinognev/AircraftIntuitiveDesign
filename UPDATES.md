@@ -1,5 +1,9 @@
 # Updates
 
+## 0.1.14 - AVL_IO.m Linux binary
+- `Matlab/fsroot/code/AVL_IO.m`: else-branch calls `./avl` (Task 10 binary); removed macOS `DYLD_LIBRARY_PATH` setenv
+- `Python/tests/test_avl_io_patch.py`: asserts `./avl` invocation, no `avl3.35` in file
+
 ## 0.1.13 - AID.m Linux DATCOM wrapper
 - `Matlab/fsroot/code/AID.m`: non-Windows DATCOM branch calls `system('./datcom')` instead of `./datcom.osx`
 - `Python/tests/test_aid_datcom_patch.py`: asserts Linux branch uses wrapper, not macOS binary

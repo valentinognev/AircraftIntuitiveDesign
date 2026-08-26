@@ -1,5 +1,9 @@
 # Updates
 
+## 0.3.1 - JSONC field documentation catalog
+- `Python/src/aid/field_docs.py`: `DOCS` dict (248 dotted paths) from spec §6.1–6.4 and `Initialize_GUI.m` labels; WG/HT/VT derived keys (`S`, `cbar`, `AR`, …)
+- `Python/tests/test_field_docs.py`: asserts Cessna wing/aero keys including `"Root Chord"` in `DOCS["WG.CHRDR"]`
+
 ## 0.3.0 - aid.paths models_dir
 - `Python/src/aid/paths.py`: `models_dir()` → `repo_root() / "Python" / "models"`
 - `Python/tests/test_paths.py`: `test_paths_resolve` asserts path helpers including `models_dir().name == "models"`

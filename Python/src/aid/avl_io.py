@@ -1,10 +1,14 @@
 import math
+import subprocess
 from copy import deepcopy
 from pathlib import Path
 
 import numpy as np
 
 from aid.aircraft import Aircraft
+from aid.avl_parse import parse_st
+from aid.paths import avl_bin
+from aid.tornado_io import tornado_io
 
 
 def _last(val) -> float:
@@ -166,7 +170,6 @@ def write_avl_geometry(
     ni: int,
     nj: int,
 ) -> None:
-    del state  # used by Task 50 Write_Case / run_avl
     run_dir = Path(run_dir)
     run_dir.mkdir(parents=True, exist_ok=True)
 
@@ -208,3 +211,57 @@ def write_avl_geometry(
                 ni,
                 nj,
             )
+
+
+def write_case(case_id: str, state: dict, run_dir: Path) -> None:
+    """Write AVL run-case file (port of ``AVL_IO.m`` ``Write_Case``)."""
+    run_dir = Path(run_dir)
+    run_path = run_dir / f"{case_id}.run"
+    as_val = float(state["AS"])
+
+    with run_path.open("w", encoding="ascii") as fid:
+        fid.write(f"LOAD {case_id}.avl\n")
+
+        mass_path = run_dir / f"{case_id}.mass"
+        if mass_path.is_file():
+            fid.write(f"MASS {case_id}.mass\n")
+            fid.write("MSET 1\n")
+
+        fid.write("0\n")
+        fid.write("PLOP\ng\n\n")
+        fid.write("OPER\n")
+        fid.write("c1\n")
+        fid.write(f"v {as_val:6.4f}\n\n")
+        fid.write("x\n")
+        fid.write("st\n")
+        fid.write(f"{case_id}.st\n")
+        fid.write("sb\n")
+        fid.write(f"{case_id}.sb\n")
+        fid.write("\n")
+        fid.write("Quit\n")
+
+
+def run_avl(run_dir: Path, *, timeout: float = 120) -> None:
+    """Run AVL in ``run_dir`` with ``geometry.run`` on stdin."""
+    run_dir = Path(run_dir)
+    run_file = run_dir / "geometry.run"
+    with run_file.open(encoding="ascii") as run_in:
+        subprocess.run(
+            [str(avl_bin())],
+            stdin=run_in,
+            cwd=run_dir,
+            check=True,
+            timeout=timeout,
+        )
+
+
+def run_avl_full(ac: Aircraft, mesh: tuple[str, str], run_dir: Path) -> dict:
+    """Tornado geo → AVL geometry/case → run → parse stability derivatives."""
+    run_dir = Path(run_dir)
+    geo, state = tornado_io(ac, mesh)
+    nj = int(mesh[0])
+    ni = int(mesh[1])
+    write_avl_geometry(ac, geo, state, run_dir, ni, nj)
+    write_case("geometry", state, run_dir)
+    run_avl(run_dir)
+    return parse_st(run_dir / "geometry.st")

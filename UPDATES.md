@@ -1,5 +1,9 @@
 # Updates
 
+## 0.3.32 - avl_io Write_Case and run_avl
+- `Python/src/aid/avl_io.py`: `write_case`, `run_avl`, `run_avl_full` — port `AVL_IO.m` `Write_Case` and `./avl < geometry.run`; chain `tornado_io` → `write_avl_geometry` → case → subprocess → `parse_st`
+- `Python/tests/test_avl_run_cessna.py`: Cessna mesh `("10","10")` asserts `CLa` vs MATLAB `avl.json` gold (atol 1e-6)
+
 ## 0.3.31 - avl_io CDp from WG.CD0
 - `Python/src/aid/avl_io.py`: `#CDp` uses `WG.CD0` if present else `0` (matches `run_aid_batch.m`, not component sum)
 - `Python/tests/test_avl_write_geometry.py`: asserts `#CDp` line equals `WG.CD0` to `%.3f`

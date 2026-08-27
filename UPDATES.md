@@ -1,5 +1,10 @@
 # Updates
 
+## 0.6.0 - aid_gui Wing tab CHRDR field
+- `Python/src/aid_gui/tabs.py`: Wing tab with `Root Chord` `QLineEdit` bound to `WG.CHRDR`
+- `Python/src/aid_gui/main_window.py`: `load_aircraft`, `wing_chrdr_value`; central tab widget
+- `Python/tests/test_gui_wing_chrdr.py`: Cessna 172 loads CHRDR=2 into Wing field
+
 ## 0.5.3 - aid_gui Help menu
 - `Python/src/aid_gui/menus.py`: Help submenu with `Examples`, `Quick Start`, `User's Manual`, `control legend`; User's Manual opens `AID_Documentation.pdf` via `QDesktopServices`
 - `Python/tests/test_gui_help_menu.py`: offscreen Help submenu action labels smoke test

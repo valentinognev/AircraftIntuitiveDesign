@@ -298,10 +298,14 @@ def write_geometry(
         fnx_row[idxs] = ni_flap
         flapped_row[idxs] = 1.0
         if "DELTA" not in cs:
-            if cs.get("DELTAR", 0) != -cs.get("DELTAR", 0):
+            deltar = np.asarray(cs.get("DELTAR", 0), dtype=float).reshape(-1)
+            if deltar.size == 1:
+                if deltar[0] != -deltar[0]:
+                    fsym_row[idxs] = 0.0
+            elif not np.allclose(deltar, -deltar):
                 fsym_row[idxs] = 0.0
             cs = dict(cs)
-            cs["DELTA"] = -float(cs.get("DELTAL", 0))
+            cs["DELTA"] = -float(np.asarray(cs.get("DELTAL", 0)).reshape(-1)[0])
         delta = cs["DELTA"]
         delta_val = float(np.asarray(delta).reshape(-1)[0]) * np.pi / 180
         flap_vector_row[idxs] = delta_val

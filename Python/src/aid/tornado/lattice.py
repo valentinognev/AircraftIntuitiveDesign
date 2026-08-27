@@ -7,7 +7,17 @@ import math
 import numpy as np
 from scipy.interpolate import PchipInterpolator
 
-__all__ = ["lattice_setup"]
+__all__ = ["lattice_setup", "flap_indices"]
+
+
+def flap_indices(geo: dict) -> tuple[np.ndarray, np.ndarray]:
+    """Return (division, wing) indices in MATLAB ``find(geo.flapped')`` order."""
+    flapped_t = np.asarray(geo["flapped"], dtype=float).T
+    linear = np.flatnonzero(flapped_t.ravel(order="F"))
+    n_div = flapped_t.shape[0]
+    i_idx = linear % n_div
+    k_idx = linear // n_div
+    return i_idx, k_idx
 
 
 def _config(key: str):
@@ -632,8 +642,7 @@ def _wakesetup2(lattice: dict, state: dict, ref: dict) -> dict:
 
 
 def _setrudder3(rudder: int, deflection: float, lattice: dict, geo: dict) -> dict:
-    flapped_t = geo["flapped"].T
-    i_idx, k_idx = np.where(flapped_t != 0)
+    i_idx, k_idx = flap_indices(geo)
     if rudder > len(i_idx):
         raise ValueError(f"Invalid rudder index {rudder}")
     wing = int(k_idx[rudder - 1])
@@ -754,8 +763,7 @@ def lattice_setup(geo: dict, state: dict, mode: int = 0) -> tuple[dict, dict]:
 
     lattice = _wakesetup2(lattice, state, ref)
 
-    flapped_t = geo["flapped"].T
-    i_idx, k_idx = np.where(flapped_t != 0)
+    i_idx, k_idx = flap_indices(geo)
     if i_idx.size:
         noof_flaps = int(np.sum(geo["flapped"]))
         for k in range(1, noof_flaps + 1):

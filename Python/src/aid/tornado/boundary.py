@@ -6,7 +6,7 @@ import copy
 
 import numpy as np
 
-from aid.tornado.lattice import _config, lattice_setup
+from aid.tornado.lattice import _config, flap_indices, lattice_setup
 
 __all__ = ["set_boundary"]
 
@@ -74,8 +74,7 @@ def set_boundary(lattice: dict, geo: dict, state: dict) -> dict:
     bc[:, 5] = _bc_column(lattice, geo, state, v, npan)
     state["R"] = state["R"] - delta
 
-    flapped_t = np.asarray(geo["flapped"], dtype=float).T
-    i_idx, k_idx = np.where(flapped_t != 0)
+    i_idx, k_idx = flap_indices(geo)
 
     for rudder in range(len(i_idx)):
         k, i = int(k_idx[rudder]), int(i_idx[rudder])

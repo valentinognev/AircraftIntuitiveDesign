@@ -1,5 +1,11 @@
 # Updates
 
+## 0.3.33 - compare harness MATLAB vs Python
+- `Python/src/aid/compare.py`: `run_python`, `compare_to_matlab` — DATCOM/Tornado/AVL chain, spec §13 tolerances, `Results/compare/<name>.json`; DATCOM crash → `failed` not abort
+- `Python/tests/test_compare_primary.py`: primary four; Navion expects `not report["datcom"]["pass"]`, tornado+avl pass (others all-three pass)
+- `Python/src/aid/tornado/lattice.py`: `flap_indices()` — MATLAB `find(geo.flapped')` column-major order (fixes DA20 lattice crash)
+- `Python/src/aid/tornado/boundary.py`, `tornado_io.py`: flap order + Navion `DELTAR` array asymmetric aileron
+
 ## 0.3.32 - avl_io Write_Case and run_avl
 - `Python/src/aid/avl_io.py`: `write_case`, `run_avl`, `run_avl_full` — port `AVL_IO.m` `Write_Case` and `./avl < geometry.run`; chain `tornado_io` → `write_avl_geometry` → case → subprocess → `parse_st`
 - `Python/tests/test_avl_run_cessna.py`: Cessna mesh `("10","10")` asserts `CLa` vs MATLAB `avl.json` gold (atol 1e-6)

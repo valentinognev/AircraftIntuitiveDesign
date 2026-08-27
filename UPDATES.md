@@ -1,5 +1,16 @@
 # Updates
 
+## 0.3.35 - Navion/DA20 Tornado setrudder parity
+- `lattice.py`: `_setrudder3` — rotate HP col 1 with TEP cols 0/5 in first loop; skip TEP/HP cols in second loop (avoids double-rotation; matches MATLAB wake/TEP parity on flapped nx=1 panels)
+- Round 1 retained: `tornado_io.py` `_fc_chord_matlab`/`fsym`, `avl_io.py` dihedral + stale `.st` cleanup, `_geometry19` hp/tep1 prealloc
+- Primary compare 4/4 pass (Navion DATCOM still expected fail)
+
+## 0.3.34 - Navion/DA20 geometry parity (partial)
+- `tornado_io.py`: `_fc_chord_matlab()` — MATLAB linear `geo.c` indexing for `fc`; `fsym` from `DELTAR` schedule matches matrix-`if` (Navion aileron)
+- `avl_io.py`: cumulative dihedral correction per `AVL_IO.m`; remove stale `geometry.st`/`.sb` before run (DA20/Navion AVL CLa gold)
+- `lattice.py`: preallocate hinge/TEP arrays in `_geometry19` (no `np.resize` on hp/tep1)
+- Tornado coeffs still RED on Navion/DA20 (TEP1/VORTEX backfill on some flapped panels)
+
 ## 0.3.33 - compare harness MATLAB vs Python
 - `Python/src/aid/compare.py`: `run_python`, `compare_to_matlab` — DATCOM/Tornado/AVL chain, spec §13 tolerances, `Results/compare/<name>.json`; DATCOM crash → `failed` not abort
 - `Python/tests/test_compare_primary.py`: primary four; Navion expects `not report["datcom"]["pass"]`, tornado+avl pass (others all-three pass)

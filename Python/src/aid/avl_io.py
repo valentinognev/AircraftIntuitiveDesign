@@ -84,8 +84,9 @@ def _write_surface(
     starty = geo["starty"][k, :n].copy()
     startz = geo["startz"][k, :n].copy()
     for i in range(1, n):
-        dy = float(geo["starty"][k, i] - geo["starty"][k, i - 1])
-        dz = float(geo["startz"][k, i] - geo["startz"][k, i - 1])
+        # AVL_IO.m updates geo.starty(k,i-1) in place; dy/dz use the running value.
+        dy = float(geo["starty"][k, i] - starty[i - 1])
+        dz = float(geo["startz"][k, i] - startz[i - 1])
         sine = math.sin(float(geo["dihed"][k, i - 1]))
         cosine = math.cos(float(geo["dihed"][k, i - 1]))
         starty[i] = starty[i - 1] + dy * cosine - dz * sine
@@ -263,5 +264,9 @@ def run_avl_full(ac: Aircraft, mesh: tuple[str, str], run_dir: Path) -> dict:
     ni = int(mesh[1])
     write_avl_geometry(ac, geo, state, run_dir, ni, nj)
     write_case("geometry", state, run_dir)
+    for stale in ("geometry.st", "geometry.sb"):
+        path = run_dir / stale
+        if path.is_file():
+            path.unlink()
     run_avl(run_dir)
     return parse_st(run_dir / "geometry.st")

@@ -85,6 +85,14 @@ def _init_geo(aero: dict) -> dict:
     }
 
 
+def _fc_chord_matlab(geo: dict, flap_id: np.ndarray, control_i: int) -> float:
+    """Chord for fc — port Tornado_IO.m ``geo.c(find(flap_id==i,1))`` linear indexing."""
+    rows = [np.asarray(r, dtype=float).reshape(-1) for r in geo["c"]]
+    mat = _pad_rows(rows)
+    matlab_find = int(np.where(flap_id == control_i + 1)[0][0]) + 1
+    return float(mat.ravel(order="F")[matlab_find - 1])
+
+
 def _pad_rows(rows: list[np.ndarray]) -> np.ndarray:
     if not rows:
         return np.empty((0, 0))
@@ -292,17 +300,18 @@ def write_geometry(
         idxs = flap_index[i]
         flap_id_row[idxs, i] = i + 1
         fsym_row[idxs] = 1.0
-        root_i = int(np.where(flap_id == i + 1)[0][0])
-        fc_row[idxs] = float(cs["CHRDFI"]) / float(c[root_i])
+        fc_row[idxs] = float(cs["CHRDFI"]) / _fc_chord_matlab(geo, flap_id, i)
         ni_flap = int(math.ceil(fc_row[idxs[0]] * ni))
         fnx_row[idxs] = ni_flap
         flapped_row[idxs] = 1.0
         if "DELTA" not in cs:
             deltar = np.asarray(cs.get("DELTAR", 0), dtype=float).reshape(-1)
+            # MATLAB ``if CS{i}.DELTAR~=-CS{i}.DELTAR`` — matrix ``if`` is true only
+            # when every element differs from its negation (e.g. scalar antisymmetry).
             if deltar.size == 1:
                 if deltar[0] != -deltar[0]:
                     fsym_row[idxs] = 0.0
-            elif not np.allclose(deltar, -deltar):
+            elif np.all(deltar != -deltar):
                 fsym_row[idxs] = 0.0
             cs = dict(cs)
             cs["DELTA"] = -float(np.asarray(cs.get("DELTAL", 0)).reshape(-1)[0])

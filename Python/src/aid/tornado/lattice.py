@@ -291,13 +291,15 @@ def _geometry19(
     x_1_s, lemma_1_s_tot = _slope2(foil_in)
     x_2_s, lemma_2_s_tot = _slope2(foil_out)
 
-    hp = np.zeros((0, 2, 3))
-    tep1 = np.zeros((0, 2, 3))
+    neqns = nx_total * ny
+    n_panels_total = neqns * (1 + sym)
+    hp = np.zeros((n_panels_total, 2, 3))
+    tep1 = np.zeros((n_panels_total, 2, 3))
     c1_list: list[np.ndarray] = []
-    v1 = np.zeros((0, 2, 3))
-    lemma_1_s = np.zeros(nx_total * ny)
-    lemma_2_s = np.zeros(nx_total * ny)
-    s_slopes = np.zeros(nx_total * ny)
+    v1 = np.zeros((n_panels_total, 2, 3))
+    lemma_1_s = np.zeros(neqns)
+    lemma_2_s = np.zeros(neqns)
+    s_slopes = np.zeros(neqns)
 
     t_idx = 0
     for j in range(ny):
@@ -311,41 +313,28 @@ def _geometry19(
             if i == (nx_total - fnx - 1):
                 for s in range(nx_total - fnx):
                     src = idx - s
-                    hp_row = np.array([[px_row[3], py_row[3], pz_row[3]],
-                                       [px_row[2], py_row[2], pz_row[2]]])
-                    if hp.shape[0] <= src:
-                        hp = np.resize(hp, (src + 1, 2, 3))
-                    hp[src] = hp_row
+                    hp[src] = np.array([[px_row[3], py_row[3], pz_row[3]],
+                                        [px_row[2], py_row[2], pz_row[2]]])
                     if sym == 1:
                         dst = src + neqns
-                        if hp.shape[0] <= dst:
-                            hp = np.resize(hp, (dst + 1, 2, 3))
                         hp[dst] = np.array([[px_row[2], -py_row[2], pz_row[2]],
                                             [px_row[3], -py_row[3], pz_row[3]]])
 
             if i == (nx_total - 1):
                 for s in range(nx_total):
                     src = idx - s
-                    tep_row = np.array([[px_row[3], py_row[3], pz_row[3]],
-                                        [px_row[2], py_row[2], pz_row[2]]])
-                    if tep1.shape[0] <= src:
-                        tep1 = np.resize(tep1, (src + 1, 2, 3))
-                    tep1[src] = tep_row
+                    tep1[src] = np.array([[px_row[3], py_row[3], pz_row[3]],
+                                          [px_row[2], py_row[2], pz_row[2]]])
                     if sym == 1:
                         dst = src + neqns
-                        if tep1.shape[0] <= dst:
-                            tep1 = np.resize(tep1, (dst + 1, 2, 3))
                         tep1[dst] = np.array([[px_row[2], -py_row[2], pz_row[2]],
                                               [px_row[3], -py_row[3], pz_row[3]]])
                     for u in range(fnx):
                         h_src = idx - u
-                        if hp.shape[0] <= h_src:
-                            hp = np.resize(hp, (h_src + 1, 2, 3))
-                        hp[h_src] = tep_row
+                        hp[h_src] = np.array([[px_row[3], py_row[3], pz_row[3]],
+                                              [px_row[2], py_row[2], pz_row[2]]])
                         if sym == 1:
                             h_dst = h_src + neqns
-                            if hp.shape[0] <= h_dst:
-                                hp = np.resize(hp, (h_dst + 1, 2, 3))
                             hp[h_dst] = np.array([[px_row[2], -py_row[2], pz_row[2]],
                                                   [px_row[3], -py_row[3], pz_row[3]]])
 
@@ -364,8 +353,6 @@ def _geometry19(
             by = (3 * py_row[1] + py_row[2]) / 4
             bz = (3 * pz_row[1] + pz_row[2]) / 4
 
-            if v1.shape[0] <= idx:
-                v1 = np.resize(v1, (idx + 1, 2, 3))
             v1[idx, 0] = [ax, ay, az]
             v1[idx, 1] = [bx, by, bz]
 
@@ -382,8 +369,6 @@ def _geometry19(
         c2 = c1.copy()
         c2[:, 1] = -c2[:, 1]
         c_out = np.vstack([c1, c2])
-        if v1.shape[0] < neqns:
-            v1 = np.resize(v1, (neqns, 2, 3))
         v_sym = np.zeros((neqns, 2, 3))
         v_sym[:, 0] = v1[:neqns, 1]
         v_sym[:, 0, 1] = -v_sym[:neqns, 0, 1]
@@ -399,15 +384,11 @@ def _geometry19(
     n_panels = c_out.shape[0]
     vor = np.zeros((n_panels, 6, 3), dtype=float)
     for k in range(n_panels):
-        if k < tep1.shape[0] and tep1.shape[0]:
-            vor[k, 0] = tep1[k, 0]
-        if k < hp.shape[0] and hp.shape[0]:
-            vor[k, 1] = hp[k, 0]
+        vor[k, 0] = tep1[k, 0]
+        vor[k, 1] = hp[k, 0]
         vor[k, 2:4] = v_full[k]
-        if k < hp.shape[0] and hp.shape[0]:
-            vor[k, 4] = hp[k, 1]
-        if k < tep1.shape[0] and tep1.shape[0]:
-            vor[k, 5] = tep1[k, 1]
+        vor[k, 4] = hp[k, 1]
+        vor[k, 5] = tep1[k, 1]
 
     n_out = _normals4(c_out, vor, s_full)
     v_out = vor
@@ -696,7 +677,7 @@ def _setrudder3(rudder: int, deflection: float, lattice: dict, geo: dict) -> dic
             h_hat = h2_hat
             a, b = a2, b2
             def_val = -deflection if fsym == 0 else deflection
-        for col in (0, 5):
+        for col in (0, 1, 5):
             p1 = vortex[rad2 - 1, col, :].copy()
             if col <= mp - 1:
                 r_vec = p1 - a
@@ -720,6 +701,8 @@ def _setrudder3(rudder: int, deflection: float, lattice: dict, geo: dict) -> dic
                 def_val = -deflection if fsym == 0 else deflection
             for k in range(4):
                 col = k + mp - 1
+                if col in (0, 1, 5):
+                    continue
                 p1 = vortex[rad1, col, :].copy()
                 if col <= mp - 1:
                     p2 = _trot3(h_hat, p1 - a, def_val) + a

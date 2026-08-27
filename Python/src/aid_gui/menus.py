@@ -12,6 +12,7 @@ from aid_gui.tabs import clear_fields
 def build_menus(window: QMainWindow) -> None:
     _build_file_menu(window)
     _build_analyze_menu(window)
+    _build_settings_menu(window)
     _build_help_menu(window)
 
 
@@ -77,6 +78,48 @@ def _build_analyze_menu(window: QMainWindow) -> None:
     avl_action = QAction("AVL", window)
     avl_action.triggered.connect(window.run_avl)
     analyze_menu.addAction(avl_action)
+
+
+def _build_settings_menu(window: QMainWindow) -> None:
+    settings_menu = window.menuBar().addMenu("Settings")
+
+    scale_action = QAction("Scale", window)
+    scale_action.setEnabled(False)
+    settings_menu.addAction(scale_action)
+
+    estimate_cg_action = QAction("Estimate CG", window)
+    estimate_cg_action.setEnabled(False)
+    settings_menu.addAction(estimate_cg_action)
+
+    plot_options_menu = settings_menu.addMenu("Plot Options")
+    for label in (
+        "Transparent",
+        "Show Axes",
+        "Plot Resolution",
+        "Interpolated Shading",
+        "Project Dimensions",
+        "Aircraft Color",
+    ):
+        action = QAction(label, window)
+        action.setEnabled(False)
+        plot_options_menu.addAction(action)
+
+    calculations_menu = settings_menu.addMenu("Calculations")
+    for label in ("Trim Mode", "Estimate Slipstream", "Multhopp's Method"):
+        action = QAction(label, window)
+        action.setEnabled(False)
+        calculations_menu.addAction(action)
+
+    units_menu = settings_menu.addMenu("Units")
+    for label in ("in-oz-ft/s", "ft-lb-kts"):
+        action = QAction(label, window)
+        action.setEnabled(False)
+        units_menu.addAction(action)
+
+    for label in ("Inputs/Outputs", "Error Check", "Scroll Sensitivity"):
+        action = QAction(label, window)
+        action.setEnabled(False)
+        settings_menu.addAction(action)
 
 
 def _build_help_menu(window: QMainWindow) -> None:

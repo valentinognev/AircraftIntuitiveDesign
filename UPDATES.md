@@ -1,5 +1,11 @@
 # Updates
 
+## 0.10.0 - aid console entry point and Settings stubs
+- `Python/pyproject.toml`: `[project.scripts] aid = "aid_gui.app:main"`
+- `Python/src/aid_gui/app.py`: `QApplication.instance() or QApplication(sys.argv)`; show `MainWindow`, `app.exec()`
+- `Python/src/aid_gui/menus.py`: Settings menu with spec §14 disabled stubs (Scale, Estimate CG, Plot Options, Calculations, Units, Inputs/Outputs, Error Check, Scroll Sensitivity)
+- `Python/tests/test_gui_entry.py`: entry point metadata + `main` callable smoke test
+
 ## 0.9.1 - GUI Analyze AVL missing-binary dialog
 - `Python/src/aid_gui/main_window.py`: `run_avl` catches missing/failed AVL subprocess; `QMessageBox.critical` with `avl_bin()` path (spec §15)
 

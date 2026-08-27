@@ -1,5 +1,10 @@
 # Updates
 
+## 0.5.2 - aid_gui Analyze menu
+- `Python/src/aid_gui/menus.py`: Analyze submenu with `DATCOM`, `Tornado`, `AVL` wired to MainWindow stub slots
+- `Python/src/aid_gui/main_window.py`: stub `run_datcom`, `run_tornado`, `run_avl` methods
+- `Python/tests/test_gui_analyze_menu.py`: offscreen Analyze submenu action labels smoke test
+
 ## 0.5.1 - aid_gui File menu
 - `Python/src/aid_gui/menus.py`: File menu with `New`, `Load`, `Save`; New clears `aircraft`; Load/Save stub slots
 - `Python/src/aid_gui/main_window.py`: calls `build_menus(self)` after init

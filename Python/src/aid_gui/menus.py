@@ -4,6 +4,7 @@ from PySide6.QtWidgets import QMainWindow
 
 def build_menus(window: QMainWindow) -> None:
     _build_file_menu(window)
+    _build_analyze_menu(window)
 
 
 def _build_file_menu(window: QMainWindow) -> None:
@@ -32,3 +33,19 @@ def _on_load(window: QMainWindow) -> None:
 
 def _on_save(window: QMainWindow) -> None:
     pass
+
+
+def _build_analyze_menu(window: QMainWindow) -> None:
+    analyze_menu = window.menuBar().addMenu("Analyze")
+
+    datcom_action = QAction("DATCOM", window)
+    datcom_action.triggered.connect(window.run_datcom)
+    analyze_menu.addAction(datcom_action)
+
+    tornado_action = QAction("Tornado", window)
+    tornado_action.triggered.connect(window.run_tornado)
+    analyze_menu.addAction(tornado_action)
+
+    avl_action = QAction("AVL", window)
+    avl_action.triggered.connect(window.run_avl)
+    analyze_menu.addAction(avl_action)

@@ -10,3 +10,12 @@ class MainWindow(QMainWindow):
         self.resize(960, 600)
         self.aircraft = None
         build_menus(self)
+
+    def run_datcom(self) -> None:
+        pass
+
+    def run_tornado(self) -> None:
+        pass
+
+    def run_avl(self) -> None:
+        pass

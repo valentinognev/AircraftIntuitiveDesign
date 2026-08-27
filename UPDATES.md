@@ -1,5 +1,11 @@
 # Updates
 
+## 0.7.0 - aid_gui geometry/aero tabs and JSONC load
+- `Python/src/aid_gui/tabs.py`: Wing/HT/VT planform RP fields, Control (F/A/E/R), Body (BD), Aero (ALSCHD/ALT/MACH/WT/XCG), `+` stub; field registry + `clear_fields`
+- `Python/src/aid_gui/main_window.py`: `field_value(dotted)`; `wing_chrdr_value` via registry
+- `Python/src/aid_gui/menus.py`: File→Load/Save via QFileDialog + `load_jsonc`/`save_jsonc`; New clears fields
+- `Python/tests/test_gui_tabs_cessna.py`: Cessna AERO.MACH and WG.SSPN load smoke test
+
 ## 0.6.0 - aid_gui Wing tab CHRDR field
 - `Python/src/aid_gui/tabs.py`: Wing tab with `Root Chord` `QLineEdit` bound to `WG.CHRDR`
 - `Python/src/aid_gui/main_window.py`: `load_aircraft`, `wing_chrdr_value`; central tab widget

@@ -1,8 +1,12 @@
+from pathlib import Path
+
 from PySide6.QtCore import QUrl
 from PySide6.QtGui import QAction, QDesktopServices
-from PySide6.QtWidgets import QMainWindow
+from PySide6.QtWidgets import QMainWindow, QFileDialog
 
+from aid.aircraft import load_jsonc, save_jsonc
 from aid.paths import matlab_code
+from aid_gui.tabs import clear_fields
 
 
 def build_menus(window: QMainWindow) -> None:
@@ -29,14 +33,33 @@ def _build_file_menu(window: QMainWindow) -> None:
 
 def _on_new(window: QMainWindow) -> None:
     window.aircraft = None
+    clear_fields(window)
 
 
 def _on_load(window: QMainWindow) -> None:
-    pass
+    path, _ = QFileDialog.getOpenFileName(
+        window,
+        "Load Aircraft",
+        "",
+        "JSONC Files (*.jsonc);;All Files (*)",
+    )
+    if not path:
+        return
+    window.load_aircraft(load_jsonc(Path(path)))
 
 
 def _on_save(window: QMainWindow) -> None:
-    pass
+    if window.aircraft is None:
+        return
+    path, _ = QFileDialog.getSaveFileName(
+        window,
+        "Save Aircraft",
+        "",
+        "JSONC Files (*.jsonc);;All Files (*)",
+    )
+    if not path:
+        return
+    save_jsonc(window.aircraft, Path(path))
 
 
 def _build_analyze_menu(window: QMainWindow) -> None:

@@ -18,8 +18,11 @@ class MainWindow(QMainWindow):
         self.aircraft = ac
         populate_from_aircraft(self, ac)
 
+    def field_value(self, dotted: str) -> float:
+        return float(self._field_edits[dotted].text())
+
     def wing_chrdr_value(self) -> float:
-        return float(self._wing_chrdr_edit.text())
+        return self.field_value("WG.CHRDR")
 
     def run_datcom(self) -> None:
         pass

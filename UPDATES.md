@@ -1,5 +1,8 @@
 # Updates
 
+## 0.8.1 - 3D view equal aspect from data ranges
+- `Python/src/aid_gui/view3d.py`: `_set_equal_aspect()` uses axis ptp tuple instead of unit cube; guards zero Z range
+
 ## 0.8.0 - GUI 3D planform view placeholder
 - `Python/src/aid_gui/view3d.py`: matplotlib `FigureCanvasQTAgg` wing outline; `line_count()` for plotted segments
 - `Python/src/aid_gui/main_window.py`: `QSplitter` tabs | 3D canvas; `load_aircraft` refreshes view

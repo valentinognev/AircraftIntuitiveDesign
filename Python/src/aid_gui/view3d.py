@@ -21,8 +21,14 @@ class View3D(FigureCanvasQTAgg):
         self._ax.clear()
         self._line_count = 0
         self._plot_wing_outline(ac.WG)
-        self._ax.set_box_aspect([1, 1, 1])
+        self._set_equal_aspect()
         self.draw()
+
+    def _set_equal_aspect(self) -> None:
+        xr = float(np.ptp(self._ax.get_xlim3d())) or 1.0
+        yr = float(np.ptp(self._ax.get_ylim3d())) or 1.0
+        zr = float(np.ptp(self._ax.get_zlim3d())) or 1.0
+        self._ax.set_box_aspect((xr, yr, zr))
 
     def _plot_polyline(self, xs: np.ndarray, ys: np.ndarray, zs: np.ndarray) -> None:
         self._ax.plot(xs, ys, zs, color="C0")

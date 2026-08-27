@@ -1,5 +1,9 @@
 # Updates
 
+## 0.7.1 - GUI load skips missing optional keys
+- `Python/src/aid_gui/tabs.py`: `populate_from_aircraft` uses `dict.get`; missing BD/control keys leave fields empty
+- `Python/tests/test_gui_tabs_cessna.py`: DA20-C1 load smoke test (no ITYPE KeyError)
+
 ## 0.7.0 - aid_gui geometry/aero tabs and JSONC load
 - `Python/src/aid_gui/tabs.py`: Wing/HT/VT planform RP fields, Control (F/A/E/R), Body (BD), Aero (ALSCHD/ALT/MACH/WT/XCG), `+` stub; field registry + `clear_fields`
 - `Python/src/aid_gui/main_window.py`: `field_value(dotted)`; `wing_chrdr_value` via registry

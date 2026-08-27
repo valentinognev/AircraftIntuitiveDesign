@@ -182,12 +182,19 @@ def _format_value(value) -> str:
 
 def _value_from_aircraft(ac: Aircraft, key: str):
     section, field = key.split(".", 1)
-    return getattr(ac, section)[field]
+    section_data = getattr(ac, section)
+    if not isinstance(section_data, dict):
+        return None
+    return section_data.get(field)
 
 
 def populate_from_aircraft(window, ac: Aircraft) -> None:
     for key, edit in window._field_edits.items():
-        edit.setText(_format_value(_value_from_aircraft(ac, key)))
+        value = _value_from_aircraft(ac, key)
+        if value is None:
+            edit.clear()
+        else:
+            edit.setText(_format_value(value))
 
 
 def clear_fields(window) -> None:

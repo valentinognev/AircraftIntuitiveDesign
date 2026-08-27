@@ -1,5 +1,8 @@
 # Updates
 
+## 0.9.1 - GUI Analyze AVL missing-binary dialog
+- `Python/src/aid_gui/main_window.py`: `run_avl` catches missing/failed AVL subprocess; `QMessageBox.critical` with `avl_bin()` path (spec §15)
+
 ## 0.9.0 - GUI Analyze DATCOM wiring and results plot
 - `Python/src/aid_gui/main_window.py`: `run_datcom`/`run_tornado`/`run_avl` call engine; `last_results`; missing-binary `QMessageBox.critical` with path; refuse Analyze without aircraft
 - `Python/src/aid_gui/results_panel.py`: matplotlib `alpha` vs `CL` plot after DATCOM

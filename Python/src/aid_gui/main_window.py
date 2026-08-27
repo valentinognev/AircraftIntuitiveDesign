@@ -7,7 +7,7 @@ from PySide6.QtWidgets import QMainWindow, QMessageBox, QSplitter
 from aid.aircraft import Aircraft
 from aid.avl_io import run_avl_full
 from aid.datcom_run import run_datcom
-from aid.paths import datcom_wrapper, results_dir
+from aid.paths import avl_bin, datcom_wrapper, results_dir
 from aid.tornado.boundary import set_boundary
 from aid.tornado.coeff import coeff_create
 from aid.tornado.lattice import lattice_setup
@@ -116,5 +116,20 @@ class MainWindow(QMainWindow):
         if not self._require_aircraft():
             return
         workdir = self._analysis_workdir("avl")
-        coeffs = run_avl_full(self.aircraft, _AVL_MESH, workdir)
+        try:
+            coeffs = run_avl_full(self.aircraft, _AVL_MESH, workdir)
+        except (FileNotFoundError, OSError):
+            QMessageBox.critical(
+                self,
+                "AVL",
+                f"AVL binary not found or could not be executed:\n{avl_bin()}",
+            )
+            return
+        except subprocess.CalledProcessError:
+            QMessageBox.critical(
+                self,
+                "AVL",
+                f"AVL run failed.\nBinary: {avl_bin()}\nWorkdir: {workdir}",
+            )
+            return
         self.last_results["avl"] = coeffs

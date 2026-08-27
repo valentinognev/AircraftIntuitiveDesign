@@ -1,5 +1,9 @@
 # Updates
 
+## 0.4.0 - run_all batch script
+- `Python/scripts/run_all.py`: loop `models/*.jsonc`, `run_python`, write spec §12 `Results/python/<name>/` dumps + `status.json`, `compare_to_matlab`; `--aircraft` filter
+- `Python/tests/test_run_all_summary.py`: Cessna 172 `status.json` exists with honest `datcom` status
+
 ## 0.3.36 - DATCOM compare parser precision
 - `compare.py`: DATCOM `cl`/`cm` tables use `_PARSER_ATOL` (1e-6), same as `cd`/`cla`/AVL — removed 1e-3 table override per spec §13
 

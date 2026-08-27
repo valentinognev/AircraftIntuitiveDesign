@@ -1,5 +1,11 @@
 # Updates
 
+## 0.8.0 - GUI 3D planform view placeholder
+- `Python/src/aid_gui/view3d.py`: matplotlib `FigureCanvasQTAgg` wing outline; `line_count()` for plotted segments
+- `Python/src/aid_gui/main_window.py`: `QSplitter` tabs | 3D canvas; `load_aircraft` refreshes view
+- `Python/pyproject.toml`: add `matplotlib` dependency
+- `Python/tests/test_gui_view3d.py`: Cessna load smoke test (`view3d`, `line_count() > 0`)
+
 ## 0.7.1 - GUI load skips missing optional keys
 - `Python/src/aid_gui/tabs.py`: `populate_from_aircraft` uses `dict.get`; missing BD/control keys leave fields empty
 - `Python/tests/test_gui_tabs_cessna.py`: DA20-C1 load smoke test (no ITYPE KeyError)

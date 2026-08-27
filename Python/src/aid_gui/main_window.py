@@ -1,8 +1,10 @@
-from PySide6.QtWidgets import QMainWindow
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QMainWindow, QSplitter
 
 from aid.aircraft import Aircraft
 from aid_gui.menus import build_menus
 from aid_gui.tabs import build_tabs, populate_from_aircraft
+from aid_gui.view3d import View3D
 
 
 class MainWindow(QMainWindow):
@@ -13,10 +15,19 @@ class MainWindow(QMainWindow):
         self.aircraft = None
         build_menus(self)
         build_tabs(self)
+        tab_widget = self.centralWidget()
+        self.view3d = View3D()
+        splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter.addWidget(tab_widget)
+        splitter.addWidget(self.view3d)
+        splitter.setStretchFactor(0, 0)
+        splitter.setStretchFactor(1, 1)
+        self.setCentralWidget(splitter)
 
     def load_aircraft(self, ac: Aircraft) -> None:
         self.aircraft = ac
         populate_from_aircraft(self, ac)
+        self.view3d.plot_aircraft(ac)
 
     def field_value(self, dotted: str) -> float:
         return float(self._field_edits[dotted].text())

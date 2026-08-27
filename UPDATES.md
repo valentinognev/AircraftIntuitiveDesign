@@ -1,5 +1,9 @@
 # Updates
 
+## 0.5.0 - aid_gui main window shell
+- `Python/src/aid_gui/`: `MainWindow` — title `Aircraft Intuitive Design Tool`, 960×600, `self.aircraft = None`; thin `app.main()` stub (entry point in Task 61)
+- `Python/tests/test_gui_window.py`: offscreen title/size smoke test
+
 ## 0.4.0 - run_all batch script
 - `Python/scripts/run_all.py`: loop `models/*.jsonc`, `run_python`, write spec §12 `Results/python/<name>/` dumps + `status.json`, `compare_to_matlab`; `--aircraft` filter
 - `Python/tests/test_run_all_summary.py`: Cessna 172 `status.json` exists with honest `datcom` status

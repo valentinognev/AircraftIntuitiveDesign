@@ -1,10 +1,14 @@
-from PySide6.QtGui import QAction
+from PySide6.QtCore import QUrl
+from PySide6.QtGui import QAction, QDesktopServices
 from PySide6.QtWidgets import QMainWindow
+
+from aid.paths import matlab_code
 
 
 def build_menus(window: QMainWindow) -> None:
     _build_file_menu(window)
     _build_analyze_menu(window)
+    _build_help_menu(window)
 
 
 def _build_file_menu(window: QMainWindow) -> None:
@@ -49,3 +53,40 @@ def _build_analyze_menu(window: QMainWindow) -> None:
     avl_action = QAction("AVL", window)
     avl_action.triggered.connect(window.run_avl)
     analyze_menu.addAction(avl_action)
+
+
+def _build_help_menu(window: QMainWindow) -> None:
+    help_menu = window.menuBar().addMenu("Help")
+
+    examples_action = QAction("Examples", window)
+    examples_action.triggered.connect(lambda: _on_examples(window))
+    help_menu.addAction(examples_action)
+
+    quick_start_action = QAction("Quick Start", window)
+    quick_start_action.triggered.connect(lambda: _on_quick_start(window))
+    help_menu.addAction(quick_start_action)
+
+    manual_action = QAction("User's Manual", window)
+    manual_action.triggered.connect(lambda: _on_users_manual(window))
+    help_menu.addAction(manual_action)
+
+    legend_action = QAction("control legend", window)
+    legend_action.triggered.connect(lambda: _on_control_legend(window))
+    help_menu.addAction(legend_action)
+
+
+def _on_examples(window: QMainWindow) -> None:
+    pass
+
+
+def _on_quick_start(window: QMainWindow) -> None:
+    pass
+
+
+def _on_users_manual(window: QMainWindow) -> None:
+    pdf = matlab_code() / "AID_Documentation.pdf"
+    QDesktopServices.openUrl(QUrl.fromLocalFile(str(pdf)))
+
+
+def _on_control_legend(window: QMainWindow) -> None:
+    pass

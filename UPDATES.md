@@ -1,5 +1,9 @@
 # Updates
 
+## 0.5.3 - aid_gui Help menu
+- `Python/src/aid_gui/menus.py`: Help submenu with `Examples`, `Quick Start`, `User's Manual`, `control legend`; User's Manual opens `AID_Documentation.pdf` via `QDesktopServices`
+- `Python/tests/test_gui_help_menu.py`: offscreen Help submenu action labels smoke test
+
 ## 0.5.2 - aid_gui Analyze menu
 - `Python/src/aid_gui/menus.py`: Analyze submenu with `DATCOM`, `Tornado`, `AVL` wired to MainWindow stub slots
 - `Python/src/aid_gui/main_window.py`: stub `run_datcom`, `run_tornado`, `run_avl` methods

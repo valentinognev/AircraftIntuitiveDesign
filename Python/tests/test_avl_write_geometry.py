@@ -13,3 +13,5 @@ def test_writes_geometry_avl(tmp_path):
     assert avl.is_file()
     text = avl.read_text()
     assert "SURFACE" in text or "SECTION" in text
+    cd0 = float(ac.WG["CD0"])
+    assert f"#CDp\n{cd0:.3f}\n" in text

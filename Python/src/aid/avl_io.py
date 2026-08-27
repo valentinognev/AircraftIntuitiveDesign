@@ -5,8 +5,6 @@ from pathlib import Path
 import numpy as np
 
 from aid.aircraft import Aircraft
-from aid.atmosphere import atmosphere
-from aid.drag import drag
 
 
 def _last(val) -> float:
@@ -17,33 +15,11 @@ def _first(val) -> float:
     return float(np.asarray(val).reshape(-1)[0])
 
 
-def _cmp_enabled(plot_cmp: list, index: int) -> bool:
-    if index >= len(plot_cmp):
-        return True
-    return bool(plot_cmp[index])
-
-
-def _total_cd0(ac: Aircraft, atm: dict) -> float:
-    wg_sref = _last(ac.WG["S"])
-    total = 0.0
-
-    for idx, pt in ((0, ac.WG), (1, ac.HT), (2, ac.VT), (3, ac.BD)):
-        if not _cmp_enabled(ac.plot_cmp, idx):
-            continue
-        if "CD0" in pt:
-            total += float(pt["CD0"])
-        else:
-            total += float(drag(dict(pt), ac.unit, atm, wg_sref)["CD0"])
-
-    for i, np_pt in enumerate(ac.NP):
-        if not np_pt or not _cmp_enabled(ac.plot_cmp, 4 + i):
-            continue
-        if "CD0" in np_pt:
-            total += float(np_pt["CD0"])
-        else:
-            total += float(drag(dict(np_pt), ac.unit, atm, wg_sref)["CD0"])
-
-    return total
+def _cdp(ac: Aircraft) -> float:
+    """Match run_aid_batch.m: AC.CD0 = WG.CD0 when present, else 0."""
+    if "CD0" in ac.WG:
+        return float(ac.WG["CD0"])
+    return 0.0
 
 
 def _prepare_flap_data(geo: dict) -> None:
@@ -199,9 +175,7 @@ def write_avl_geometry(
 
     case_id = "geometry"
     avl_path = run_dir / f"{case_id}.avl"
-    alt_ft = _first(ac.AERO["ALT"])
-    atm = atmosphere(alt_ft)
-    cd0 = _total_cd0(ac, atm)
+    cd0 = _cdp(ac)
 
     labels = ["WG", "HT", "VT"] + [f"Planform {i + 4}" for i in range(3)]
     control_names = ["flap", "elevator", "rudder", "", "", ""]

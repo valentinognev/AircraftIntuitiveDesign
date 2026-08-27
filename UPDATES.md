@@ -1,5 +1,9 @@
 # Updates
 
+## 0.3.31 - avl_io CDp from WG.CD0
+- `Python/src/aid/avl_io.py`: `#CDp` uses `WG.CD0` if present else `0` (matches `run_aid_batch.m`, not component sum)
+- `Python/tests/test_avl_write_geometry.py`: asserts `#CDp` line equals `WG.CD0` to `%.3f`
+
 ## 0.3.30 - avl_io write geometry.avl
 - `Python/src/aid/avl_io.py`: `write_avl_geometry(ac, geo, state, run_dir, ni, nj)` — port `AVL_IO.m` `Write_Input`/`Write_Surface`; `geometry.avl` header (MACH, IYsym/IZsym, Sref/Cref/Bref, XCG/ZCG, CDp); cap `nwing` at 3; cosine mesh when `nelem>=4`; `AFILE` side files (`WG.1`, …); flap/aileron controls
 - `Python/tests/test_avl_write_geometry.py`: Cessna mesh `("10","10")` asserts `geometry.avl` with `SURFACE`/`SECTION`

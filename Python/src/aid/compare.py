@@ -23,7 +23,6 @@ from aid.tornado_io import tornado_io
 _FORCE_RTOL, _FORCE_ATOL = 1e-4, 1e-5
 _MOMENT_RTOL, _MOMENT_ATOL = 1e-4, 1e-5
 _DERIV_RTOL, _DERIV_ATOL = 1e-3, 1e-4
-_DATCOM_TABLE_ATOL = 1e-3
 
 # Shared Fortran DATCOM/AVL — parser precision
 _PARSER_ATOL = 1e-6
@@ -34,8 +33,6 @@ _AVL_MESH = ("10", "10")
 _TORNADO_FORCES = ("CL", "CD", "CY")
 _TORNADO_MOMENTS = ("Cm", "Cl", "Cn")
 _TORNADO_DERIVS = ("CL_a", "Cm_a", "CY_b", "Cl_b", "Cn_b")
-
-_DATCOM_TABLE_KEYS = ("cl", "cm")
 
 
 def _to_jsonable(obj: Any) -> Any:
@@ -105,21 +102,13 @@ def _values_close(a, b, *, rtol: float, atol: float) -> bool:
     return bool(np.allclose(np.asarray(a, dtype=float), np.asarray(b, dtype=float), rtol=rtol, atol=atol))
 
 
-def _max_abs_close(a, b, *, atol: float) -> bool:
-    diff = np.abs(np.asarray(a, dtype=float) - np.asarray(b, dtype=float))
-    return bool(np.max(diff) <= atol)
-
-
 def _compare_datcom(python: dict, gold: dict) -> bool:
     for key, gold_val in gold.items():
         if key not in python:
             return False
         py_val = python[key]
         if isinstance(gold_val, list):
-            if key in _DATCOM_TABLE_KEYS:
-                if not _max_abs_close(py_val, gold_val, atol=_DATCOM_TABLE_ATOL):
-                    return False
-            elif not _values_close(py_val, gold_val, rtol=0.0, atol=_PARSER_ATOL):
+            if not _values_close(py_val, gold_val, rtol=0.0, atol=_PARSER_ATOL):
                 return False
         elif isinstance(gold_val, (int, float)):
             if not _values_close(py_val, gold_val, rtol=0.0, atol=_PARSER_ATOL):

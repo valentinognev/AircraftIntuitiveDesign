@@ -1,5 +1,8 @@
 # Updates
 
+## 0.3.36 - DATCOM compare parser precision
+- `compare.py`: DATCOM `cl`/`cm` tables use `_PARSER_ATOL` (1e-6), same as `cd`/`cla`/AVL — removed 1e-3 table override per spec §13
+
 ## 0.3.35 - Navion/DA20 Tornado setrudder parity
 - `lattice.py`: `_setrudder3` — rotate HP col 1 with TEP cols 0/5 in first loop; skip TEP/HP cols in second loop (avoids double-rotation; matches MATLAB wake/TEP parity on flapped nx=1 panels)
 - Round 1 retained: `tornado_io.py` `_fc_chord_matlab`/`fsym`, `avl_io.py` dihedral + stale `.st` cleanup, `_geometry19` hp/tep1 prealloc

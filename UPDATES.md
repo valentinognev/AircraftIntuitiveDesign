@@ -1,5 +1,10 @@
 # Updates
 
+## 0.5.1 - aid_gui File menu
+- `Python/src/aid_gui/menus.py`: File menu with `New`, `Load`, `Save`; New clears `aircraft`; Load/Save stub slots
+- `Python/src/aid_gui/main_window.py`: calls `build_menus(self)` after init
+- `Python/tests/test_gui_file_menu.py`: offscreen File menu action labels smoke test
+
 ## 0.5.0 - aid_gui main window shell
 - `Python/src/aid_gui/`: `MainWindow` — title `Aircraft Intuitive Design Tool`, 960×600, `self.aircraft = None`; thin `app.main()` stub (entry point in Task 61)
 - `Python/tests/test_gui_window.py`: offscreen title/size smoke test

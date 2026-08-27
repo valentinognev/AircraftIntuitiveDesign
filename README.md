@@ -11,6 +11,32 @@ MATLAB GUI (AID) for conceptual aircraft geometry and aerodynamic coefficients v
 - `Results/` — run dumps, not versioned.
 - Spec/plan: `Docs/`.
 
+## Quick start
+
+**MATLAB batch (headless gold run, one aircraft):**
+
+```bash
+/home/valentin/ProgramFiles/MB2025b/bin/matlab -batch "cd('Matlab/fsroot/code'); run_aid_batch('Cessna 172')"
+```
+
+Run from the repo root; adjust the `cd(...)` path if your checkout differs.
+
+**Python install and GUI:**
+
+```bash
+cd Python
+pip install -e ".[dev]"
+aid
+```
+
+Headless/offscreen: `QT_QPA_PLATFORM=offscreen aid`. Without the console entry point: `python -m aid_gui.app`.
+
+**Python tests (primary compare + full suite except all-23 MATLAB batch):**
+
+```bash
+cd Python && python -m pytest tests/ -q --ignore=tests/test_matlab_batch_all.py
+```
+
 ## Reading order for agents
 1. Read this `README.md` (mandatory if present).
 2. Read `UPDATES.md` (mandatory) for the change history and current state before working.

@@ -1,5 +1,10 @@
 # Updates
 
+## 1.0.0 - Python AID GUI and solver parity
+- `Python/tests/test_e2e_primary.py`: MATLAB Cessna batch + subprocess primary compare/GUI smoke
+- `README.md`: Quick start — MATLAB `run_aid_batch`, `pip install -e .`, `aid` launch, pytest suite command
+- Release: PySide6 GUI (Tasks 53–61), Python DATCOM/Tornado/AVL engine parity vs MATLAB gold on primary four (Navion DATCOM honest fail retained)
+
 ## 0.10.0 - aid console entry point and Settings stubs
 - `Python/pyproject.toml`: `[project.scripts] aid = "aid_gui.app:main"`
 - `Python/src/aid_gui/app.py`: `QApplication.instance() or QApplication(sys.argv)`; show `MainWindow`, `app.exec()`

@@ -45,7 +45,8 @@ def _on_load(window: QMainWindow) -> None:
     )
     if not path:
         return
-    window.load_aircraft(load_jsonc(Path(path)))
+    p = Path(path)
+    window.load_aircraft(load_jsonc(p), source_stem=p.stem)
 
 
 def _on_save(window: QMainWindow) -> None:

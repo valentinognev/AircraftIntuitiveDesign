@@ -1,5 +1,10 @@
 # Updates
 
+## 0.9.0 - GUI Analyze DATCOM wiring and results plot
+- `Python/src/aid_gui/main_window.py`: `run_datcom`/`run_tornado`/`run_avl` call engine; `last_results`; missing-binary `QMessageBox.critical` with path; refuse Analyze without aircraft
+- `Python/src/aid_gui/results_panel.py`: matplotlib `alpha` vs `CL` plot after DATCOM
+- `Python/tests/test_gui_analyze_datcom.py`: Cessna load + `run_datcom()` asserts `cl` length ≥ 3
+
 ## 0.8.1 - 3D view equal aspect from data ranges
 - `Python/src/aid_gui/view3d.py`: `_set_equal_aspect()` uses axis ptp tuple instead of unit cube; guards zero Z range
 

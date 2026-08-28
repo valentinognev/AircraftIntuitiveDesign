@@ -372,7 +372,7 @@ def _cmp_enabled(plot_cmp: list, index: int) -> bool:
     return bool(plot_cmp[index])
 
 
-def tornado_io(ac: Aircraft, mesh: tuple[str, str]) -> tuple[dict, dict]:
+def tornado_io(ac: Aircraft, mesh: tuple[str, ...]) -> tuple[dict, dict]:
     nj = int(mesh[0])
     ni = int(mesh[1])
     m = [1, 1]

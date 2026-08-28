@@ -1,12 +1,34 @@
+from copy import deepcopy
 from pathlib import Path
 
 import numpy as np
+from scipy.interpolate import CubicSpline
 
 from aid.aircraft import Aircraft
 
 
 def _last(val) -> float:
     return float(np.asarray(val).reshape(-1)[-1])
+
+
+def with_aid_exposed_spans(ac: Aircraft) -> Aircraft:
+    """Copy of `ac` with WG/HT/VT SSPNE matching AID.m GUI geometry update.
+
+    AID.m interpolates body radius at each planform LE/TE
+    (`interp1(..., 'spline', 'extrap')`) and sets
+    `SSPNE = SSPN - (R_LE + R_TE) / 2`. Batch gold keeps stored SSPNE.
+    """
+    ac = deepcopy(ac)
+    x = np.asarray(ac.BD["X"], dtype=float).reshape(-1)
+    r = np.asarray(ac.BD["R"], dtype=float).reshape(-1)
+    spline = CubicSpline(x, r, extrapolate=True)
+    for pt in (ac.WG, ac.HT, ac.VT):
+        x_le = float(pt["X"])
+        x_te = x_le + float(pt["CHRDR"])
+        r_le = float(spline(x_le))
+        r_te = float(spline(x_te))
+        pt["SSPNE"] = float(pt["SSPN"]) - (r_le + r_te) / 2.0
+    return ac
 
 
 def _as_list(value):

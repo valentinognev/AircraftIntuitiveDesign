@@ -137,7 +137,11 @@ def geometry(pt: dict, angl: bool, type: str = "") -> dict:
     tr_end = tr[-1]
     pt["ymac"] = pt["b"] / 6 * (1 + 2 * tr_end) / (1 + tr_end)
     if type == "v":
-        pt["S"] = pt["S"] / 2
+        s = pt["S"]
+        if isinstance(s, (list, tuple)):
+            pt["S"] = [x / 2 for x in s]
+        else:
+            pt["S"] = s / 2
         pt["b"] = pt["b"] / 2
         pt["ymac"] = pt["ymac"] * 2
     pt["xmac"] = pt["ymac"] * tand(swp_matrix[0, -1])

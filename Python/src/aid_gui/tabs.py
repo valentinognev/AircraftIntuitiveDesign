@@ -1,6 +1,55 @@
-from PySide6.QtWidgets import QFormLayout, QLabel, QLineEdit, QTabWidget, QVBoxLayout, QWidget
+import ast
+
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QWheelEvent
+from PySide6.QtWidgets import (
+    QFormLayout,
+    QFrame,
+    QLabel,
+    QLineEdit,
+    QScrollArea,
+    QTabWidget,
+    QVBoxLayout,
+    QWidget,
+)
 
 from aid.aircraft import Aircraft
+
+_ANGLE_FIELDS = frozenset(
+    {
+        "SAVSI",
+        "SAVSO",
+        "DHDADI",
+        "DHDADO",
+        "TWISTA",
+        "i",
+        "PHETE",
+        "PHETEP",
+        "DELTA",
+        "DELTAL",
+        "DELTAR",
+    }
+)
+_LENGTH_FIELDS = frozenset(
+    {
+        "CHRDR",
+        "CHRDBP",
+        "CHRDTP",
+        "SSPN",
+        "SSPNOP",
+        "X",
+        "Y",
+        "Z",
+        "SPANFI",
+        "SPANFO",
+        "CHRDFI",
+        "CHRDFO",
+        "CB",
+    }
+)
+_POSITIVE_MIN_LENGTH_FIELDS = frozenset({"CHRDR", "CHRDBP", "CHRDTP", "SSPN"})
+_POSITION_FIELDS = frozenset({"X", "Y", "Z"})
+_CONTROL_LENGTH_FIELDS = frozenset({"SPANFI", "SPANFO", "CHRDFI", "CHRDFO", "CB"})
 
 PLANFORM_RP = [
     ("CHRDR", "Root Chord"),
@@ -104,23 +153,144 @@ BODY_FIELDS = [
 ]
 
 
+def _field_kind(key: str) -> str:
+    field = key.split(".", 1)[1]
+    if field == "CHSTAT":
+        return "chstat"
+    if field == "TC" and not key.startswith("AERO."):
+        return "tc"
+    if field in _ANGLE_FIELDS:
+        return "angle"
+    if field in _LENGTH_FIELDS:
+        return "length"
+    return "other"
+
+
+def _minimum_limit(window, min_setting: float) -> float:
+    if min_setting == 0:
+        return float(window.settings.scroll_delta)
+    return float(min_setting)
+
+
+def _parse_scalar(text: str) -> float | None:
+    try:
+        value = ast.literal_eval(text)
+    except (ValueError, SyntaxError):
+        return None
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value)
+
+
+def clamp_value(window, key: str, value: float) -> float:
+    if not window.settings.error_check:
+        return value
+    max_len, max_angle, min_setting = window.settings.error_limits
+    field = key.split(".", 1)[1]
+    kind = _field_kind(key)
+    if field in _POSITIVE_MIN_LENGTH_FIELDS:
+        minimum = _minimum_limit(window, min_setting)
+        return max(minimum, min(value, max_len))
+    if field == "SSPNOP" or field in _CONTROL_LENGTH_FIELDS:
+        return max(0.0, min(value, max_len))
+    if field in _POSITION_FIELDS:
+        return max(-max_len, min(value, max_len))
+    if kind == "angle":
+        return max(-max_angle, min(value, max_angle))
+    if kind == "chstat":
+        return max(0.0, min(value, 1.0))
+    if kind == "tc":
+        return max(0.01, min(value, 0.99))
+    return value
+
+
+def _nudge_delta(window, key: str) -> float:
+    kind = _field_kind(key)
+    if kind == "length":
+        return float(window.settings.scroll_delta)
+    if kind == "angle":
+        return 1.0
+    if kind in ("chstat", "tc"):
+        return 0.01
+    return float(window.settings.scroll_delta)
+
+
+def nudge_field(window, edit: QLineEdit, direction: int) -> None:
+    key = getattr(edit, "_field_key", None)
+    if key is None:
+        return
+    text = edit.text().strip()
+    if not text:
+        base = 0.0
+    else:
+        parsed = _parse_scalar(text)
+        if parsed is None:
+            return
+        base = parsed
+    new_val = base + _nudge_delta(window, key) * direction
+    if window.settings.error_check:
+        new_val = clamp_value(window, key, new_val)
+    edit.setText(_format_value(new_val))
+
+
+class AidLineEdit(QLineEdit):
+    def __init__(self, window, key: str) -> None:
+        super().__init__()
+        self._window = window
+        self._field_key = key
+        self.editingFinished.connect(lambda: _clamp_edit(window, key, self))
+
+    def wheelEvent(self, event: QWheelEvent) -> None:
+        delta = event.angleDelta().y()
+        if delta == 0:
+            super().wheelEvent(event)
+            return
+        direction = 1 if delta > 0 else -1
+        nudge_field(self._window, self, direction)
+        event.accept()
+
+
+def _clamp_edit(window, key: str, edit: QLineEdit) -> None:
+    if not window.settings.error_check:
+        return
+    text = edit.text().strip()
+    if not text:
+        return
+    value = _parse_scalar(text)
+    if value is None:
+        return
+    clamped = clamp_value(window, key, value)
+    if clamped != value:
+        edit.setText(_format_value(clamped))
+
+
 def build_tabs(window) -> None:
     window._field_edits: dict[str, QLineEdit] = {}
     tab_widget = QTabWidget()
 
     for prefix, title in [("WG", "Wing"), ("HT", "HT"), ("VT", "VT")]:
-        tab_widget.addTab(_planform_tab(window, prefix), title)
+        tab_widget.addTab(_scrollable(_planform_tab(window, prefix)), title)
 
-    tab_widget.addTab(_control_tab(window), "Control")
-    tab_widget.addTab(_body_tab(window), "Body")
-    tab_widget.addTab(_aero_tab(window), "Aero")
-    tab_widget.addTab(_plus_tab(), "+")
+    tab_widget.addTab(_scrollable(_control_tab(window)), "Control")
+    tab_widget.addTab(_scrollable(_body_tab(window)), "Body")
+    tab_widget.addTab(_scrollable(_aero_tab(window)), "Aero")
+    tab_widget.addTab(_scrollable(_plus_tab()), "+")
 
     window.setCentralWidget(tab_widget)
 
 
+def _scrollable(inner: QWidget) -> QScrollArea:
+    scroll = QScrollArea()
+    scroll.setWidgetResizable(True)
+    scroll.setFrameShape(QFrame.Shape.NoFrame)
+    scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+    scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+    scroll.setWidget(inner)
+    return scroll
+
+
 def _register_field(window, key: str, layout: QFormLayout, label: str) -> QLineEdit:
-    edit = QLineEdit()
+    edit = AidLineEdit(window, key)
     window._field_edits[key] = edit
     layout.addRow(label, edit)
     return edit
@@ -200,3 +370,31 @@ def populate_from_aircraft(window, ac: Aircraft) -> None:
 def clear_fields(window) -> None:
     for edit in window._field_edits.values():
         edit.clear()
+
+
+def set_aero_cg_fields_enabled(window, enabled: bool) -> None:
+    for key in ("AERO.WT", "AERO.XCG"):
+        edit = window._field_edits.get(key)
+        if edit is not None:
+            edit.setEnabled(enabled)
+
+
+def sync_fields_to_aircraft(window) -> None:
+    ac: Aircraft = window.aircraft
+    if ac is None:
+        return
+    for key, edit in window._field_edits.items():
+        text = edit.text().strip()
+        if not text:
+            continue
+        section, field = key.split(".", 1)
+        section_data = getattr(ac, section)
+        if not isinstance(section_data, dict):
+            continue
+        try:
+            value = ast.literal_eval(text)
+        except (ValueError, SyntaxError):
+            value = text
+        if field in ("NACA", "DATA") and isinstance(value, (int, float)):
+            value = text
+        section_data[field] = value

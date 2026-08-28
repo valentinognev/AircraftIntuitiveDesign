@@ -35,6 +35,9 @@ def _build_file_menu(window: QMainWindow) -> None:
 def _on_new(window: QMainWindow) -> None:
     window.aircraft = None
     clear_fields(window)
+    window.settings.set_units_menu(False)
+    if hasattr(window, "results_bar"):
+        window.results_bar.set_summary([])
 
 
 def _on_load(window: QMainWindow) -> None:
@@ -72,54 +75,143 @@ def _build_analyze_menu(window: QMainWindow) -> None:
     analyze_menu.addAction(datcom_action)
 
     tornado_action = QAction("Tornado", window)
-    tornado_action.triggered.connect(window.run_tornado)
+    tornado_action.triggered.connect(lambda: window.run_tornado())
     analyze_menu.addAction(tornado_action)
 
     avl_action = QAction("AVL", window)
-    avl_action.triggered.connect(window.run_avl)
+    avl_action.triggered.connect(lambda: window.run_avl())
     analyze_menu.addAction(avl_action)
 
 
 def _build_settings_menu(window: QMainWindow) -> None:
+    settings = window.settings
     settings_menu = window.menuBar().addMenu("Settings")
 
-    scale_action = QAction("Scale", window)
-    scale_action.setEnabled(False)
+    scale_action = QAction("Scale A/C Size", window)
+    settings.add_action(("Scale A/C Size",), scale_action)
+    scale_action.triggered.connect(settings.on_scale)
     settings_menu.addAction(scale_action)
 
     estimate_cg_action = QAction("Estimate CG", window)
-    estimate_cg_action.setEnabled(False)
+    settings.add_checkable(
+        ("Estimate CG",), estimate_cg_action, checked=settings.estimate_cg
+    )
+    estimate_cg_action.triggered.connect(
+        lambda: settings.on_estimate_cg(estimate_cg_action)
+    )
     settings_menu.addAction(estimate_cg_action)
 
     plot_options_menu = settings_menu.addMenu("Plot Options")
-    for label in (
-        "Transparent",
-        "Show Axes",
-        "Plot Resolution",
-        "Interpolated Shading",
-        "Project Dimensions",
-        "Aircraft Color",
-    ):
-        action = QAction(label, window)
-        action.setEnabled(False)
-        plot_options_menu.addAction(action)
+    transparent_action = QAction("Transparent", window)
+    settings.add_checkable(
+        ("Plot Options", "Transparent"),
+        transparent_action,
+        checked=settings.transparent,
+    )
+    transparent_action.triggered.connect(
+        lambda: settings.on_transparent(transparent_action)
+    )
+    plot_options_menu.addAction(transparent_action)
+
+    show_axes_action = QAction("Show Axes", window)
+    settings.add_checkable(
+        ("Plot Options", "Show Axes"), show_axes_action, checked=settings.show_axes
+    )
+    show_axes_action.triggered.connect(lambda: settings.on_show_axes(show_axes_action))
+    plot_options_menu.addAction(show_axes_action)
+
+    plot_res_action = QAction("Plot Resolution", window)
+    settings.add_action(("Plot Options", "Plot Resolution"), plot_res_action)
+    plot_res_action.triggered.connect(settings.on_plot_res)
+    plot_options_menu.addAction(plot_res_action)
+
+    shading_action = QAction("Interpolated Shading", window)
+    settings.add_checkable(
+        ("Plot Options", "Interpolated Shading"),
+        shading_action,
+        checked=settings.shading,
+    )
+    shading_action.triggered.connect(lambda: settings.on_shading(shading_action))
+    plot_options_menu.addAction(shading_action)
+
+    project_dims_action = QAction("Project Dimensions", window)
+    settings.add_checkable(
+        ("Plot Options", "Project Dimensions"),
+        project_dims_action,
+        checked=settings.project_dims,
+    )
+    project_dims_action.triggered.connect(
+        lambda: settings.on_project_dims(project_dims_action)
+    )
+    plot_options_menu.addAction(project_dims_action)
+
+    ac_color_action = QAction("Aircraft Color", window)
+    settings.add_action(("Plot Options", "Aircraft Color"), ac_color_action)
+    ac_color_action.triggered.connect(settings.on_ac_color)
+    plot_options_menu.addAction(ac_color_action)
 
     calculations_menu = settings_menu.addMenu("Calculations")
-    for label in ("Trim Mode", "Estimate Slipstream", "Multhopp's Method"):
-        action = QAction(label, window)
-        action.setEnabled(False)
-        calculations_menu.addAction(action)
+    trim_action = QAction("Trim Mode", window)
+    settings.add_checkable(
+        ("Calculations", "Trim Mode"), trim_action, checked=settings.trim_mode
+    )
+    trim_action.triggered.connect(lambda: settings.on_trim_mode(trim_action))
+    calculations_menu.addAction(trim_action)
+
+    slipstream_action = QAction("Estimate Slipstream", window)
+    settings.add_checkable(
+        ("Calculations", "Estimate Slipstream"),
+        slipstream_action,
+        checked=settings.slipstream,
+    )
+    slipstream_action.triggered.connect(lambda: settings.on_slipstream(slipstream_action))
+    calculations_menu.addAction(slipstream_action)
+
+    multhopp_action = QAction("Multhopp's Method", window)
+    settings.add_checkable(
+        ("Calculations", "Multhopp's Method"),
+        multhopp_action,
+        checked=settings.multhopp,
+    )
+    multhopp_action.triggered.connect(lambda: settings.on_multhopp(multhopp_action))
+    calculations_menu.addAction(multhopp_action)
 
     units_menu = settings_menu.addMenu("Units")
-    for label in ("in-oz-ft/s", "ft-lb-kts"):
-        action = QAction(label, window)
-        action.setEnabled(False)
-        units_menu.addAction(action)
+    units_in_action = QAction("in-oz-ft/s", window)
+    settings.add_checkable(
+        ("Units", "in-oz-ft/s"), units_in_action, checked=settings.units_in
+    )
+    units_in_action.triggered.connect(lambda: settings.on_units_in(units_in_action))
+    units_menu.addAction(units_in_action)
 
-    for label in ("Inputs/Outputs", "Error Check", "Scroll Sensitivity"):
-        action = QAction(label, window)
-        action.setEnabled(False)
-        settings_menu.addAction(action)
+    units_kts_action = QAction("ft-lb-kts", window)
+    settings.add_checkable(
+        ("Units", "ft-lb-kts"), units_kts_action, checked=settings.units_kts
+    )
+    units_kts_action.triggered.connect(lambda: settings.on_units_kts(units_kts_action))
+    units_menu.addAction(units_kts_action)
+
+    check_io_action = QAction("Inputs/Outputs", window)
+    settings.add_checkable(
+        ("Inputs/Outputs",), check_io_action, checked=settings.check_io
+    )
+    check_io_action.triggered.connect(lambda: settings.on_check_io(check_io_action))
+    settings_menu.addAction(check_io_action)
+
+    error_check_action = QAction("Error Check", window)
+    settings.add_checkable(
+        ("Error Check",), error_check_action, checked=settings.error_check
+    )
+    error_check_action.triggered.connect(
+        lambda: settings.on_error_check(error_check_action)
+    )
+    settings_menu.addAction(error_check_action)
+
+    scroll_action = QAction("Scroll Sensitivity", window)
+    settings.add_checkable(
+        ("Scroll Sensitivity",), scroll_action, checked=settings.scroll
+    )
+    settings_menu.addAction(scroll_action)
 
 
 def _build_help_menu(window: QMainWindow) -> None:

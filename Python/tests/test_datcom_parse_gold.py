@@ -11,3 +11,4 @@ def test_parse_matlab_gold_for006():
     import numpy as np
     assert np.allclose(got["alpha"], gold["alpha"], atol=1e-6)
     assert np.allclose(got["cl"], gold["cl"], atol=1e-6)
+    assert np.allclose(got["cm"], gold["cm"], atol=1e-6)

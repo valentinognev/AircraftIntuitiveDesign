@@ -1,5 +1,75 @@
 # Updates
 
+## 1.3.0 - GUI MATLAB parity
+- Wing Mesh Parameters dialog on Analyze Tornado/AVL; batch/compare unchanged (10×5 / 10×10, no dialogs)
+- Initial 3D camera matches MATLAB `view(3)` nose-on
+- Aerodynamics tab: 60/40 splitter; Prandtl lift overlay (+ Tornado red after Analyze)
+- Settings menu live: plot options, scale, units, calculations, Estimate CG, error check / scroll sensitivity
+
+## 1.2.8 - MATLAB DATCOM section-limit RED harness
+- `datcom_interp_sections.m`: body/airfoil interpolators + raw `$BODY`/`$WGSCHR` writers (no 18-pt downsample)
+- `test_datcom_section_limits.m`: Cessna baseline must pass; NX=25/160, NPTS=60, 737Max must fail on today's DATCOM (TDD RED)
+
+## 1.2.7 - Wing Mesh Parameters dialog
+- `MeshDialog` QDialog: `mesh_fields(ac, solver)` labels/defaults, OK/Cancel, `values()` after accept
+- Analyze wiring deferred to Task 8
+
+## 1.2.6 - Settings menu MATLAB defaults
+- Settings menu enabled with checkable actions matching `Initialize_GUI.m` defaults (`SettingsState`, `Scale A/C Size` label)
+- Toggle-only wiring; Scale/Units/plot behavior deferred to later tasks
+
+## 1.2.5 - GUI DATCOM exposed span
+- Python GUI Analyze DATCOM now applies `AID.m` wing-body interference: `SSPNE = SSPN - (R_LE+R_TE)/2` from body-radius spline at LE/TE
+- Cessna Cm at α=12 matches MATLAB GUI (−0.129), not batch gold (−0.156); batch/compare still uses stored JSONC SSPNE
+- Approximated vs DATCOM intersection now agrees with MATLAB GUI (~11–12°)
+
+## 1.2.4 - Stability Cm legend
+- Cm plot now has the same series legend as MATLAB (`AID.m` `legend(ax{3},lgnd)`); DATCOM at α=12 is −0.1558, handbook Approximated is −0.124
+
+## 1.2.3 - GUI Tornado stability overlays
+- Python Stability Tornado now matches `AID.m` Analyze: handbook trim α (not mid-`ALSCHD`), moments about 25% MAC, intercepts `CL0=CL-CL_a*α`
+- DATCOM/AVL/Approximated overlay formulas already matched MATLAB gold; Cessna intercepts locked in tests
+- Batch compare vs `run_aid_batch` unchanged (mid-`ALSCHD`, origin ref)
+
+## 1.2.2 - Plot axis limits
+- Aerodynamics drag: xlim stall–Vmax, ylim `[0, WT/3]` (AID.m); DATCOM CL plot uses same CL ylim as Stability
+- Geometry 3D has no 2D axes (unchanged)
+
+## 1.2.1 - Stability plot y-limits
+- CL-α ylim `[-0.5, max(2, 1.1 CL)]`; Cm-α ylim MATLAB `Cmlim` (was ±100 from axis crosshairs)
+
+## 1.2.0 - Results Geometry / Stability / Aerodynamics
+- Left **Results** strip: Plot radios (Geometry, Stability, Aerodynamics) and Stability text (`CG at xx% MAC` / `Aircraft is yy% stable`)
+- `aid.stability`: handbook CG fraction, neutral point, static margin, CL/Cm slopes, CD0 (Cessna: 37% MAC, 13% stable)
+- Geometry = PyVista 3D; Stability = CL-α and Cm-α (DATCOM/Tornado/AVL overlays after Analyze); Aerodynamics = 3D + drag vs speed
+
+## 1.1.0 - PyVista 3D aircraft view
+- `aid.viz`: loft WG/HT/VT/BD/NP/NB from existing JSONC `DATA`/body stations (`Plot_Planform.m` / `Plot_Body.m`)
+- `aid_gui.view3d`: pyvistaqt `QtInteractor` in the same splitter (VTK lighting, axes off); headless `Plotter` when `QT_QPA_PLATFORM=offscreen`
+- matplotlib remains only on the CL-vs-alpha results pane
+- deps: `pyvista`, `pyvistaqt`
+
+## 1.0.6 - Python GUI fits screen height
+- Tabs wrapped in `QScrollArea` so the Control form no longer forces a ~1254px window
+- On show, size is 960×600 (or available screen if smaller) and centered
+- `View3D` uses a 4×3 inch figure so matplotlib sizeHint does not inflate the splitter
+
+## 1.0.5 - Python GUI start.sh
+- Root `start.sh`: Anaconda `pigeon` env (`$HOME/anaconda/envs/pigeon`), `pip install -e Python` if needed, launch `aid`
+- `README.md`: Quick start uses `./start.sh`
+
+## 1.0.4 - MATLAB GUI edit-field contrast
+- `AID.m` / `Initialize_GUI.m`: edit `ForegroundColor` black so DATCOM field values stay readable on white boxes under MATLAB dark desktop
+
+## 1.0.3 - README credits for AID, DATCOM, Tornado, AVL
+- `README.md`: Credits table with original project links (Lietzau AID File Exchange, PDAS Digital Datcom, Melin Tornado, Drela/Youngren AVL)
+
+## 1.0.2 - MATLAB GUI DATCOM path
+- `AID.m`: `lib_path` from `mfilename` (not `which('code/AID.m')`); `addpath` code/Tornado/AVL so Analyze DATCOM still finds `DATCOM_IO` after `cd` into `DATCOM/`; restore pwd on error
+
+## 1.0.1 - README full project description
+- `README.md`: solvers, dual MATLAB/Python architecture, aircraft schema, 23 models, package/GUI map, non-goals, GitHub URL — still names `UPDATES.md` and the spec reading order
+
 ## 1.0.0 - Python AID GUI and solver parity
 - `Python/tests/test_e2e_primary.py`: MATLAB Cessna batch + subprocess primary compare/GUI smoke
 - `README.md`: Quick start — MATLAB `run_aid_batch`, `pip install -e .`, `aid` launch, pytest suite command

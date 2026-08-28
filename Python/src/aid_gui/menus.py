@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 
 from aid.aircraft import load_jsonc, save_jsonc
 from aid.paths import matlab_code, models_dir
+from aid_gui import recent as recent_store
 from aid_gui.tabs import clear_fields, sync_extra_parts
 
 QUICK_START_TEXT = (
@@ -75,6 +76,30 @@ def _build_file_menu(window: QMainWindow) -> None:
     save_action.triggered.connect(lambda: _on_save(window))
     file_menu.addAction(save_action)
 
+    file_menu.addSeparator()
+    window._recent_menu = file_menu.addMenu("Recent")
+    _rebuild_recent_menu(window)
+
+
+def _rebuild_recent_menu(window: QMainWindow) -> None:
+    menu = window._recent_menu
+    menu.clear()
+    for path in recent_store.recent_paths():
+        action = QAction(Path(path).name, window)
+        action.setToolTip(path)
+        action.triggered.connect(lambda checked=False, p=path: _on_load_recent(window, p))
+        menu.addAction(action)
+
+
+def _on_load_recent(window: QMainWindow, path: str) -> None:
+    p = Path(path)
+    if not p.is_file():
+        _rebuild_recent_menu(window)
+        return
+    window.load_aircraft(load_jsonc(p), source_stem=p.stem)
+    recent_store.remember_recent(p)
+    _rebuild_recent_menu(window)
+
 
 def _on_new(window: QMainWindow) -> None:
     window.aircraft = None
@@ -96,6 +121,8 @@ def _on_load(window: QMainWindow, start_dir: str = "") -> None:
         return
     p = Path(path)
     window.load_aircraft(load_jsonc(p), source_stem=p.stem)
+    recent_store.remember_recent(p)
+    _rebuild_recent_menu(window)
 
 
 def _on_save(window: QMainWindow) -> None:

@@ -22,6 +22,8 @@ TAB_NAMES = (
 )
 
 _STYLE_COLOR = {"g": "g", "c": "c", "m": "m", "b": "b"}
+_TORNADO_SPANWISE_LS = ("-", "--", "-.", ":")
+_TORNADO_SPANWISE_LW = (2.2, 1.7, 1.4, 1.1)
 
 
 class _TabCanvas(FigureCanvasQTAgg):
@@ -242,8 +244,18 @@ class CompareTabs(QTabWidget):
         if sw:
             items = sw if isinstance(sw, (list, tuple)) else [sw]
             for i, wing in enumerate(items):
-                lab = "Tornado" if i == 0 else f"Tornado {i + 1}"
-                ax.plot(wing["y"], wing["Cl"], "c-", label=lab)
+                surface = wing.get("name") or ("Wing" if i == 0 else f"Wing {i + 1}")
+                lab = f"Tornado {surface}"
+                ls = _TORNADO_SPANWISE_LS[i % len(_TORNADO_SPANWISE_LS)]
+                lw = _TORNADO_SPANWISE_LW[i % len(_TORNADO_SPANWISE_LW)]
+                ax.plot(
+                    wing["y"],
+                    wing["Cl"],
+                    color="c",
+                    linestyle=ls,
+                    linewidth=lw,
+                    label=lab,
+                )
         ax.set_xlabel("y (ft)")
         ax.set_ylabel(r"$C_\ell$")
         ax.set_title("Spanwise lift")

@@ -22,4 +22,5 @@ def test_da20_load_skips_missing_optional_keys():
     w.load_aircraft(load_jsonc(models_dir() / "DA20-C1.jsonc"))
     assert abs(w.field_value("AERO.MACH") - 0.09) < 1e-9
     assert abs(w.field_value("WG.SSPN") - 17.8333) < 1e-9
-    assert w._field_edits["BD.ITYPE"].text() == ""
+    assert "BD.ITYPE" not in w._field_edits
+    assert "BD.N[0]" in w._field_edits

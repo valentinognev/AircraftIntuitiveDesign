@@ -152,13 +152,14 @@ class MainWindow(QMainWindow):
         self.isolate_from_key(event)
         super().keyPressEvent(event)
 
-    def open_profile_sketcher(self) -> None:
+    def open_profile_sketcher(self, bd: dict | None = None) -> None:
         if self.aircraft is None or not hasattr(self, "view3d"):
             return
-        dlg = ProfileSketcherDialog(self.aircraft.BD, parent=self)
+        target = self.aircraft.BD if bd is None else bd
+        dlg = ProfileSketcherDialog(target, parent=self)
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
-        dlg.apply_to(self.aircraft.BD)
+        dlg.apply_to(target)
         populate_from_aircraft(self, self.aircraft)
         self.view3d.plot_aircraft(
             self.aircraft,

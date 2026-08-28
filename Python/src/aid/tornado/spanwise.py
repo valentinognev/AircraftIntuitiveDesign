@@ -128,6 +128,7 @@ def tornado_spanwise(
 
     b = np.asarray(geo["b"], dtype=float)
     nwing = int(geo["nwing"])
+    names = list(geo.get("name") or [])
     out: list[dict] = []
     for k in range(nwing):
         y_col = ys[:, k]
@@ -137,5 +138,6 @@ def tornado_spanwise(
         l_lbft = fpm_col[mask] * _N_M_TO_LBFT
         cl = l_lbft / (s_ref * q)
         semi = float(np.sum(b[k, :]))
-        out.append({"y": y1, "dy": _spanwise_dy(y1, semi), "Cl": cl})
+        name = names[k] if k < len(names) else ("Wing" if k == 0 else f"Wing {k + 1}")
+        out.append({"y": y1, "dy": _spanwise_dy(y1, semi), "Cl": cl, "name": name})
     return out

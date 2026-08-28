@@ -227,6 +227,34 @@ def test_derivative_cyb_uses_full_alpha_range():
     assert ax_cyb.xaxis.get_ticklabels()[0].get_fontsize() >= 8
 
 
+def test_spanwise_legend_names_tornado_surfaces():
+    app = QApplication.instance() or QApplication([])
+    w = MainWindow()
+    w.show()
+    w.load_aircraft(load_jsonc(models_dir() / "Cessna 172.jsonc"))
+    y = np.linspace(-5.0, 5.0, 5)
+    w.last_results["tornado"] = {
+        "spanwise": [
+            {"y": y, "Cl": np.full(5, 0.3), "name": "Wing"},
+            {"y": y * 0.4, "Cl": np.full(5, 0.04), "name": "HT"},
+            {"y": y * 0.3, "Cl": np.zeros(5), "name": "VT"},
+            {"y": y * 0.8, "Cl": np.full(5, 0.02), "name": "Wing 2"},
+        ]
+    }
+    w.set_plot_mode("Aerodynamics")
+    app.processEvents()
+    ax = w.compare_tabs.figure("Spanwise").axes[0]
+    lines = {ln.get_label(): ln for ln in ax.get_lines()}
+    assert "Prandtl" in lines
+    for name in ("Tornado Wing", "Tornado HT", "Tornado VT", "Tornado Wing 2"):
+        assert name in lines
+    tornado = [lines[n] for n in ("Tornado Wing", "Tornado HT", "Tornado VT", "Tornado Wing 2")]
+    styles = [ln.get_linestyle() for ln in tornado]
+    widths = [ln.get_linewidth() for ln in tornado]
+    assert len(set(styles)) == 4
+    assert len(set(widths)) == 4
+
+
 def test_cessna_all_solvers_fill_compare_axes():
     app = QApplication.instance() or QApplication([])
     w = MainWindow()

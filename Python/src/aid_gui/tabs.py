@@ -7,8 +7,9 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QWheelEvent
 from PySide6.QtWidgets import (
     QCheckBox,
-    QFormLayout,
     QFrame,
+    QGridLayout,
+    QHBoxLayout,
     QLabel,
     QLineEdit,
     QMessageBox,
@@ -67,128 +68,111 @@ _POSITION_FIELDS = frozenset({"X", "Y", "Z", "X0", "Y0", "Z0"})
 _CONTROL_LENGTH_FIELDS = frozenset({"SPANFI", "SPANFO", "CHRDFI", "CHRDFO", "CB"})
 
 PLANFORM_RP = [
-    ("CHRDR", "Root Chord"),
-    ("CHRDBP", "Break Chord"),
-    ("CHRDTP", "Tip Chord"),
-    ("SSPN", "Semi-Span"),
-    ("SSPNOP", "Break Span"),
-    ("SAVSI", "Inboard Sweep"),
-    ("SAVSO", "Outboard Sweep"),
-    ("CHSTAT", "Sweep Reference"),
-    ("DHDADI", "Inboard Dihedral"),
-    ("DHDADO", "Outboard Dihedral"),
-    ("TC", "Thickness"),
-    ("TWISTA", "Washout"),
-    ("i", "Incidence"),
-    ("X", "Position, X"),
-    ("Y", "Position, Y"),
-    ("Z", "Position, Z"),
-    ("NACA", "airfoil id"),
-    ("DATA", "airfoil xy"),
+    ("CHRDR", "Root Chord", "len"),
+    ("CHRDBP", "Break Chord", "len"),
+    ("CHRDTP", "Tip Chord", "len"),
+    ("SSPN", "Semi-Span", "len"),
+    ("SSPNOP", "Break Span", "len"),
+    ("SAVSI", "Inboard Sweep", "deg"),
+    ("SAVSO", "Outboard Sweep", "deg"),
+    ("CHSTAT", "Sweep Reference", "le_te"),
+    ("DHDADI", "Inboard Dihedral", "deg"),
+    ("DHDADO", "Outboard Dihedral", "deg"),
+    ("TC", "Thickness", "chord"),
+    ("TWISTA", "Washout", "deg"),
+    ("i", "Incidence", "deg"),
+    ("X", "Position, X", "len"),
+    ("Y", "Position, Y", "len"),
+    ("Z", "Position, Z", "len"),
 ]
+PLANFORM_BREAKS = (3, 5, 8, 10, 13)
 
 AERO_FIELDS = [
-    ("ALSCHD", "Angle(s) of Attack"),
-    ("ALT", "Altitude"),
-    ("MACH", "Mach Number"),
-    ("WT", "Weight"),
-    ("XCG", "CG Location, X"),
-    ("ZCG", "CG Location, Z"),
-    ("XI", "Inertia, X"),
-    ("YI", "Inertia, Y"),
+    ("ALSCHD", "Angle(s) of Attack", "deg"),
+    ("ALT", "Altitude", "alt"),
+    ("MACH", "Mach Number", "mach"),
+    ("WT", "Weight", "wt"),
+    ("XCG", "CG Location, X", "len"),
+    ("ZCG", "CG Location, Z", "len"),
+    ("XI", "Inertia, X", "inertia"),
+    ("YI", "Inertia, Y", "inertia"),
 ]
+AERO_BREAKS = (1, 4, 6, 8, 11)
 
 AERO_NACA_FIELDS = [
-    ("WG.NACA[0]", "Wing Root Airfoil"),
-    ("WG.NACA[1]", "Wing Tip Airfoil"),
-    ("HT.NACA", "Tail Airfoil"),
+    ("WG.NACA[0]", "Wing Root Airfoil", 0),
+    ("WG.NACA[1]", "Wing Tip Airfoil", 0),
+    ("HT.NACA", "Tail Airfoil", 1),
 ]
 
-CONTROL_SECTIONS = [
+CONTROL_BLOCKS = [
     (
         "F",
-        "Flap",
-        [
-            ("FTYPE", "Flap Type"),
-            ("PHETE", "Trailing-Edge Angle"),
-            ("PHETEP", "Trailing-Edge Angle (prime)"),
-            ("TC", "Thickness"),
-            ("CB", "Balance Chord"),
-            ("SPANFI", "Inboard Span"),
-            ("SPANFO", "Outboard Span"),
-            ("CHRDFI", "Inboard Chord"),
-            ("CHRDFO", "Outboard Chord"),
-            ("DELTA", "Deflection"),
-        ],
+        "Flaps:",
+        0,
+        (
+            ("SPANFI", "SPANFO", "Span", "len"),
+            ("CHRDFI", "CHRDFO", "Chord", "len"),
+            ("DELTA", None, "Deflection", "deg"),
+        ),
     ),
     (
         "A",
-        "Aileron",
-        [
-            ("STYPE", "Aileron Type"),
-            ("SPANFI", "Inboard Span"),
-            ("SPANFO", "Outboard Span"),
-            ("CHRDFI", "Inboard Chord"),
-            ("CHRDFO", "Outboard Chord"),
-            ("DELTAL", "Left Deflection"),
-            ("DELTAR", "Right Deflection"),
-            ("Kb", "Effectiveness"),
-        ],
+        "Ailerons:",
+        0,
+        (
+            ("SPANFI", "SPANFO", "Span", "len"),
+            ("CHRDFI", "CHRDFO", "Chord", "len"),
+            ("DELTAL", "DELTAR", "Deflection", "deg"),
+        ),
     ),
     (
         "E",
-        "Elevator",
-        [
-            ("FTYPE", "Flap Type"),
-            ("PHETE", "Trailing-Edge Angle"),
-            ("PHETEP", "Trailing-Edge Angle (prime)"),
-            ("TC", "Thickness"),
-            ("CB", "Balance Chord"),
-            ("SPANFI", "Inboard Span"),
-            ("SPANFO", "Outboard Span"),
-            ("CHRDFI", "Inboard Chord"),
-            ("CHRDFO", "Outboard Chord"),
-            ("DELTA", "Deflection"),
-        ],
+        "Elevator:",
+        1,
+        (
+            ("SPANFI", "SPANFO", "Span", "len"),
+            ("CHRDFI", "CHRDFO", "Chord", "len"),
+            ("DELTA", None, "Deflection", "deg"),
+        ),
     ),
     (
         "R",
-        "Rudder",
-        [
-            ("SPANFI", "Inboard Span"),
-            ("SPANFO", "Outboard Span"),
-            ("CHRDFI", "Inboard Chord"),
-            ("CHRDFO", "Outboard Chord"),
-            ("DELTA", "Deflection"),
-        ],
+        "Rudder:",
+        2,
+        (
+            ("SPANFI", "SPANFO", "Span", "len"),
+            ("CHRDFI", "CHRDFO", "Chord", "len"),
+            ("DELTA", None, "Deflection", "deg"),
+        ),
     ),
 ]
 
-BODY_FIELDS = [
-    ("NX", "Number of Stations"),
-    ("X", "Station X"),
-    ("ZU", "Upper Body"),
-    ("ZL", "Lower Body"),
-    ("R", "Body Half-Width"),
-    ("S", "Cross-Section Area"),
-    ("N", "Station Index"),
-    ("P", "Shape Parameter"),
-    ("ITYPE", "Body Type"),
-]
-
-EXTRA_BODY_FIELDS = BODY_FIELDS + [
-    ("X0", "Position, X"),
-    ("Y0", "Position, Y"),
-    ("Z0", "Position, Z"),
-]
+BODY_STATION_ROWS = 11
+EXTRA_BODY_STATION_ROWS = 7
+_STATION_KEY = re.compile(r"^(?:BD|NB\[\d+\])\.(N|X|P)\[\d+\]$")
 
 PLUS_PARTS = ("New Body", "Propeller", "New Wing", "New HT", "New VT")
 _EXTRA_TAB_TITLES = frozenset({"Body 2", "Body 3", "Prop", "Wing 2", "HT 2", "VT 2"})
-_PLANFORM_NUMERIC = [field for field, _ in PLANFORM_RP if field not in ("NACA", "DATA")]
+_PLANFORM_NUMERIC = [field for field, _label, _kind in PLANFORM_RP]
+
+
+def _field_name(key: str) -> str:
+    listed = _LIST_KEY.match(key)
+    if listed:
+        rest = listed.group(3)
+        indexed = _INDEXED_FIELD.match(rest)
+        return indexed.group(1) if indexed else rest
+    matched = _INDEXED_KEY.match(key)
+    if matched:
+        return matched.group(2)
+    if "." not in key:
+        return key
+    return key.split(".", 1)[1].split("[", 1)[0]
 
 
 def _field_kind(key: str) -> str:
-    field = key.split(".", 1)[1]
+    field = _field_name(key)
     if field == "CHSTAT":
         return "chstat"
     if field == "TC" and not key.startswith("AERO."):
@@ -220,7 +204,7 @@ def clamp_value(window, key: str, value: float) -> float:
     if not window.settings.error_check:
         return value
     max_len, max_angle, min_setting = window.settings.error_limits
-    field = key.split(".", 1)[1]
+    field = _field_name(key)
     kind = _field_kind(key)
     if field in _POSITIVE_MIN_LENGTH_FIELDS:
         minimum = _minimum_limit(window, min_setting)
@@ -343,16 +327,22 @@ def build_tabs(window) -> None:
     window._plus_buttons: dict[str, QPushButton] = {}
     window._extra_tab_fields: dict[str, list[str]] = {}
     window._extra_cmp: dict[int, QCheckBox] = {}
+    window._unit_labels: list[tuple[QLabel, str]] = []
+    window._cmp_boxes: dict[int, QCheckBox] = {}
+    window._cmp_edits: dict[int, list[QLineEdit]] = {}
+    window._body_station_rows: dict[str, list[tuple[QLineEdit, QLineEdit, QLineEdit]]] = {}
     tab_widget = QTabWidget()
     window._tab_widget = tab_widget
 
+    cmp_for = {"WG": 0, "HT": 1, "VT": 2}
     for prefix, title in [("WG", "Wing"), ("HT", "HT"), ("VT", "VT")]:
-        tab_widget.addTab(_scrollable(_planform_tab(window, prefix)), title)
+        tab_widget.addTab(_scrollable(_planform_tab(window, prefix, cmp_for[prefix])), title)
 
     tab_widget.addTab(_scrollable(_control_tab(window)), "Control")
-    tab_widget.addTab(_scrollable(_body_tab(window)), "Body")
+    tab_widget.addTab(_scrollable(_body_tab(window, "BD", BODY_STATION_ROWS, 3)), "Body")
     tab_widget.addTab(_scrollable(_aero_tab(window)), "Aero")
     tab_widget.addTab(_scrollable(_plus_tab(window)), "+")
+    _refresh_unit_labels(window)
 
     window.setCentralWidget(tab_widget)
 
@@ -367,63 +357,298 @@ def _scrollable(inner: QWidget) -> QScrollArea:
     return scroll
 
 
-def _register_field(window, key: str, layout: QFormLayout, label: str) -> QLineEdit:
+def _unit_text(kind: str, unit: str, kts: bool) -> str:
+    if kind == "len":
+        return unit
+    if kind == "deg":
+        return "deg"
+    if kind == "le_te":
+        return "LE-TE"
+    if kind == "chord":
+        return "chord"
+    if kind == "alt":
+        return "ft"
+    if kind == "mach":
+        return "(or kts)" if kts else "(or ft/s)"
+    if kind == "wt":
+        return "lb"
+    if kind == "inertia":
+        return "oz*in^2" if unit == "in" else "slug*ft^2"
+    if kind == "naca":
+        return "NACA"
+    if kind == "pos_hdr":
+        return f"Position, {unit}"
+    return kind
+
+
+def _refresh_unit_labels(window) -> None:
+    ac = getattr(window, "aircraft", None)
+    unit = ac.unit if ac is not None else "ft"
+    kts = bool(getattr(getattr(window, "settings", None), "units_kts", True))
+    alive: list[tuple[QLabel, str]] = []
+    for lab, kind in getattr(window, "_unit_labels", []):
+        try:
+            lab.setText(_unit_text(kind, unit, kts))
+        except RuntimeError:
+            continue
+        alive.append((lab, kind))
+    window._unit_labels = alive
+
+
+def _separator() -> QFrame:
+    line = QFrame()
+    line.setFrameShape(QFrame.Shape.HLine)
+    line.setStyleSheet("background-color: rgb(204, 204, 204);")
+    line.setFixedHeight(2)
+    return line
+
+
+def _add_break(layout: QGridLayout, row: int, cols: int) -> int:
+    layout.addWidget(_separator(), row, 0, 1, cols)
+    return row + 1
+
+
+def _right_label(text: str, checkbox: QCheckBox | None = None) -> QWidget:
+    cell = QWidget()
+    row = QHBoxLayout(cell)
+    row.setContentsMargins(0, 0, 0, 0)
+    row.setSpacing(2)
+    if checkbox is not None:
+        checkbox.setText("")
+        row.addWidget(checkbox, 0)
+    row.addStretch(1)
+    lab = QLabel(text)
+    lab.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+    row.addWidget(lab, 0)
+    return cell
+
+
+def _make_edit(window, key: str) -> QLineEdit:
     edit = AidLineEdit(window, key)
     if key in window._field_edits:
         window._field_edits_extra.setdefault(key, []).append(window._field_edits[key])
     window._field_edits[key] = edit
-    layout.addRow(label, edit)
+    edit.setObjectName(key)
     return edit
 
 
-def _planform_tab(window, prefix: str) -> QWidget:
+def _add_unit(window, layout: QGridLayout, row: int, col: int, kind: str) -> QLabel:
+    lab = QLabel()
+    lab.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+    window._unit_labels.append((lab, kind))
+    layout.addWidget(lab, row, col)
+    return lab
+
+
+def _track_cmp_edit(window, index: int, edit: QLineEdit) -> None:
+    window._cmp_edits.setdefault(index, []).append(edit)
+
+
+def _cmp_checkbox(window, index: int) -> QCheckBox:
+    chk = QCheckBox()
+    chk.setChecked(True)
+    window._cmp_boxes[index] = chk
+    if index >= 4:
+        window._extra_cmp[index] = chk
+    chk.toggled.connect(lambda checked, i=index: _on_cmp(window, i, checked))
+    return chk
+
+
+def _on_cmp(window, index: int, checked: bool) -> None:
+    ac = getattr(window, "aircraft", None)
+    if ac is not None:
+        _ensure_plot_cmp(ac)
+        ac.plot_cmp[index] = 1 if checked else 0
+    for edit in window._cmp_edits.get(index, []):
+        try:
+            edit.setEnabled(checked)
+        except RuntimeError:
+            continue
+    if ac is not None:
+        _replot(window)
+
+
+def _is_station_key(key: str) -> bool:
+    return bool(_STATION_KEY.match(key))
+
+
+def _planform_tab(window, prefix: str, cmp_index: int) -> QWidget:
     tab = QWidget()
-    layout = QFormLayout(tab)
-    for field, label in PLANFORM_RP:
-        edit = _register_field(window, f"{prefix}.{field}", layout, label)
+    layout = QGridLayout(tab)
+    layout.setContentsMargins(4, 4, 4, 4)
+    layout.setHorizontalSpacing(4)
+    layout.setVerticalSpacing(2)
+    layout.setColumnStretch(0, 5)
+    layout.setColumnStretch(1, 3)
+    layout.setColumnStretch(2, 2)
+    chk = _cmp_checkbox(window, cmp_index)
+    row = 0
+    for i, (field, label, kind) in enumerate(PLANFORM_RP, start=1):
+        layout.addWidget(_right_label(label, chk if i == 1 else None), row, 0)
+        edit = _make_edit(window, f"{prefix}.{field}")
+        layout.addWidget(edit, row, 1)
+        _track_cmp_edit(window, cmp_index, edit)
+        _add_unit(window, layout, row, 2, kind)
         if prefix == "WG" and field == "CHRDR":
             window._wing_chrdr_edit = edit
+        row += 1
+        if i in PLANFORM_BREAKS:
+            row = _add_break(layout, row, 3)
+    layout.setRowStretch(row, 1)
     return tab
 
 
 def _control_tab(window) -> QWidget:
     tab = QWidget()
-    outer = QVBoxLayout(tab)
-    for prefix, section_title, fields in CONTROL_SECTIONS:
-        group = QWidget()
-        layout = QFormLayout(group)
-        layout.addRow(QLabel(f"<b>{section_title}</b>"))
-        for field, label in fields:
-            _register_field(window, f"{prefix}.{field}", layout, label)
-        outer.addWidget(group)
-    outer.addStretch()
+    layout = QGridLayout(tab)
+    layout.setContentsMargins(4, 4, 4, 4)
+    layout.setHorizontalSpacing(4)
+    layout.setVerticalSpacing(2)
+    layout.setColumnStretch(0, 3)
+    layout.setColumnStretch(1, 3)
+    layout.setColumnStretch(2, 3)
+    layout.setColumnStretch(3, 2)
+    row = 0
+    last = len(CONTROL_BLOCKS) - 1
+    for bi, (prefix, title, cmp_index, specs) in enumerate(CONTROL_BLOCKS):
+        layout.addWidget(QLabel(title), row, 0)
+        in_h = QLabel("Inboard")
+        in_h.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        out_h = QLabel("Outboard")
+        out_h.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(in_h, row, 1)
+        layout.addWidget(out_h, row, 2)
+        row += 1
+        for left, right, label, kind in specs:
+            layout.addWidget(_right_label(label), row, 0)
+            if right is None:
+                edit = _make_edit(window, f"{prefix}.{left}")
+                layout.addWidget(edit, row, 1, 1, 2)
+                _track_cmp_edit(window, cmp_index, edit)
+            else:
+                e1 = _make_edit(window, f"{prefix}.{left}")
+                e2 = _make_edit(window, f"{prefix}.{right}")
+                layout.addWidget(e1, row, 1)
+                layout.addWidget(e2, row, 2)
+                _track_cmp_edit(window, cmp_index, e1)
+                _track_cmp_edit(window, cmp_index, e2)
+            _add_unit(window, layout, row, 3, kind)
+            row += 1
+        if bi != last:
+            row = _add_break(layout, row, 4)
+    layout.setRowStretch(row, 1)
     return tab
 
 
-def _body_tab(window) -> QWidget:
+def _body_tab(
+    window,
+    prefix: str,
+    n_rows: int,
+    cmp_index: int,
+    *,
+    extra_xyz: bool = False,
+    extra_title: str | None = None,
+) -> QWidget:
     tab = QWidget()
-    layout = QFormLayout(tab)
+    layout = QGridLayout(tab)
+    layout.setContentsMargins(4, 4, 4, 4)
+    layout.setHorizontalSpacing(4)
+    layout.setVerticalSpacing(2)
+    layout.setColumnStretch(0, 1)
+    layout.setColumnStretch(1, 1)
+    layout.setColumnStretch(2, 1)
+    chk = _cmp_checkbox(window, cmp_index)
+    layout.addWidget(chk, 0, 0, Qt.AlignmentFlag.AlignLeft)
     adjust = QPushButton("Adjust")
-    adjust.clicked.connect(lambda *_: window.open_profile_sketcher())
-    layout.addRow(adjust)
-    for field, label in BODY_FIELDS:
-        _register_field(window, f"BD.{field}", layout, label)
+    adjust.setMinimumHeight(28)
+    adjust.clicked.connect(lambda *_: _open_body_sketcher(window, prefix))
+    layout.addWidget(adjust, 1, 0, 1, 3)
+    layout.addWidget(QLabel("Station"), 2, 0, Qt.AlignmentFlag.AlignCenter)
+    pos_hdr = QLabel()
+    pos_hdr.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    window._unit_labels.append((pos_hdr, "pos_hdr"))
+    layout.addWidget(pos_hdr, 2, 1)
+    shape = QPushButton("Shape")
+    shape.clicked.connect(lambda *_: _cycle_body_shape(window, prefix, n_rows))
+    layout.addWidget(shape, 2, 2)
+    keys: list[str] = []
+    rows: list[tuple[QLineEdit, QLineEdit, QLineEdit]] = []
+    row = 3
+    for i in range(n_rows):
+        n_edit = _make_edit(window, f"{prefix}.N[{i}]")
+        x_edit = _make_edit(window, f"{prefix}.X[{i}]")
+        p_edit = _make_edit(window, f"{prefix}.P[{i}]")
+        layout.addWidget(n_edit, row, 0)
+        layout.addWidget(x_edit, row, 1)
+        layout.addWidget(p_edit, row, 2)
+        _track_cmp_edit(window, cmp_index, n_edit)
+        _track_cmp_edit(window, cmp_index, x_edit)
+        _track_cmp_edit(window, cmp_index, p_edit)
+        rows.append((n_edit, x_edit, p_edit))
+        keys.extend([f"{prefix}.N[{i}]", f"{prefix}.X[{i}]", f"{prefix}.P[{i}]"])
+        row += 1
+    window._body_station_rows[prefix] = rows
+    circ = QPushButton("Circular Cross-Section")
+    circ.clicked.connect(lambda *_: _circularize_body(window, prefix))
+    layout.addWidget(circ, row, 0, 1, 3)
+    row += 1
+    if extra_xyz:
+        for field, label in (("X0", "Position, X"), ("Y0", "Position, Y"), ("Z0", "Position, Z")):
+            layout.addWidget(_right_label(label), row, 0)
+            edit = _make_edit(window, f"{prefix}.{field}")
+            layout.addWidget(edit, row, 1)
+            _add_unit(window, layout, row, 2, "len")
+            _track_cmp_edit(window, cmp_index, edit)
+            keys.append(f"{prefix}.{field}")
+            row += 1
+    if extra_title:
+        window._extra_tab_fields[extra_title] = keys
+    layout.setRowStretch(row, 1)
     return tab
 
 
 def _aero_tab(window) -> QWidget:
     tab = QWidget()
-    layout = QFormLayout(tab)
-    for field, label in AERO_FIELDS:
-        _register_field(window, f"AERO.{field}", layout, label)
-    for key, label in AERO_NACA_FIELDS:
-        _register_field(window, key, layout, label)
+    layout = QGridLayout(tab)
+    layout.setContentsMargins(4, 4, 4, 4)
+    layout.setHorizontalSpacing(4)
+    layout.setVerticalSpacing(2)
+    layout.setColumnStretch(0, 5)
+    layout.setColumnStretch(1, 3)
+    layout.setColumnStretch(2, 2)
+    row = 0
+    i = 0
+    for field, label, kind in AERO_FIELDS:
+        i += 1
+        layout.addWidget(_right_label(label), row, 0)
+        layout.addWidget(_make_edit(window, f"AERO.{field}"), row, 1)
+        _add_unit(window, layout, row, 2, kind)
+        row += 1
+        if i in AERO_BREAKS:
+            row = _add_break(layout, row, 3)
+    for key, label, cmp_index in AERO_NACA_FIELDS:
+        i += 1
+        layout.addWidget(_right_label(label), row, 0)
+        edit = _make_edit(window, key)
+        layout.addWidget(edit, row, 1)
+        _track_cmp_edit(window, cmp_index, edit)
+        _add_unit(window, layout, row, 2, "naca")
+        row += 1
+        if i in AERO_BREAKS:
+            row = _add_break(layout, row, 3)
+    cg_row = QWidget()
+    cg_l = QHBoxLayout(cg_row)
+    cg_l.setContentsMargins(0, 8, 0, 0)
+    cg_l.addWidget(QLabel("CG Adjust:"))
     mac = QCheckBox("%MAC")
+    cg_l.addWidget(mac)
+    cg_l.addStretch(1)
+    layout.addWidget(cg_row, row, 0, 1, 3)
+    row += 1
     slider = CgSlider()
+    layout.addWidget(slider, row, 0, 1, 3)
     window._mac_checkbox = mac
     window._cg_slider = slider
-    layout.addRow("CG Adjust:", mac)
-    layout.addRow(slider)
     mac.toggled.connect(lambda checked: _on_mac_checkbox(window, checked))
     slider.valueChanged.connect(lambda _: _on_cg_slider(window))
     return tab
@@ -432,15 +657,207 @@ def _aero_tab(window) -> QWidget:
 def _plus_tab(window) -> QWidget:
     tab = QWidget()
     layout = QVBoxLayout(tab)
+    layout.setContentsMargins(12, 8, 12, 8)
+    layout.setSpacing(10)
     layout.addWidget(QLabel("Choose a Component to Add:"))
     window._plus_buttons = {}
     for i, name in enumerate(PLUS_PARTS, start=1):
         btn = QPushButton(name)
+        btn.setMinimumHeight(32)
         btn.clicked.connect(lambda checked=False, c=i: add_part(window, c))
         window._plus_buttons[name] = btn
         layout.addWidget(btn)
     layout.addStretch()
     return tab
+
+
+def _body_section(ac: Aircraft, prefix: str):
+    if prefix == "BD":
+        return ac.BD
+    listed = _LIST_KEY.match(f"{prefix}.X")
+    if listed:
+        return _section_dict(ac, listed.group(1), int(listed.group(2)))
+    return None
+
+
+def _open_body_sketcher(window, prefix: str) -> None:
+    ac = getattr(window, "aircraft", None)
+    opener = getattr(window, "open_profile_sketcher", None)
+    if ac is None or not callable(opener):
+        return
+    section = _body_section(ac, prefix)
+    if isinstance(section, dict):
+        opener(section)
+
+
+def _cycle_body_shape(window, prefix: str, n_rows: int) -> None:
+    ac = getattr(window, "aircraft", None)
+    rows = getattr(window, "_body_station_rows", {}).get(prefix)
+    if ac is None or not rows:
+        return
+    section = _body_section(ac, prefix)
+    if not isinstance(section, dict):
+        return
+    p = np.asarray(section.get("P", [1]), dtype=float).reshape(-1)
+    nx = int(section.get("NX") or len(p) or 1)
+    for _n, _x, p_e in rows:
+        _set_edit_text(p_e, "")
+    if np.all(p == 0):
+        val = "1"
+    elif np.all((p > 0) & (p < 5)):
+        val = "5"
+    else:
+        val = "0"
+    _set_edit_text(rows[0][2], val)
+    last = min(nx, n_rows) - 1
+    if last > 0:
+        _set_edit_text(rows[last][2], val)
+    _notify_field_edit(window)
+
+
+def _circularize_body(window, prefix: str) -> None:
+    ac = getattr(window, "aircraft", None)
+    if ac is None:
+        return
+    section = _body_section(ac, prefix)
+    if not isinstance(section, dict):
+        return
+    zu = np.asarray(section.get("ZU", [0.0]), dtype=float).reshape(-1)
+    zl = np.asarray(section.get("ZL", [0.0]), dtype=float).reshape(-1)
+    r = np.asarray(section.get("R", [0.0]), dtype=float).reshape(-1)
+    el = 30.0
+    view = getattr(window, "view3d", None)
+    if view is not None:
+        try:
+            pos = np.asarray(view.camera_xyz(), dtype=float)
+            foc = np.asarray(view.camera_focus(), dtype=float)
+            d = pos - foc
+            el = float(np.degrees(np.arctan2(d[2], np.hypot(d[0], d[1]))))
+        except Exception:
+            pass
+    if el > 45:
+        section["ZU"] = r.tolist()
+        section["ZL"] = (-r).tolist()
+    else:
+        n = min(len(zu), len(zl))
+        section["R"] = ((zu[:n] - zl[:n]) / 2.0).tolist()
+    _notify_field_edit(window)
+
+
+def _cmp_enabled_for_edits(window, edits) -> bool:
+    sample = edits[0][0] if edits else None
+    if sample is None:
+        return True
+    for i, box in getattr(window, "_cmp_boxes", {}).items():
+        if sample in window._cmp_edits.get(i, []):
+            try:
+                return box.isChecked()
+            except RuntimeError:
+                return True
+    return True
+
+
+def _populate_body_stations(window, ac: Aircraft) -> None:
+    for prefix, rows in getattr(window, "_body_station_rows", {}).items():
+        section = _body_section(ac, prefix)
+        if not isinstance(section, dict):
+            continue
+        parent_on = _cmp_enabled_for_edits(window, rows)
+        x = [float(v) for v in np.asarray(section.get("X", []), dtype=float).reshape(-1)]
+        p = [float(v) for v in np.asarray(section.get("P", [1] * max(len(x), 1)), dtype=float).reshape(-1)]
+        nx = int(section.get("NX") or len(x) or 1)
+        n_raw = section.get("N")
+        if n_raw is None or (isinstance(n_raw, list) and len(n_raw) == 0):
+            n_list = list(range(1, min(nx, len(rows)) + 1))
+        else:
+            n_list = [int(v) for v in np.asarray(n_raw, dtype=float).reshape(-1)]
+        p_all_equal = len(p) > 1 and (max(p) - min(p) == 0)
+        for i, (n_e, x_e, p_e) in enumerate(rows):
+            active = i < min(nx, len(rows)) and i < len(n_list)
+            enabled = active and parent_on
+            n_e.setEnabled(enabled)
+            x_e.setEnabled(enabled)
+            p_e.setEnabled(enabled)
+            if not active:
+                _set_edit_text(n_e, "")
+                _set_edit_text(x_e, "")
+                _set_edit_text(p_e, "")
+                continue
+            n = n_list[i]
+            _set_edit_text(n_e, str(n))
+            xi = n - 1
+            if 0 <= xi < len(x):
+                _set_edit_text(x_e, _format_value(x[xi]))
+            else:
+                _set_edit_text(x_e, "")
+            if p_all_equal and 0 < i < len(rows) - 1:
+                _set_edit_text(p_e, "")
+            elif 0 <= xi < len(p):
+                _set_edit_text(p_e, _format_value(p[xi]))
+            else:
+                _set_edit_text(p_e, "")
+
+
+def _sync_body_stations(window, ac: Aircraft) -> None:
+    for prefix, rows in getattr(window, "_body_station_rows", {}).items():
+        section = _body_section(ac, prefix)
+        if not isinstance(section, dict):
+            continue
+        x = [float(v) for v in np.asarray(section.get("X", [0.0]), dtype=float).reshape(-1)]
+        p = [float(v) for v in np.asarray(section.get("P", [1.0] * max(len(x), 1)), dtype=float).reshape(-1)]
+        nx = max(int(section.get("NX") or len(x) or 1), len(x), 1)
+        while len(x) < nx:
+            x.append((x[-1] + 1e-6) if x else 0.0)
+        while len(p) < nx:
+            p.append(1.0)
+        n_out: list[int] = []
+        p_ctrl: list[float] = []
+        x_ctrl: list[float] = []
+        for n_e, x_e, p_e in rows:
+            nt = n_e.text().strip()
+            if not nt:
+                continue
+            try:
+                n = int(float(nt))
+            except ValueError:
+                continue
+            n = max(1, min(n, nx))
+            n_out.append(n)
+            xt = x_e.text().strip()
+            parsed_x = _parse_scalar(xt) if xt else None
+            if parsed_x is not None:
+                x[n - 1] = parsed_x
+            pt = p_e.text().strip()
+            parsed_p = _parse_scalar(pt) if pt else None
+            if parsed_p is not None:
+                p_ctrl.append(parsed_p)
+                x_ctrl.append(x[n - 1])
+        section["N"] = n_out
+        section["X"] = x
+        if len(p_ctrl) >= 2:
+            order = np.argsort(x_ctrl)
+            xs = np.asarray(x_ctrl, dtype=float)[order]
+            ps = np.asarray(p_ctrl, dtype=float)[order]
+            uniq = np.concatenate(([True], np.diff(xs) > 1e-12))
+            section["P"] = np.interp(x, xs[uniq], ps[uniq]).tolist()
+        elif len(p_ctrl) == 1:
+            section["P"] = [p_ctrl[0]] * nx
+        else:
+            section["P"] = p
+
+
+def _sync_cmp_boxes(window, ac: Aircraft) -> None:
+    flags = list(ac.plot_cmp) + [1] * 8
+    for i, box in getattr(window, "_cmp_boxes", {}).items():
+        try:
+            box.blockSignals(True)
+            box.setChecked(bool(flags[i]) if i < len(flags) else True)
+            box.blockSignals(False)
+            enabled = box.isChecked()
+            for edit in window._cmp_edits.get(i, []):
+                edit.setEnabled(enabled)
+        except RuntimeError:
+            continue
 
 
 def _format_value(value) -> str:
@@ -513,11 +930,16 @@ def _set_edit_text(edit: QLineEdit, text: str) -> None:
 
 def populate_from_aircraft(window, ac: Aircraft) -> None:
     for key, edit in window._field_edits.items():
+        if _is_station_key(key):
+            continue
         value = _value_from_aircraft(ac, key)
         text = "" if value is None else _format_value(value)
         _set_edit_text(edit, text)
         for extra in window._field_edits_extra.get(key, []):
             _set_edit_text(extra, text)
+    _sync_cmp_boxes(window, ac)
+    _populate_body_stations(window, ac)
+    _refresh_unit_labels(window)
     _sync_cg_slider_from_aircraft(window, ac)
 
 
@@ -600,6 +1022,8 @@ def sync_fields_to_aircraft(window) -> None:
     if ac is None:
         return
     for key, edit in window._field_edits.items():
+        if _is_station_key(key):
+            continue
         text = edit.text().strip()
         if not text:
             continue
@@ -612,6 +1036,7 @@ def sync_fields_to_aircraft(window) -> None:
         except (ValueError, SyntaxError):
             value = text
         _assign_field(section_data, field, index, text, value)
+    _sync_body_stations(window, ac)
 
 
 def _ensure_np_nb(ac: Aircraft) -> None:
@@ -777,50 +1202,25 @@ def _replot(window) -> None:
 
 
 def _on_extra_cmp(window, index: int, checked: bool) -> None:
-    ac = getattr(window, "aircraft", None)
-    if ac is None:
-        return
-    _ensure_plot_cmp(ac)
-    ac.plot_cmp[index] = 1 if checked else 0
-    _replot(window)
+    _on_cmp(window, index, checked)
 
 
 def _extra_planform_tab(window, prefix: str, title: str, cmp_index: int) -> QWidget:
-    ac = window.aircraft
-    tab = QWidget()
-    layout = QFormLayout(tab)
-    chk = QCheckBox()
-    flags = list(ac.plot_cmp) + [1] * 8
-    chk.setChecked(bool(flags[cmp_index]))
-    chk.toggled.connect(lambda checked, i=cmp_index: _on_extra_cmp(window, i, checked))
-    layout.addRow(chk)
-    window._extra_cmp[cmp_index] = chk
-    keys = []
-    for field, label in PLANFORM_RP:
-        key = f"{prefix}.{field}"
-        _register_field(window, key, layout, label)
-        keys.append(key)
+    tab = _planform_tab(window, prefix, cmp_index)
+    keys = [f"{prefix}.{field}" for field, _label, _kind in PLANFORM_RP]
     window._extra_tab_fields[title] = keys
     return tab
 
 
 def _extra_body_tab(window, prefix: str, title: str, cmp_index: int) -> QWidget:
-    ac = window.aircraft
-    tab = QWidget()
-    layout = QFormLayout(tab)
-    chk = QCheckBox()
-    flags = list(ac.plot_cmp) + [1] * 8
-    chk.setChecked(bool(flags[cmp_index]))
-    chk.toggled.connect(lambda checked, i=cmp_index: _on_extra_cmp(window, i, checked))
-    layout.addRow(chk)
-    window._extra_cmp[cmp_index] = chk
-    keys = []
-    for field, label in EXTRA_BODY_FIELDS:
-        key = f"{prefix}.{field}"
-        _register_field(window, key, layout, label)
-        keys.append(key)
-    window._extra_tab_fields[title] = keys
-    return tab
+    return _body_tab(
+        window,
+        prefix,
+        EXTRA_BODY_STATION_ROWS,
+        cmp_index,
+        extra_xyz=True,
+        extra_title=title,
+    )
 
 
 def _hide_plus_button(window, name: str) -> None:
@@ -845,6 +1245,13 @@ def _remove_extra_tabs(window) -> None:
         tw.removeTab(i)
         if widget is not None:
             widget.deleteLater()
+    for idx in list(getattr(window, "_cmp_boxes", {})):
+        if idx >= 4:
+            window._cmp_boxes.pop(idx, None)
+            window._cmp_edits.pop(idx, None)
+    for prefix in list(getattr(window, "_body_station_rows", {})):
+        if prefix.startswith("NB"):
+            window._body_station_rows.pop(prefix, None)
     window._extra_cmp = {}
     for btn in getattr(window, "_plus_buttons", {}).values():
         btn.setVisible(True)

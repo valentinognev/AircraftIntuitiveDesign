@@ -32,3 +32,18 @@ def test_cessna_tornado_spanwise_covers_span():
     assert y.min() < 0 < y.max()
     assert np.isfinite(cl).all()
     assert cl.max() > 0
+
+
+def test_cessna_tornado_spanwise_names_surfaces():
+    ac = load_jsonc(models_dir() / "Cessna 172.jsonc")
+    geo, state = tornado_io(ac, ("10", "5"))
+    assert list(geo["name"]) == ["Wing", "HT", "VT", "Wing 2"]
+    st = aircraft_stability(ac)
+    state = dict(state)
+    state["alpha"] = float(st["alpha"]) * math.pi / 180.0
+    lattice, ref = lattice_setup(geo, state, 0)
+    lattice = set_boundary(lattice, geo, state)
+    raw = solve(state, geo, lattice)
+    coeffs = coeff_create(raw, lattice, state, ref, geo)
+    sw = tornado_spanwise(coeffs, lattice, geo, state, ac)
+    assert [item["name"] for item in sw] == ["Wing", "HT", "VT", "Wing 2"]

@@ -82,6 +82,7 @@ def _init_geo(aero: dict) -> dict:
         "meshtype": [],
         "ny": [],
         "nx": [],
+        "name": [],
     }
 
 
@@ -168,6 +169,7 @@ def write_geometry(
     m: tuple[int, int],
     geo: dict | None = None,
     type: str = "h",
+    name: str = "Wing",
 ) -> dict:
     if geo is None:
         geo = _init_geo({"XCG": 0.0})
@@ -175,6 +177,7 @@ def write_geometry(
     pt = _ensure_planform(pt, vertical=(type == "v"))
 
     geo["nwing"] = geo["nwing"] + 1
+    geo.setdefault("name", []).append(name)
     geo["symetric"].append(1.0)
 
     eta = np.array([0.0, 1.0])
@@ -396,7 +399,7 @@ def tornado_io(ac: Aircraft, mesh: tuple[str, ...]) -> tuple[dict, dict]:
             cs.append(ac.A)
         if geo is None:
             geo = _init_geo(ac.AERO)
-        geo = write_geometry(ac.WG, cs, ni, nj, tuple(m), geo)
+        geo = write_geometry(ac.WG, cs, ni, nj, tuple(m), geo, name="Wing")
 
     if _cmp_enabled(cmp, 1):
         cs = []
@@ -411,6 +414,7 @@ def tornado_io(ac: Aircraft, mesh: tuple[str, ...]) -> tuple[dict, dict]:
             _matlab_round(nj / 2),
             (1, 1),
             geo,
+            name="HT",
         )
 
     if _cmp_enabled(cmp, 2):
@@ -427,9 +431,11 @@ def tornado_io(ac: Aircraft, mesh: tuple[str, ...]) -> tuple[dict, dict]:
             (1, 1),
             geo,
             type="v",
+            name="VT",
         )
 
     np_types = ("h", "h", "v", "v")
+    np_names = ("Wing 2", "HT 2", "VT 2")
     # Extra planforms 0..2 (wing2/HT2/VT2). NP{4} (index 3) is a propeller — not VLM.
     for i in range(min(3, len(ac.NP))):
         np_pt = ac.NP[i]
@@ -444,6 +450,7 @@ def tornado_io(ac: Aircraft, mesh: tuple[str, ...]) -> tuple[dict, dict]:
                 (1, 1),
                 geo,
                 type=np_types[i],
+                name=np_names[i],
             )
 
     if geo is None:

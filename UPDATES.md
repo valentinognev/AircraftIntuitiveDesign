@@ -1,5 +1,21 @@
 # Updates
 
+## 1.13.0 - Spanwise Tornado surface legend
+- Spanwise tab labels each Tornado curve by surface (`Tornado Wing` / `HT` / `VT` / `Wing 2` / …) instead of `Tornado 2`
+- Distinct linestyle and linewidth per surface (solid/dashed/dash-dot/dotted, decreasing width)
+- `geo["name"]` set in `tornado_io`; `tornado_spanwise` stores it on each `{y, Cl}` series
+
+## 1.12.0 - Python tabs match MATLAB field layout
+- Wing/HT/VT/`+` extras: right-aligned labels, edit, unit suffix, gray breaks after MATLAB `xi`, visibility checkbox; NACA/DATA stay on Aero (and JSONC), not on planform
+- Control: Flaps/Ailerons/Elevator/Rudder Inboard|Outboard grids (Span/Chord/Deflection); DATCOM-only extras (FTYPE, PHETE, Kb, …) no longer on the tab
+- Body: Adjust, Station | Position | Shape table (11 rows; extra bodies 7 + X0/Y0/Z0), Circular Cross-Section; Shape cycles P like MATLAB
+- Aero: same row style plus unit labels and CG Adjust / `%MAC` / slider; unit suffixes follow ft vs in
+
+## 1.11.0 - File Recent submenu
+- File → Recent lists the last 5 JSONC models (most recent first, filename label, full path tooltip)
+- Recorded after File → Load and Help → Examples; re-open moves a path to the top; missing files are dropped
+- Persisted in Qt QSettings (`AircraftIntuitiveDesign` / `AID`); tests isolate the store
+
 ## 1.10.3 - DATCOM elevator SPANFO clamp / AVL check_io retry
 - Do not omit `$SYMFLP`/`$ASYFLP` solely because SPANFO > parent SSPN (DA20 elevator 4.7 vs HT 4.2764). Skip only SPANFO<=SPANFI or elevator when HT was omitted
 - Unclamped DA20 elevator SIGSEGVs Digital DATCOM; write-time clamp SPANFO to parent SSPN (`DatcomInputWarning`); stored JSONC unchanged

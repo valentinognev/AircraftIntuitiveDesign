@@ -1,12 +1,56 @@
+from __future__ import annotations
+
 from pathlib import Path
 
 from PySide6.QtCore import QUrl
 from PySide6.QtGui import QAction, QDesktopServices
-from PySide6.QtWidgets import QMainWindow, QFileDialog
+from PySide6.QtWidgets import (
+    QDialog,
+    QDialogButtonBox,
+    QFileDialog,
+    QLabel,
+    QMainWindow,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
 
 from aid.aircraft import load_jsonc, save_jsonc
-from aid.paths import matlab_code
-from aid_gui.tabs import clear_fields
+from aid.paths import matlab_code, models_dir
+from aid_gui.tabs import clear_fields, sync_extra_parts
+
+QUICK_START_TEXT = (
+    "1. File → Load an aircraft, or Help → Examples for bundled JSONC models.\n\n"
+    "2. Edit geometry and flight condition on the Wing, HT, VT, Control, Body, "
+    "and Aero tabs.\n\n"
+    "3. Analyze → DATCOM, Tornado, or AVL.\n\n"
+    "4. Results: Geometry, Stability, or Aerodynamics."
+)
+
+# MATLAB Initialize_GUI.m 198–216 (empty labels are separators).
+CONTROL_LEGEND_ITEMS = [
+    "",
+    "Interactive Controls:",
+    "===================",
+    "Scroll - Adjust Selection/Zoom",
+    "Left Click - Select/Rotate",
+    "Double Click - Adjust Profile",
+    "Right Click - Drag Plot/Pan",
+    " -> Model - Weight/Balance",
+    " -> Background - Options",
+    "Center/Shift Click - Drag Part",
+    "Space Key - Assign to Variable",
+    "Any Other Key - Isolate Part",
+    "===================",
+    "",
+    "Background Image:",
+    "===================",
+    "Scroll - Scale Image",
+    "Left Click - Drag Image",
+    "Right Click - Options",
+    "===================",
+    "",
+]
 
 
 def build_menus(window: QMainWindow) -> None:
@@ -34,17 +78,18 @@ def _build_file_menu(window: QMainWindow) -> None:
 
 def _on_new(window: QMainWindow) -> None:
     window.aircraft = None
+    sync_extra_parts(window)
     clear_fields(window)
     window.settings.set_units_menu(False)
     if hasattr(window, "results_bar"):
         window.results_bar.set_summary([])
 
 
-def _on_load(window: QMainWindow) -> None:
+def _on_load(window: QMainWindow, start_dir: str = "") -> None:
     path, _ = QFileDialog.getOpenFileName(
         window,
         "Load Aircraft",
-        "",
+        start_dir,
         "JSONC Files (*.jsonc);;All Files (*)",
     )
     if not path:
@@ -229,23 +274,42 @@ def _build_help_menu(window: QMainWindow) -> None:
     manual_action.triggered.connect(lambda: _on_users_manual(window))
     help_menu.addAction(manual_action)
 
-    legend_action = QAction("control legend", window)
-    legend_action.triggered.connect(lambda: _on_control_legend(window))
-    help_menu.addAction(legend_action)
+    for label in CONTROL_LEGEND_ITEMS:
+        if not label:
+            help_menu.addSeparator()
+            continue
+        item = QAction(label, window)
+        item.setEnabled(False)
+        help_menu.addAction(item)
+
+
+class QuickStartDialog(QDialog):
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Quick Start")
+        self._label = QLabel(QUICK_START_TEXT)
+        self._label.setWordWrap(True)
+        manual_btn = QPushButton("User's Manual")
+        manual_btn.clicked.connect(lambda: _on_users_manual(parent))
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        buttons.rejected.connect(self.reject)
+        layout = QVBoxLayout(self)
+        layout.addWidget(self._label)
+        layout.addWidget(manual_btn)
+        layout.addWidget(buttons)
+
+    def body_text(self) -> str:
+        return self._label.text()
 
 
 def _on_examples(window: QMainWindow) -> None:
-    pass
+    _on_load(window, start_dir=str(models_dir()))
 
 
 def _on_quick_start(window: QMainWindow) -> None:
-    pass
+    QuickStartDialog(window).exec()
 
 
-def _on_users_manual(window: QMainWindow) -> None:
+def _on_users_manual(window: QMainWindow | QWidget | None) -> None:
     pdf = matlab_code() / "AID_Documentation.pdf"
     QDesktopServices.openUrl(QUrl.fromLocalFile(str(pdf)))
-
-
-def _on_control_legend(window: QMainWindow) -> None:
-    pass

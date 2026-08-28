@@ -43,7 +43,7 @@ def _multhopp(ac: Aircraft, bd: dict) -> None:
     cr_exp = x[te] - x[le]
     fwd = np.arange(0, le)
     aft = np.arange(te, nx - 1)
-    if fwd.size == 0 or aft.size == 0:
+    if fwd.size == 0 or aft.size == 0 or cr_exp <= 0:
         _gilruth_white(bd, wg)
         return
 

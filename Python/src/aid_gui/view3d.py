@@ -10,43 +10,30 @@ if _OFFSCREEN:
     os.environ.setdefault("VTK_DEFAULT_RENDER_WINDOW_OFFSCREEN", "1")
 
 import pyvista as pv
-from PySide6.QtWidgets import QVBoxLayout, QWidget
+from PySide6.QtCore import QEvent, Qt
+from PySide6.QtWidgets import QFileDialog, QMenu, QVBoxLayout, QWidget
 
 if _OFFSCREEN:
     pv.OFF_SCREEN = True
 
 from aid.aircraft import Aircraft
 from aid.viz import aircraft_surfaces
+from aid_gui.context_menu import build_plot_context_menu
+from aid_gui.estimate_cg import column_for_surface, part_for_column
 
 _BG = "#3c3c3c"
 _COLOR = (1.0, 1.0, 1.0)
 _MISSING_CG_COLOR = (1.0, 0.0, 0.0)
 _AXIS_PREFIX = "matlab_axis_"
+_PICK_DRAG_PX = 5.0
+_BG_ACTOR = "aid_background"
 
 
 def _part_for_surface_name(ac: Aircraft, name: str) -> dict | None:
-    if name.startswith("WG"):
-        return ac.WG
-    if name.startswith("HT"):
-        return ac.HT
-    if name.startswith("VT"):
-        return ac.VT
-    if name == "BD" or name.startswith("BD"):
-        return ac.BD
-    if name.startswith("NP{"):
-        idx = int(name[3]) - 1
-        if 0 <= idx < len(ac.NP):
-            part = ac.NP[idx]
-            return part if isinstance(part, dict) else None
-    if name == "prop" and len(ac.NP) > 3:
-        part = ac.NP[3]
-        return part if isinstance(part, dict) else None
-    if name.startswith("NB{"):
-        idx = int(name[3]) - 1
-        if 0 <= idx < len(ac.NB):
-            part = ac.NB[idx]
-            return part if isinstance(part, dict) else None
-    return None
+    col = column_for_surface(name)
+    if col is None:
+        return None
+    return part_for_column(ac, col)
 
 
 def _part_missing_xcg(part: dict | None) -> bool:
@@ -84,10 +71,31 @@ def _make_plotter(parent: QWidget):
     return plotter
 
 
+class _KeyAcceptHost(QWidget):
+    """Stand-in for QtInteractor offscreen: accepts KeyPress so it does not bubble."""
+
+    def keyPressEvent(self, event) -> None:
+        event.accept()
+
+
 def _actor_prop(plotter, actor):
     if isinstance(actor, str):
         return plotter.actors[actor].GetProperty()
     return actor.GetProperty()
+
+
+def _vtk_actor(plotter, actor):
+    if isinstance(actor, str):
+        return plotter.actors[actor]
+    return actor
+
+
+def _same_component(surf_name: str, isolate_key: str) -> bool:
+    col_iso = column_for_surface(isolate_key)
+    col_surf = column_for_surface(surf_name)
+    if col_iso is not None and col_surf is not None:
+        return col_iso == col_surf
+    return surf_name == isolate_key or surf_name.startswith(isolate_key)
 
 
 class View3D(QWidget):
@@ -114,6 +122,44 @@ class View3D(QWidget):
         self._angle = True
         self._estimate_cg = False
         self._missing_cg_highlights = 0
+        self._part_click_handler = None
+        self._mesh_part_names: list[str] = []
+        self._pending_part: str | None = None
+        self._press_xy: tuple[float, float] | None = None
+        self._pointer_xy_override: tuple[float, float] | None = None
+        self._release_observer = None
+        self._isolated_part: str | None = None
+        self._background_path: str | None = None
+        self._background_hidden = True
+        self._bg_flip = False
+        self._bg_rot90 = 0
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.customContextMenuRequested.connect(self._on_context_menu)
+        if isinstance(self._plotter, QWidget):
+            self._key_host = self._plotter
+        else:
+            self._key_host = _KeyAcceptHost(self)
+            self._key_host.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self._key_host.installEventFilter(self)
+        if not _OFFSCREEN:
+            interactor = self._plotter
+            set_policy = getattr(interactor, "setContextMenuPolicy", None)
+            if callable(set_policy):
+                set_policy(Qt.ContextMenuPolicy.CustomContextMenu)
+                interactor.customContextMenuRequested.connect(self._on_context_menu)
+
+    def plotter_widget(self) -> QWidget:
+        return self._key_host
+
+    def eventFilter(self, obj, event) -> bool:
+        if obj is self._key_host and event.type() == QEvent.Type.KeyPress:
+            parent = self.window()
+            handler = getattr(parent, "isolate_from_key", None)
+            if callable(handler):
+                handler(event)
+            return False
+        return super().eventFilter(obj, event)
 
     def missing_cg_highlights(self) -> int:
         return self._missing_cg_highlights
@@ -122,9 +168,24 @@ class View3D(QWidget):
         self._estimate_cg = bool(enabled)
         if self._aircraft is not None:
             self._draw_meshes(self._aircraft)
+        self._setup_picking()
+
+    def set_part_click_handler(self, handler) -> None:
+        self._part_click_handler = handler
+        self._setup_picking()
 
     def mesh_count(self) -> int:
         return self._mesh_count
+
+    def mesh_part_names(self) -> list[str]:
+        return list(self._mesh_part_names)
+
+    def mesh_visibility(self) -> list[bool]:
+        out = []
+        for actor in self._mesh_actor_names:
+            vtk_actor = _vtk_actor(self._plotter, actor)
+            out.append(bool(vtk_actor.GetVisibility()))
+        return out
 
     def line_count(self) -> int:
         return self._mesh_count
@@ -185,12 +246,19 @@ class View3D(QWidget):
         *,
         res: tuple[int, int, int] | None = None,
         angle: bool | None = None,
+        keep_camera: bool = False,
     ) -> None:
         self._aircraft = ac
         if res is not None:
             self._res = tuple(res)
         if angle is not None:
             self._angle = bool(angle)
+        cam = None
+        if keep_camera:
+            try:
+                cam = self._plotter.camera_position
+            except Exception:
+                cam = None
         self._plotter.clear()
         self._mesh_count = 0
         self._mesh_actor_names = []
@@ -198,16 +266,28 @@ class View3D(QWidget):
         self._overlay_actor_names = []
         self._draw_meshes(ac)
         self._add_lights()
-        self._plotter.reset_camera()
+        if keep_camera and cam is not None:
+            self._plotter.camera_position = cam
+        else:
+            self._plotter.reset_camera()
+            if self._show_axes:
+                self._add_matlab_axes()
+                self._plotter.enable_parallel_projection()
+            self.apply_matlab_view()
+            self._restore_background()
+            self._apply_isolate()
+            return
         if self._show_axes:
             self._add_matlab_axes()
             self._plotter.enable_parallel_projection()
-        self.apply_matlab_view()
+        self._restore_background()
+        self._apply_isolate()
 
     def _draw_meshes(self, ac: Aircraft) -> None:
         for name in self._mesh_actor_names:
             self._plotter.remove_actor(name)
         self._mesh_actor_names = []
+        self._mesh_part_names = []
         self._mesh_count = 0
         self._missing_cg_highlights = _count_missing_xcg_components(ac) if self._estimate_cg else 0
         for i, surf in enumerate(aircraft_surfaces(ac, angle=self._angle, res=self._res)):
@@ -227,9 +307,142 @@ class View3D(QWidget):
                 show_edges=self._show_edges,
                 opacity=self._opacity,
                 name=f"ac_mesh_{i}",
+                pickable=True,
             )
             self._mesh_actor_names.append(actor)
+            self._mesh_part_names.append(surf.name)
             self._mesh_count += 1
+        self._setup_picking()
+        self._apply_isolate()
+
+    def _setup_picking(self) -> None:
+        plotter = self._plotter
+        self._clear_release_observer()
+        disable = getattr(plotter, "disable_picking", None)
+        if callable(disable):
+            try:
+                disable()
+            except Exception:
+                pass
+        if not self._estimate_cg or self._part_click_handler is None:
+            return
+        enable = getattr(plotter, "enable_mesh_picking", None)
+        if not callable(enable):
+            return
+        try:
+            enable(
+                callback=self._on_mesh_picked,
+                show=False,
+                show_message=False,
+                picker="cell",
+                use_actor=True,
+                left_clicking=True,
+            )
+        except TypeError:
+            try:
+                enable(
+                    callback=self._on_mesh_picked,
+                    use_actor=True,
+                    left_clicking=True,
+                )
+            except Exception:
+                return
+        except Exception:
+            return
+        self._attach_release_observer()
+
+    def _clear_release_observer(self) -> None:
+        iren = getattr(self._plotter, "iren", None)
+        if self._release_observer is not None and iren is not None:
+            try:
+                iren.remove_observer(self._release_observer)
+            except Exception:
+                pass
+        self._release_observer = None
+
+    def _attach_release_observer(self) -> None:
+        iren = getattr(self._plotter, "iren", None)
+        if iren is None:
+            return
+        add = getattr(iren, "add_observer", None)
+        if not callable(add):
+            return
+        try:
+            self._release_observer = add("LeftButtonReleaseEvent", lambda *_: self.finish_pick())
+        except Exception:
+            self._release_observer = None
+
+    def set_pointer_xy(self, x: float, y: float) -> None:
+        self._pointer_xy_override = (float(x), float(y))
+
+    def _pointer_xy(self) -> tuple[float, float] | None:
+        if self._pointer_xy_override is not None:
+            return self._pointer_xy_override
+        pos = getattr(self._plotter, "mouse_position", None)
+        if pos is not None and len(pos) >= 2 and pos[0] is not None:
+            return float(pos[0]), float(pos[1])
+        iren = getattr(self._plotter, "iren", None)
+        if iren is not None:
+            get = getattr(iren, "get_event_position", None) or getattr(iren, "GetEventPosition", None)
+            if callable(get):
+                try:
+                    event_pos = get()
+                    return float(event_pos[0]), float(event_pos[1])
+                except Exception:
+                    pass
+        return None
+
+    def _picked_object_name(self, picked) -> str | None:
+        if picked is None:
+            return None
+        if isinstance(picked, str):
+            return picked
+        name = getattr(picked, "name", None)
+        if isinstance(name, str) and name:
+            return name
+        return None
+
+    def _part_name_for_picked(self, picked) -> str | None:
+        actors = self._mesh_actor_names
+        parts = self._mesh_part_names
+        if not actors or len(actors) != len(parts):
+            return None
+        for actor, part in zip(actors, parts, strict=True):
+            if picked is actor:
+                return part
+        picked_name = self._picked_object_name(picked)
+        if not picked_name:
+            return None
+        for i, actor in enumerate(actors):
+            actor_name = actor if isinstance(actor, str) else self._picked_object_name(actor)
+            if actor_name == picked_name or picked_name == f"ac_mesh_{i}":
+                return parts[i]
+        return None
+
+    def _on_mesh_picked(self, picked) -> None:
+        if not self._estimate_cg or self._part_click_handler is None:
+            return
+        part = self._part_name_for_picked(picked)
+        if part is None:
+            self._pending_part = None
+            return
+        self._pending_part = part
+        self._press_xy = self._pointer_xy()
+
+    def finish_pick(self) -> None:
+        part = self._pending_part
+        press = self._press_xy
+        self._pending_part = None
+        self._press_xy = None
+        if not self._estimate_cg or self._part_click_handler is None or part is None:
+            return
+        now = self._pointer_xy()
+        if press is not None and now is not None:
+            dx = now[0] - press[0]
+            dy = now[1] - press[1]
+            if math.hypot(dx, dy) > _PICK_DRAG_PX:
+                return
+        self._part_click_handler(part)
 
     def plot_lift_overlay(self, ov: dict, tornado_sw=None) -> None:
         """Prandtl lift distribution: blue Cl, dashed black Cl_ideal, lift arrows."""
@@ -284,12 +497,131 @@ class View3D(QWidget):
 
     def apply_matlab_view(self) -> None:
         """MATLAB view(3): az=-37.5°, el=30°."""
-        az = math.radians(-37.5)
-        el = math.radians(30.0)
+        self._apply_az_el(-37.5, 30.0)
+
+    def apply_view(self, preset: str) -> None:
+        if preset == "Side":
+            self._apply_az_el(0.0, 0.0)
+        elif preset == "Top":
+            self._apply_az_el(0.0, 90.0)
+        elif preset == "Front":
+            self._apply_az_el(-90.0, 0.0)
+        else:
+            self.apply_matlab_view()
+
+    def _apply_az_el(self, az_deg: float, el_deg: float) -> None:
+        az = math.radians(az_deg)
+        el = math.radians(el_deg)
         dx = math.cos(el) * math.sin(az)
         dy = -math.cos(el) * math.cos(az)
         dz = math.sin(el)
-        self._plotter.view_vector((dx, dy, dz), viewup=(0, 0, 1))
+        viewup = (0.0, 0.0, 1.0)
+        if abs(el_deg) >= 89.0:
+            dx, dy, dz = 0.0, 0.0, 1.0 if el_deg > 0 else -1.0
+            viewup = (0.0, 1.0, 0.0)
+        self._plotter.view_vector((dx, dy, dz), viewup=viewup)
+
+    def isolate_part(self, part: str | None) -> None:
+        self._isolated_part = part
+        self._apply_isolate()
+
+    def _apply_isolate(self) -> None:
+        part = self._isolated_part
+        for actor, name in zip(self._mesh_actor_names, self._mesh_part_names):
+            visible = part is None or _same_component(name, part)
+            try:
+                _vtk_actor(self._plotter, actor).SetVisibility(int(visible))
+            except Exception:
+                pass
+
+    def reset_plot(self) -> None:
+        self._isolated_part = None
+        self._apply_isolate()
+        self.apply_matlab_view()
+
+    def plot_context_menu(self) -> QMenu:
+        return build_plot_context_menu(self)
+
+    def _on_context_menu(self, pos) -> None:
+        self.plot_context_menu().exec(self.mapToGlobal(pos))
+
+    def keyPressEvent(self, event) -> None:
+        parent = self.window()
+        handler = getattr(parent, "isolate_from_key", None)
+        if callable(handler):
+            handler(event)
+        super().keyPressEvent(event)
+
+    def prompt_load_background(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Choose Background Image File",
+            "",
+            "Image Files (*.png *.jpg *.gif *.jpeg *.bmp)",
+        )
+        if path:
+            self.load_background(path)
+
+    def load_background(self, path: str) -> None:
+        self._background_path = path
+        self._background_hidden = False
+        self._add_background_actor()
+
+    def hide_background(self) -> None:
+        self._background_hidden = True
+        self._remove_background_actor()
+
+    def background_visible(self) -> bool:
+        if self._background_hidden or not self._background_path:
+            return False
+        actors = getattr(self._plotter, "actors", {}) or {}
+        if _BG_ACTOR in actors:
+            return bool(actors[_BG_ACTOR].GetVisibility())
+        return False
+
+    def flip_background(self) -> None:
+        if self._background_hidden or not self._background_path:
+            return
+        self._bg_flip = not self._bg_flip
+        self._add_background_actor()
+
+    def rotate_background(self) -> None:
+        if self._background_hidden or not self._background_path:
+            return
+        self._bg_rot90 = (self._bg_rot90 + 90) % 360
+        self._add_background_actor()
+
+    def _restore_background(self) -> None:
+        if not self._background_hidden and self._background_path:
+            self._add_background_actor()
+
+    def _remove_background_actor(self) -> None:
+        try:
+            self._plotter.remove_actor(_BG_ACTOR)
+        except Exception:
+            pass
+
+    def _add_background_actor(self) -> None:
+        self._remove_background_actor()
+        if self._background_hidden or not self._background_path:
+            return
+        d = max(self._body_half_length(), 0.5)
+        plane = pv.Plane(
+            center=(d, 0.0, 0.0),
+            direction=(0.0, 1.0, 0.0),
+            i_size=max(4.0 * d, 1.0),
+            j_size=max(2.0 * d, 1.0),
+        )
+        if self._bg_rot90:
+            plane.rotate_z(self._bg_rot90, inplace=True)
+        if self._bg_flip:
+            plane.points[:, 0] *= -1.0
+        kwargs = {"name": _BG_ACTOR, "pickable": False}
+        try:
+            tex = pv.read_texture(self._background_path)
+            self._plotter.add_mesh(plane, texture=tex, **kwargs)
+        except Exception:
+            self._plotter.add_mesh(plane, color="white", **kwargs)
 
     def _body_half_length(self) -> float:
         if self._aircraft is None:

@@ -9,9 +9,8 @@
 #======================================================#
 
 # Set library name (either libPlt.a or variant with compiler and precision)
-PLTLIB = libPlt_gSP.a
+PLTLIB = libPlt_gDP.a
 #PLTLIB = libPlt_gfortran.a
-#PLTLIB = libPlt_gfortranSP.a
 #PLTLIB = libPlt_gfortranDP.a  ! use this for DP library if preferred
 
 # Some fortrans need trailing underscores in C interface symbols (see Xwin.c)
@@ -20,12 +19,12 @@ PLTLIB = libPlt_gSP.a
 # The DBL_ARGS define is needed to make the double precision pdf interface
 # The DEBUG define can be used to debug the pdf interface
 
-DEFINE = -DUNDERSCORE
-#DEFINE = -DUNDERSCORE -DDEBUG
+DEFINE = -DUNDERSCORE -DDBL_ARGS
+#DEFINE = -DUNDERSCORE -DDBL_ARGS -DDEBUG
 
 FC = gfortran
-#CC  = gcc
-CC  = cc
+#CC = gcc
+CC = cc
 
 # Depending on your system and libraries you might specify an architecture flag
 # to gcc/gfortran to give a compatible binary 32 bit or 64 bit 
@@ -35,7 +34,7 @@ MARCH =
 
 # Fortran double precision (real) flag
 DP =
-#DP = -fdefault-real-8
+DP = -fdefault-real-8
 
 CHECK = 
 #CHECK = -fdollar-ok -fbounds-check -finit-real=inf -ffpe-trap=invalid,zero
@@ -73,5 +72,5 @@ PDFLIBDIR =
 #PDFINCDIR = -I/opt/local/include
 #PDFLIBDIR = -L/opt/local/lib -lhpdf
 # OSX brew setup
-#PDFLIBDIR = -I/usr/local/lib
 #PDFINCDIR = -L/usr/local/include
+#PDFLIBDIR = -I/usr/local/lib -lhpdf

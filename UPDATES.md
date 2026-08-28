@@ -1,5 +1,112 @@
 # Updates
 
+## 1.10.3 - DATCOM elevator SPANFO clamp / AVL check_io retry
+- Do not omit `$SYMFLP`/`$ASYFLP` solely because SPANFO > parent SSPN (DA20 elevator 4.7 vs HT 4.2764). Skip only SPANFO<=SPANFI or elevator when HT was omitted
+- Unclamped DA20 elevator SIGSEGVs Digital DATCOM; write-time clamp SPANFO to parent SSPN (`DatcomInputWarning`); stored JSONC unchanged
+- First gold mismatch after elevator restore was **Cm** from NX=24 vs stale 18-station MATLAB `datcom.json`; re-ran `run_aid_batch('DA20-C1','datcom')` (body_max=200). MATLAB batch still omits DA20 elevator (`SPANFI<0.01`); Python writes clamped elevator; compared CL/Cm/CD match
+- GUI Analyze AVL with Inputs/Outputs calls `run_avl_full` (spacing retry), then previews the successful attempt’s `geometry.avl` / `geometry.run`
+
+## 1.10.2 - DATCOM 80-col wrap / illegal HT omit / AVL spacing retry
+- `_write_namelist_array` matches MATLAB `format_wrapped_array`: 10 values/line, wrap at 80 columns; BODY `body_max=200` (no 18-station downsample)
+- Write-time omit DATCOM-illegal HT/VT (stored SSPNE<0, SSPNE>SSPN, zero area) and illegal `$SYMFLP`/`$ASYFLP` spans; JSONC unchanged; `DatcomInputWarning`
+- AVL: if `geometry.st` missing, retry weighted-outboard (`sspace=-1.1`), equal span, then slightly finer/coarser nj
+- Live 23: DATCOM 19/23 finite CL (new: Orbiter, Navion, 727, HK36, T-38, plus wrap-unblocked ASW-20/DA20/Rocket Prop/B-1/737/747). AVL 22/23 (T-34C CLa=5.073). Still NaN/Inf: SR-71, Enterprise, XB-70, X-Wing. Sphere VLM still body-only
+- Sphere MATLAB `datcom.json` gold is from the old 18-station body; NX=200 CD differs until gold is re-run
+
+## 1.10.1 - Isolate hotkey reaches PyVista interactor
+- Event filter on the plotter widget (`QtInteractor` on-screen; key-accepting host offscreen) calls `isolate_from_key` and returns False so VTK still gets the key
+- Test sends `QKeyEvent` via `QApplication.sendEvent` to `plotter_widget()`, not only `MainWindow.keyPressEvent`
+
+## 1.10.0 - Context menu, isolate, background, profile sketcher
+- 3D context menu: Reset Plot; View Side/Top/Front (MATLAB `view` az/el); Background Load/Hide/Flip/Rotate
+- Isolate hotkey fades other components from the selected tab; Reset Plot restores visibility and `view(3)`
+- Background tracing loads a PNG/JPG as an XZ back-plane actor (Hide removes it; replot keeps it)
+- Body tab Adjust opens a station table (X, ZU, ZL, R, P); Apply writes `ac.BD` and replots
+- Estimate CG actor pick and 5 px drag-gate unchanged
+
+## 1.9.0 - Help Examples / Quick Start / control legend
+- Help → Examples: `QFileDialog` at `Python/models/*.jsonc` (no `.mat`), then `load_aircraft` with `source_stem`
+- Help → Quick Start: first-run dialog (Load/Examples, edit tabs, Analyze DATCOM/Tornado/AVL, Results Geometry/Stability/Aerodynamics) plus User's Manual button (`AID_Documentation.pdf`)
+- Control legend is the MATLAB disabled Help labels (`Initialize_GUI.m` 198–216), not a stub; User's Manual unchanged
+
+## 1.8.0 - Plus tab extra parts
+- `+` buttons New Body, Propeller, New Wing, New HT, New VT fill `NP` 1×4 / `NB` 1×2 and add tabs Body 2/3, Prop, Wing 2, HT 2, VT 2
+- Load recreates extra tabs when those slots are non-null (Cessna Wing 2+Prop, Enterprise Body 2); File New strips them
+- Planform extras use the same fields as Wing/HT/VT; extra bodies match the Body tab plus X0/Y0/Z0; `cmp(5+)` checkboxes gate `plot_cmp` / viz
+- New-wing winglet dialog (offscreen defaults No); defaults from MATLAB `addPart` (`L` from body length)
+- Field keys `NP[i].` / `NB[j].`; Aero / Estimate CG unchanged
+
+## 1.7.2 - Estimate CG pick ignores orbit drag
+- Left-click pick defers until release; movement >5 px (orbit) does not open the weight dialog
+- `left_clicking=True` and actor identity mapping unchanged
+
+## 1.7.1 - Estimate CG pick, %MAC, recompute path
+- 3D pick: `enable_mesh_picking(use_actor=True, left_clicking=True)`; map actor via `_mesh_actor_names`; no fallback to mesh 0
+- `%MAC` no longer clamps mass-weighted XCG while Estimate CG is on
+- `recompute_aero_cg` on `apply_field_edit` and when toggling Estimate CG on if the table has weight
+- Extra-planform tips `NP{1}tip`/`NP{2}tip`/`NP{3}tip` map to columns 4–6
+
+## 1.7.0 - Aero tab MATLAB AP + Estimate CG
+- Aero tab: ZCG, XI, YI, wing root/tip NACA, tail NACA; `%MAC` checkbox and CG slider bound to `AERO.XCG` (MAC range vs body X)
+- Estimate CG: 3×10 `ac.cg_data`, click-part numeric X/Z/weight dialog, mass-weighted `AERO.WT`/`XCG`/`ZCG` (apex offsets; plot_cmp gates extra parts)
+- Settings Estimate CG also disables ZCG and hides the slider; 3D pick uses viz surface names (`wing`, `ht`, …)
+
+## 1.6.0 - DATCOM/AVL input clamps
+- `write_for005` clamps MACH>0.6 to STMACH 0.6, SSPNE<0.01 to 0.01, NDELTA to 9; stored JSONC `AERO.MACH` / planform / DELTA unchanged; `DatcomInputWarning`
+- NACA cell `Data.` or a file path uses a later numeric code (Box → `NACA-W-4-2412`); no tabulated `$WGSCHR`
+- Tornado/AVL skip NP{4} propeller; T-34C AVL still fails (cosine spanwise spacing, 0.2 ft tip panel)
+- DATCOM wrapper copies `datcom.out` after binary SIGSEGV; `run_datcom` parses a finite table when present (T-34C)
+- Live: F-16 DATCOM ok at written 0.6; Box DATCOM ok; T-34C DATCOM ok; SR-71 DATCOM still NaN at 0.6; Orbiter DATCOM still no α table (BODY line >80 cols / HT stub); Sphere body-only unchanged; plot_cmp gates kept
+
+## 1.5.5 - Tornado PCHIP duplicate-x
+- `_slope2` skips Δx=0 airfoil stations and replaces non-finite camber slopes; `_pchip_interp` unique-sorts finite x before SciPy PCHIP
+- Box and ERAU DBF Plane Tornado (`tornado_io` → lattice → boundary → solve → coeff, mesh 10×5) return finite CL, CD, Cm
+- Cessna Tornado gold unchanged (existing coeff / matlab-gold tests)
+
+## 1.5.4 - Sphere DATCOM plot_cmp
+- `write_for005` gates HT/VT/body on `plot_cmp` (indices 1, 2, 3); wing always, matching `DATCOM_IO.m`
+- Missing/short `plot_cmp` pads True (same as Tornado `_cmp_enabled`)
+- Sphere `[0,0,0,1]` omits `$HTPLNF`/`$VTPLNF`; Cessna still writes all three; Sphere DATCOM keys match MATLAB gold at 1e-6
+
+## 1.5.3 - Control-tab deflections update 3D geometry
+- `Plot_Planform.m` hinge rotation is now in `aid.viz`: nonzero flap/aileron/elevator/rudder δ adds F/A/E/R meshes and blanks the parent TE (MATLAB `mean(DELTA)`)
+- Control (and other) field edits sync into the aircraft and replot the 3D view without resetting the camera
+- Zero δ still draws the clean airframe only; DA20-style loaded deflections show on Open
+
+## 1.5.2 - Empty comparison plots filled
+- DATCOM `for005` always writes `$SYMFLP`/`$ASYFLP` (MATLAB parity), so Cessna cruise at δ=0 still gets a HIGH LIFT table
+- Forces now include \(C_Y, C_N, C_A\) plus per-wing / AVL extras; Moments include \(C_\ell, C_n\)
+- Controls plots DATCOM \(\Delta C_L/\Delta C_m/\Delta C_{Di}\) and hinge-moment extras; Tornado `C*_d` and AVL deflections when those solvers return them
+- Sections lists leftover Tornado/AVL scalars (extra \(p,q,r\), \(C_{Ya}\), \(C_{Dwing}\), …) that are not on the vs-α axes
+- Cessna Analyze DATCOM+Tornado+AVL: every comparison axis has data
+
+## 1.5.1 - Comparison tabs fill the canvas
+- Tab figures resize to the widget (no left-clustered 5×3 inch plot); subplots use tight margins
+- Larger tick/label fonts; vs-α axes share DATCOM α limits so sparse CYB/CNB are not zoomed to one point
+- Comparison tabs get more of the Aerodynamics pane than the handbook drag plot
+
+## 1.5.0 - Aerodynamics solver comparison tabs
+- Results → Aerodynamics keeps 3D + handbook drag; adds tabs Forces, Moments, Derivatives, Downwash, Controls, Spanwise, Sections
+- Each tab overlays DATCOM (α table), Tornado (run α + slope), AVL (totals + slope) when that Analyze has been run; missing solvers omitted
+- `parse_for006` now exports XCP, downwash (ε, dε/dα, q/q∞), high-lift increments, and wing/HT/VT section scalars
+- Analyze AVL keeps run-case totals (`CLtot`, `CDtot`, `Cmtot`, α) beside ST derivatives
+- DATCOM NDM/99999 derivatives plot as NaN, not spikes
+
+## 1.4.4 - DATCOM transonic NaN warning
+- Mach > 0.6 (DATCOM STMACH) uses transonic wing-body fairing; F-16 at 0.7 (and Cessna at 0.7) get `CLB/CL = NaN` so CL/Cm stay NDM — not a missed Mach edit
+- Warning names STMACH 0.6 and tells the user to stay at Mach ≤ 0.6 for subsonic methods; crest-critical (~0.73) is a separate higher-Mach failure
+
+## 1.4.3 - DATCOM method-limit warning
+- Analyze DATCOM shows a **warning** (not a traceback or critical crash) when the solver has no method: crest-critical Mach exceeded, NDM/empty table, or similar `*** … EXCEEDED/ERROR/FATAL/INVALID ***` banners
+- Cessna-style `NDM PRINTED` legends do not warn; coefficients still plot when the table is finite
+- F-16 Mach 0.8: warning names crest-critical Mach 0.73 and that CL/Cm are NDM
+
+## 1.4.2 - F-16 DATCOM NDM is an honest fail
+- F-16 Analyze DATCOM no longer tracebacks: Mach 0.8 exceeds crest-critical (~0.73) so DATCOM prints NDM/NaN (MATLAB gold already `datcom: failed`)
+- `parse_for006` raises `no finite coefficients (missing or ND)` when the stability table has no numeric rows; notes crest-critical Mach when present
+- GUI Analyze DATCOM shows a dialog on empty/NDM tables instead of crashing
+- Multhopp body method falls back to Gilruth-White when body stations skip the wing chord (`cr_exp<=0`; F-16 load divide-by-zero)
+
 ## 1.4.1 - DATCOM writer NPTS clamp
 - `$WGSCHR` NPTS clamped to 60 (SECI `/IWING/`); `$HTSCHR`/`$VTSCHR`/extra planforms to 50. Downsample XCORD/YUPPER/YLOWER together, keep 0 and 1, so Analyze cannot hang on 100–500-pt sections
 - Harness: 60s Linux `timeout` on `./datcom` (MATLAB `system` has no Timeout option); non-zero/timeout fails the case

@@ -14,5 +14,18 @@ from aid.paths import datcom_wrapper
 def run_datcom(ac: Aircraft, workdir: Path) -> dict:
     workdir.mkdir(parents=True, exist_ok=True)
     write_for005(ac, workdir / "for005.dat", unit=ac.unit)
-    subprocess.run([str(datcom_wrapper())], cwd=workdir, check=True, timeout=120)
-    return parse_for006((workdir / "for006.dat").read_text())
+    proc = subprocess.run([str(datcom_wrapper())], cwd=workdir, check=False, timeout=120)
+    out = workdir / "for006.dat"
+    if not out.is_file():
+        dumped = workdir / "datcom.out"
+        if dumped.is_file():
+            out = dumped
+    if out.is_file():
+        try:
+            return parse_for006(out.read_text())
+        except ValueError:
+            if proc.returncode:
+                proc.check_returncode()
+            raise
+    proc.check_returncode()
+    raise FileNotFoundError(f"DATCOM produced no output in {workdir}")

@@ -48,7 +48,7 @@ Aircraft (WG/HT/VT/F/A/E/R/BD/AERO)
 ```
 
 - `Matlab/fsroot/code` — AID GUI, geometry/aero/drag, Tornado VLM, AVL I/O, 23 `.mat` models, user manual PDF.
-- DATCOM Fortran lives beside this repo at `../datcom/datcom.f` (namelist MAXNX=200 body stations, MAXNPTS=500 airfoil points; analysis uses the first 60 section points). AID writers clamp wing `$WGSCHR` to 60 and HT/VT/extra to 50 so Analyze cannot hang. Linux binary `DATCOM/datcom.bin` is gitignored; wrapper `DATCOM/datcom` feeds `for005.dat` on stdin and copies `datcom.out` → `for006.dat` (AID/`datcomimport` expect that name).
+- DATCOM Fortran lives beside this repo at `../datcom/datcom.f` (namelist MAXNX=200 body stations, MAXNPTS=500 airfoil points; analysis uses the first 60 section points). AID writers clamp wing `$WGSCHR` to 60 and HT/VT/extra to 50 so Analyze cannot hang. Python `write_for005` wraps BODY arrays at 80 columns (`body_max=200`, no 18-station downsample), clamps MACH>0.6 to STMACH 0.6, omits DATCOM-illegal HT/VT (buried/negative SSPNE, SSPNE>SSPN, zero area) and inverted control spans (SPANFO<=SPANFI; no elevator namelist without HT). SPANFO past parent SSPN is still written, clamped to parent SSPN so DATCOM does not SIGSEGV (DA20 elevator). Uses a later numeric NACA when the first cell is `Data.`/a path (stored JSONC unchanged). Linux binary `DATCOM/datcom.bin` is gitignored; wrapper `DATCOM/datcom` feeds `for005.dat` on stdin and copies `datcom.out` → `for006.dat` even if the binary later SIGSEGVs (AID/`datcomimport` expect that name). AVL `run_avl_full` retries weighted-outboard / equal spanwise spacing if `geometry.st` is missing (GUI Analyze AVL with Inputs/Outputs uses the same retry, then previews the successful files).
 - AVL 3.52 source: `Matlab/fsroot/code/AVL/AVL3.52rel09032025/`. Install executable to `AVL/run/avl` (gitignored).
 - `Python/` — package `aid` (engine) + `aid_gui` (PySide6). Models: `Python/models/*.jsonc`.
 - `Results/` — solver dumps, not versioned (`matlab/`, `python/`, `compare/`).
@@ -70,13 +70,13 @@ MATLAB save variables (and JSONC top-level keys):
 | `NP` / `NB` | Extra planforms (1×4 cell) and extra bodies (1×2 cell) |
 | `AERO` | Flight: `ALSCHD`, `ALT`, `MACH`, `WT`, `XCG`, reference lengths, component positions (`XW`…`ZV`) |
 | `unit` | `'ft'` or `'in'` (`DIM IN` only for inches) |
-| `plot_cmp` | Visibility flags `[wing, HT, VT, body]` |
+| `plot_cmp` | Component flags `[wing, HT, VT, body]`; DATCOM writes HT/VT/body only when set (wing always) |
 
 JSONC is JSON plus `//` comments on every key. MATLAB field `i` (incidence) is the JSON key `"i"`. Converter: `Python/scripts/mat_to_jsonc.py`. Python GUI Open/Save is JSONC only.
 
 **Bundled models (23):** ASW-20 Sailplane, B-1 Lancer, Beechcraft T-34C, Boeing 727, Boeing 737Max, Boeing 747-400, Box, Cessna 172, DA20-C1, Enterprise, ERAU DBF Plane, F-16, HK36, Learjet 23, Navion, Orbiter, Rocket Prop, Ski Plane, Sphere, SR-71, T-38, XB-70 Valkyrie, X-Wing.
 
-Primary compare aircraft: **Cessna 172**, **Navion**, **DA20-C1**, **Learjet 23**. Exotic shapes may fail DATCOM; status is `ok|failed|skipped`, numbers are not invented. Navion DATCOM is an expected honest fail.
+Primary compare aircraft: **Cessna 172**, **Navion**, **DA20-C1**, **Learjet 23**. Status is `ok|failed|skipped`; numbers are not invented. Not all 23×3 succeed. Live Python DATCOM is finite for 19/23 (honest NaN/Inf remain: SR-71, Enterprise, XB-70, X-Wing). Tornado 22/23 (Sphere body-only). AVL 22/23 (T-34C retries weighted-outboard spacing; Sphere has no lifting surface). F-16 DATCOM runs when MACH is clamped to 0.6 at write time; Box DATCOM uses a numeric NACA card; Orbiter DATCOM omits a buried HT; Sphere DATCOM omits HT/VT via `plot_cmp`.
 
 ## MATLAB map (`Matlab/fsroot/code`)
 
@@ -99,8 +99,8 @@ GUI Analyze Tornado matches `AID.m` (handbook trim α, moments about 25% MAC, `C
 
 ## Python package (`Python/`)
 
-- `aid/` — `aircraft` (`.mat`/JSONC), `geometry`/`atmosphere`/`drag`, `stability` (CG % MAC, static margin, handbook CL/Cm), `viz` (Plot_Planform/Plot_Body loft meshes), DATCOM write/parse/run, Tornado lattice/boundary/solver/coeff, AVL write/parse/run, `compare` vs MATLAB gold. No widgets.
-- `aid_gui/` — window **Aircraft Intuitive Design Tool** (960×600): File New/Load/Save; Analyze DATCOM/Tornado/AVL (Tornado/AVL always prompt Wing Mesh Parameters); Settings live (plot options, scale, units, calculations, Estimate CG, error check, scroll sensitivity); Help (Examples, Quick Start, User's Manual, control legend); tabs Wing/HT/VT/Control/Body/Aero/`+`; Results radios Geometry / Stability / Aerodynamics plus CG/static-margin text; PyVista/VTK 3D aircraft view (initial camera MATLAB `view(3)` nose-on; Aerodynamics 60/40 splitter with Prandtl lift overlay and Tornado red after Analyze; matplotlib CL/Cm and drag plots). Batch/compare stays headless 10×5 / 10×10 (no mesh dialogs).
+- `aid/` — `aircraft` (`.mat`/JSONC), `geometry`/`atmosphere`/`drag`, `stability` (CG % MAC, static margin, handbook CL/Cm), `viz` (Plot_Planform/Plot_Body loft meshes, including control-surface hinge deflection), DATCOM write/parse/run, Tornado lattice/boundary/solver/coeff, AVL write/parse/run, `compare` vs MATLAB gold. No widgets.
+- `aid_gui/` — window **Aircraft Intuitive Design Tool** (960×600): File New/Load/Save; Analyze DATCOM/Tornado/AVL (Tornado/AVL always prompt Wing Mesh Parameters); Settings live (plot options, scale, units, calculations, Estimate CG, error check, scroll sensitivity); Help (Examples → `Python/models/*.jsonc`; Quick Start dialog; User's Manual PDF; disabled MATLAB control-legend labels); tabs Wing/HT/VT/Control/Body/Aero/`+` (Aero is MATLAB `AP`: α/alt/Mach/WT/XCG/ZCG/XI/YI + root/tip/tail NACA, `%MAC` slider). `+` adds MATLAB `addPart` extras — Body 2/3 (`NB` 1×2), Prop / Wing 2 / HT 2 / VT 2 (`NP` 1×4); Load recreates those tabs when slots are filled. Estimate CG stores 3×10 `cg_data`, click-part X/Z/weight dialog, recomputes WT/XCG/ZCG; Results radios Geometry / Stability / Aerodynamics plus CG/static-margin text; PyVista/VTK 3D aircraft view (initial camera MATLAB `view(3)` nose-on; right-click context menu Reset Plot / View Side-Top-Front / Background load-hide; key isolates the selected-tab component until Reset Plot; Body Adjust edits station X/ZU/ZL/R/P). Control-tab δ rotates flaps/ailerons/elevator/rudder; Aerodynamics 60/40 splitter with Prandtl lift overlay, Tornado red after Analyze, handbook drag vs speed, and comparison tabs Forces/Moments/Derivatives/Downwash/Controls/Spanwise/Sections overlaying DATCOM/Tornado/AVL, with leftover solver scalars on Sections). Batch/compare stays headless 10×5 / 10×10 (no mesh dialogs).
 - Console entry: `aid` → `aid_gui.app:main`.
 - Batch: `python scripts/run_all.py` [`--aircraft "Cessna 172"`] writes `Results/python/<name>/` and compare JSON.
 

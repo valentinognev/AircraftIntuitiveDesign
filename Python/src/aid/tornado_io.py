@@ -430,8 +430,9 @@ def tornado_io(ac: Aircraft, mesh: tuple[str, ...]) -> tuple[dict, dict]:
         )
 
     np_types = ("h", "h", "v", "v")
-    for i in range(3):
-        np_pt = ac.NP[i] if i < len(ac.NP) else None
+    # Extra planforms 0..2 (wing2/HT2/VT2). NP{4} (index 3) is a propeller — not VLM.
+    for i in range(min(3, len(ac.NP))):
+        np_pt = ac.NP[i]
         if np_pt and _cmp_enabled(cmp, 4 + i):
             if geo is None:
                 geo = _init_geo(ac.AERO)

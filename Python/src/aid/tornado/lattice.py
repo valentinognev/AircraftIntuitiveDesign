@@ -64,12 +64,20 @@ def _slope2(foil) -> tuple[np.ndarray, np.ndarray]:
         zu = data[-nx:, 1]
         zl = np.flip(data[:nx, 1])
         c = 0.5 * (zl + zu)
-        xa = np.zeros(nx - 1)
-        angle = np.zeros(nx - 1)
+        xa_pts: list[float] = []
+        angle_pts: list[float] = []
         for i in range(nx - 1):
-            xa[i] = 0.5 * (x[i] + x[i + 1])
-            angle[i] = math.atan((c[i + 1] - c[i]) / (x[i + 1] - x[i]))
-        return xa, angle
+            dx = float(x[i + 1] - x[i])
+            if dx == 0.0:
+                continue
+            ang = math.atan((c[i + 1] - c[i]) / dx)
+            if not math.isfinite(ang):
+                ang = 0.0
+            xa_pts.append(0.5 * (x[i] + x[i + 1]))
+            angle_pts.append(ang)
+        if len(xa_pts) < 2:
+            return np.array([0.0, 1.0]), np.array([0.0, 0.0])
+        return np.asarray(xa_pts, dtype=float), np.asarray(angle_pts, dtype=float)
 
     foil_str = str(foil).strip()
     try:
@@ -199,10 +207,21 @@ def _normals4(colloc: np.ndarray, vortex: np.ndarray, c_slope: np.ndarray) -> np
 
 
 def _pchip_interp(x_src: np.ndarray, y_src: np.ndarray, xq: float) -> float:
-    if x_src.size < 2:
-        return float(y_src[0]) if y_src.size else 0.0
-    interp = PchipInterpolator(x_src, y_src, extrapolate=True)
-    return float(interp(xq))
+    x = np.asarray(x_src, dtype=float).ravel()
+    y = np.asarray(y_src, dtype=float).ravel()
+    n = min(x.size, y.size)
+    x, y = x[:n], y[:n]
+    ok = np.isfinite(x) & np.isfinite(y)
+    x, y = x[ok], y[ok]
+    if y.size == 0:
+        return 0.0
+    x, idx = np.unique(x, return_index=True)
+    y = y[idx]
+    if x.size < 2:
+        return float(y[0])
+    interp = PchipInterpolator(x, y, extrapolate=True)
+    val = float(interp(xq))
+    return val if math.isfinite(val) else 0.0
 
 
 def _geometry19(

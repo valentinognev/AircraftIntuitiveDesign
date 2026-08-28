@@ -1,5 +1,6 @@
 import math
 import subprocess
+import warnings
 from pathlib import Path
 
 import numpy as np
@@ -8,6 +9,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QApplication,
     QDialog,
+    QLineEdit,
     QMainWindow,
     QMessageBox,
     QSplitter,
@@ -16,10 +18,9 @@ from PySide6.QtWidgets import (
 )
 
 from aid.aircraft import Aircraft
-from aid.avl_io import run_avl, run_avl_full, write_avl_geometry, write_case
-from aid.avl_parse import parse_st
-from aid.datcom_io import with_aid_exposed_spans, write_for005
-from aid.datcom_parse import parse_for006
+from aid.avl_io import run_avl_full
+from aid.datcom_io import DatcomInputWarning, with_aid_exposed_spans, write_for005
+from aid.datcom_parse import datcom_user_warning, parse_for006
 from aid.paths import avl_bin, datcom_wrapper, results_dir
 from aid.geometry import geometry
 from aid.scale_geom import scale_aircraft, scale_lengths
@@ -42,9 +43,21 @@ from aid_gui.mesh_dialog import MeshDialog
 from aid_gui.settings import SettingsState
 from aid_gui.results_bar import ResultsBar
 from aid_gui.results_panel import ResultsPanel
-from aid_gui.tabs import build_tabs, populate_from_aircraft, sync_fields_to_aircraft
+from aid_gui.compare_tabs import CompareTabs
+from aid_gui.tabs import build_tabs, populate_from_aircraft, sync_extra_parts, sync_fields_to_aircraft
 from aid.viz import lift_overlay, planform_stations
 from aid_gui.view3d import View3D
+from aid_gui.context_menu import isolate_key_for_tab
+from aid_gui.profile_sketcher import ProfileSketcherDialog
+from aid_gui.estimate_cg import (
+    CG_TITLES,
+    ComponentCgDialog,
+    apply_component,
+    column_for_surface,
+    default_component_values,
+    recompute_aero_cg,
+    weight_unit,
+)
 
 
 class MainWindow(QMainWindow):
@@ -67,10 +80,18 @@ class MainWindow(QMainWindow):
         self.results_bar.modeChanged.connect(self.set_plot_mode)
         left_layout.addWidget(self.results_bar, 0)
         self.view3d = View3D()
+        self.view3d.set_part_click_handler(self.pick_estimate_cg_part)
         self.results_panel = ResultsPanel()
+        self.compare_tabs = CompareTabs()
+        self._plot_column = QWidget()
+        plot_col = QVBoxLayout(self._plot_column)
+        plot_col.setContentsMargins(0, 0, 0, 0)
+        plot_col.setSpacing(2)
+        plot_col.addWidget(self.results_panel, 1)
+        plot_col.addWidget(self.compare_tabs, 2)
         self._right_splitter = QSplitter(Qt.Orientation.Vertical)
         self._right_splitter.addWidget(self.view3d)
-        self._right_splitter.addWidget(self.results_panel)
+        self._right_splitter.addWidget(self._plot_column)
         self._right_splitter.setStretchFactor(0, 1)
         self._right_splitter.setStretchFactor(1, 0)
         splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -103,6 +124,48 @@ class MainWindow(QMainWindow):
             )
         else:
             self.resize(w, h)
+
+    def _current_tab_title(self) -> str:
+        tw = getattr(self, "_tab_widget", None)
+        if tw is None:
+            return ""
+        return tw.tabText(tw.currentIndex())
+
+    def isolate_from_key(self, event) -> None:
+        key = event.key()
+        if key in (
+            Qt.Key.Key_Shift,
+            Qt.Key.Key_Control,
+            Qt.Key.Key_Alt,
+            Qt.Key.Key_Meta,
+            Qt.Key.Key_Space,
+        ):
+            return
+        part = isolate_key_for_tab(self._current_tab_title())
+        if part is not None:
+            self.view3d.isolate_part(part)
+
+    def keyPressEvent(self, event) -> None:
+        if isinstance(self.focusWidget(), QLineEdit):
+            super().keyPressEvent(event)
+            return
+        self.isolate_from_key(event)
+        super().keyPressEvent(event)
+
+    def open_profile_sketcher(self) -> None:
+        if self.aircraft is None or not hasattr(self, "view3d"):
+            return
+        dlg = ProfileSketcherDialog(self.aircraft.BD, parent=self)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+        dlg.apply_to(self.aircraft.BD)
+        populate_from_aircraft(self, self.aircraft)
+        self.view3d.plot_aircraft(
+            self.aircraft,
+            res=tuple(self.settings.plot_res),
+            angle=self.settings.angle,
+            keep_camera=True,
+        )
 
     def _stability_kwargs(self) -> dict:
         s = self.settings
@@ -137,6 +200,7 @@ class MainWindow(QMainWindow):
         if source_stem is not None:
             self._aircraft_stem = source_stem
         self.settings.set_units_menu(ac.unit == "in")
+        sync_extra_parts(self)
         populate_from_aircraft(self, ac)
         self.view3d.plot_aircraft(
             ac, res=tuple(self.settings.plot_res), angle=self.settings.angle
@@ -144,6 +208,49 @@ class MainWindow(QMainWindow):
         st = self.stability_for_display()
         self.results_bar.set_summary(st["summary"])
         self.set_plot_mode(self._plot_mode)
+
+    def apply_field_edit(self) -> None:
+        if self.aircraft is None or not hasattr(self, "view3d"):
+            return
+        sync_fields_to_aircraft(self)
+        if self.settings.estimate_cg and recompute_aero_cg(self.aircraft):
+            populate_from_aircraft(self, self.aircraft)
+        self.view3d.plot_aircraft(
+            self.aircraft,
+            res=tuple(self.settings.plot_res),
+            angle=self.settings.angle,
+            keep_camera=True,
+        )
+
+    def apply_component_cg(self, col: int, x: float, z: float, wt: float) -> None:
+        if self.aircraft is None:
+            return
+        apply_component(self.aircraft, col, x, z, wt)
+        if self.settings.estimate_cg:
+            recompute_aero_cg(self.aircraft)
+            populate_from_aircraft(self, self.aircraft)
+            self.view3d.set_estimate_cg(True)
+
+    def pick_estimate_cg_part(self, surface_name: str) -> None:
+        if not self.settings.estimate_cg or self.aircraft is None:
+            return
+        col = column_for_surface(surface_name)
+        if col is None:
+            return
+        defaults = default_component_values(self.aircraft, col)
+        dlg = ComponentCgDialog(
+            CG_TITLES[col],
+            defaults=defaults,
+            unit=self.aircraft.unit,
+            wt_unit=weight_unit(self.aircraft),
+            parent=self,
+        )
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+        values = dlg.values()
+        if values is None:
+            return
+        self.apply_component_cg(col, *values)
 
     def plot_mode(self) -> str:
         return self._plot_mode
@@ -160,6 +267,7 @@ class MainWindow(QMainWindow):
                 )
             self.view3d.show()
             self.results_panel.hide()
+            self.compare_tabs.hide()
         elif mode == "Stability":
             if self.aircraft is not None:
                 self.view3d.plot_aircraft(
@@ -169,12 +277,14 @@ class MainWindow(QMainWindow):
                 )
             self.view3d.hide()
             self.results_panel.show()
+            self.compare_tabs.hide()
             self._right_splitter.setStretchFactor(0, 0)
             self._right_splitter.setStretchFactor(1, 1)
             self._refresh_plots()
         else:
             self.view3d.show()
             self.results_panel.show()
+            self.compare_tabs.show()
             self._right_splitter.setStretchFactor(0, 3)
             self._right_splitter.setStretchFactor(1, 2)
             self._right_splitter.setSizes([360, 240])
@@ -189,6 +299,9 @@ class MainWindow(QMainWindow):
             self.results_panel.plot_stability(st, self.last_results)
         elif self._plot_mode == "Aerodynamics":
             self.results_panel.plot_drag(st)
+            self.compare_tabs.plot(
+                st, self.last_results, self.aircraft, angle=self.settings.angle
+            )
             nj = max(8, round(self.settings.plot_res[1] / 4))
             ov = lift_overlay(self.aircraft, nj, angle=self.settings.angle)
             tornado_sw = None
@@ -295,11 +408,18 @@ class MainWindow(QMainWindow):
         workdir.mkdir(parents=True, exist_ok=True)
         input_path = workdir / "for005.dat"
         try:
-            write_for005(ac, input_path, unit=ac.unit)
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always", DatcomInputWarning)
+                write_for005(ac, input_path, unit=ac.unit)
+            clamp_notes = [
+                str(w.message)
+                for w in caught
+                if issubclass(w.category, DatcomInputWarning)
+            ]
             if self.settings.check_io:
                 show_io_file_preview(self, "DATCOM Input", input_path)
-            subprocess.run(
-                [str(datcom_wrapper())], cwd=workdir, check=True, timeout=120
+            proc = subprocess.run(
+                [str(datcom_wrapper())], cwd=workdir, check=False, timeout=120
             )
         except (FileNotFoundError, OSError):
             QMessageBox.critical(
@@ -308,17 +428,42 @@ class MainWindow(QMainWindow):
                 f"DATCOM binary not found or could not be executed:\n{datcom_wrapper()}",
             )
             return
-        except subprocess.CalledProcessError:
-            QMessageBox.critical(
-                self,
-                "DATCOM",
-                f"DATCOM run failed.\nBinary: {datcom_wrapper()}\nWorkdir: {workdir}",
-            )
-            return
         output_path = workdir / "for006.dat"
+        if not output_path.is_file():
+            dumped = workdir / "datcom.out"
+            if dumped.is_file():
+                output_path = dumped
         if self.settings.check_io and output_path.is_file():
             show_io_file_preview(self, "DATCOM Output", output_path)
-        coeffs = parse_for006(output_path.read_text())
+        if not output_path.is_file():
+            if proc.returncode:
+                QMessageBox.critical(
+                    self,
+                    "DATCOM",
+                    f"DATCOM run failed.\nBinary: {datcom_wrapper()}\nWorkdir: {workdir}",
+                )
+            else:
+                QMessageBox.critical(
+                    self,
+                    "DATCOM",
+                    f"DATCOM produced no output file.\nWorkdir: {workdir}",
+                )
+            return
+        text = output_path.read_text()
+        try:
+            coeffs = parse_for006(text)
+            parse_error: BaseException | None = None
+        except ValueError as exc:
+            coeffs = None
+            parse_error = exc
+        msg = datcom_user_warning(text, error=parse_error)
+        if clamp_notes:
+            clamp_text = "\n".join(clamp_notes)
+            msg = f"{clamp_text}\n\n{msg}" if msg else clamp_text
+        if msg:
+            QMessageBox.warning(self, "DATCOM", f"{msg}\n\nWorkdir: {workdir}")
+        if coeffs is None:
+            return
         self.last_results["datcom"] = coeffs
         self._refresh_plots()
 
@@ -397,22 +542,12 @@ class MainWindow(QMainWindow):
             return
         workdir = self._analysis_workdir("avl")
         try:
+            coeffs = run_avl_full(self.aircraft, mesh, workdir)
             if self.settings.check_io:
-                geo, state = tornado_io(self.aircraft, mesh)
-                nj = int(mesh[0])
-                ni = int(mesh[1])
-                write_avl_geometry(self.aircraft, geo, state, workdir, ni, nj)
-                write_case("geometry", state, workdir)
                 for name in ("geometry.avl", "geometry.run"):
-                    show_io_file_preview(self, f"AVL {name}", workdir / name)
-                for stale in ("geometry.st", "geometry.sb"):
-                    path = workdir / stale
+                    path = workdir / name
                     if path.is_file():
-                        path.unlink()
-                run_avl(workdir)
-                coeffs = parse_st(workdir / "geometry.st")
-            else:
-                coeffs = run_avl_full(self.aircraft, mesh, workdir)
+                        show_io_file_preview(self, f"AVL {name}", path)
         except (FileNotFoundError, OSError):
             QMessageBox.critical(
                 self,

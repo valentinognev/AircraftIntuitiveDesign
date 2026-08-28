@@ -165,8 +165,13 @@ class SettingsState:
         self.estimate_cg = action.isChecked()
         if self._window is None:
             return
-        from aid_gui.tabs import set_aero_cg_fields_enabled
+        from aid_gui.estimate_cg import ensure_cg_data, recompute_aero_cg
+        from aid_gui.tabs import populate_from_aircraft, set_aero_cg_fields_enabled
 
+        if self.estimate_cg and self._window.aircraft is not None:
+            ensure_cg_data(self._window.aircraft)
+            if recompute_aero_cg(self._window.aircraft):
+                populate_from_aircraft(self._window, self._window.aircraft)
         set_aero_cg_fields_enabled(self._window, not self.estimate_cg)
         self._window.view3d.set_estimate_cg(self.estimate_cg)
 

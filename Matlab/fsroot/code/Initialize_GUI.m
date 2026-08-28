@@ -743,6 +743,9 @@ AERO_Out = uicontrol(results,'Style','text','Units','normalized',...
 %Normalize Units
 f.Units = 'normalized';
 
+% Dark MATLAB desktop uses light uicontrol text; keep values readable on white edits
+set(findall(f,'Style','edit'),'ForegroundColor',[0,0,0])
+
 %Update Plot
 delete(findall(ax{1},'Type','light'))
 AID(0,0,'update')
@@ -2758,7 +2761,8 @@ else
     
     %Reset Selection Boxes
     gray = [0.94,0.94,0.94];
-    set(findall(gcf,'Style','edit'),'BackgroundColor',gray)
+    set(findall(gcf,'Style','edit'),'BackgroundColor',gray,...
+        'ForegroundColor',[0,0,0])
     if strcmp(get(gco,'Type'),'figure') && strcmp(click,'normal')
         set(tabs,'SelectedTab',tab_list(6))
         AID(0,0,'update')

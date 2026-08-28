@@ -12,6 +12,12 @@ global ax cmp WG_In WG HT_In HT VT_In VT BD_In BD AERO_In AERO AERO_Out ...
 %global ACOUT %experimental implementation of the ASCDM code (line 1550)
 global lib_path %path to dependencies for app implementation (line 52)
 
+% Code root from this file, not pwd. Analyze DATCOM cds into DATCOM/, which
+% would hide DATCOM_IO.m unless the code folder is on the MATLAB path.
+this = fileparts(mfilename('fullpath'));
+lib_path = [this filesep];
+addpath(this, fullfile(this,'Tornado'), fullfile(this,'AVL'), '-begin');
+
 %=====================================
 %               TO DO:
 %    (Anticipated Difficulty 1-3)
@@ -35,12 +41,6 @@ global lib_path %path to dependencies for app implementation (line 52)
 
 %Options
 if nargin>=1 && ~strcmp(action,'initialize')
-    
-    %Path to App Dependencies
-    %lib_path = which(fullfile('code','AID_ReadMe.txt'));
-    lib_path = which(fullfile('code','AID.m'));
-    lib_path = lib_path(1:end-6);
-    %lib_path = %directory containing source code and supporting folders
     
     %CG
     cg_calc = strcmp(get(opt(1),'Checked'),'on');       %estimate CG
@@ -364,7 +364,8 @@ elseif strcmp(action,'update')%%%%%%%%%%%%%%%%% UPDATE %%%%%%%%%%%%%%%%%%%%
         
         %Reset Background Color
         gray = [0.94,0.94,0.94]; blue = [0.8,0.9,1];
-        set(findall(gcf,'Style','edit'),'BackgroundColor',gray)
+        set(findall(gcf,'Style','edit'),'BackgroundColor',gray,...
+            'ForegroundColor',[0,0,0])
         if isprop(handle,'Style') && strcmp(get(handle,'Style'),'edit')
             set(handle,'BackGroundColor',blue)
         end
@@ -1566,6 +1567,7 @@ elseif strcmp(action,'save')%%%%%%%%%%%%%%%%%% SAVE %%%%%%%%%%%%%%%%%%%%%%%
             loadvar = 0; %set(opt(13),'Checked','off');
         end
         current_path = pwd;
+        restore_pwd = onCleanup(@() cd(current_path)); %#ok<NASGU>
         cd(fullfile(lib_path,'DATCOM')); delete('*.dat') %clean up
         DATCOM_IO('for005.dat','case',choice,cg_calc,unit);
         if ispc %windows

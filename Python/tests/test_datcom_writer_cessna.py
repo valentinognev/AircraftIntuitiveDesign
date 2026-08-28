@@ -12,3 +12,8 @@ def test_full_for005_cessna(tmp_path):
     assert "$FLTCON" in text and "$WGPLNF" in text
     assert "NACA-W-4-2412" in text
     assert "PLOT" in text and "NEXT CASE" in text
+    assert "$HTPLNF" in text
+    assert "$VTPLNF" in text
+    assert "$SYMFLP" in text
+    assert "$ASYFLP" in text
+    assert text.count("$SYMFLP") == 2

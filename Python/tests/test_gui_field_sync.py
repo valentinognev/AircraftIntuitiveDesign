@@ -26,3 +26,15 @@ def test_sync_keeps_naca_as_string():
     sync_fields_to_aircraft(w)
     assert w.aircraft.HT["NACA"] == "2412"
     assert isinstance(w.aircraft.HT["NACA"], str)
+
+
+def test_control_deflection_edit_updates_geometry():
+    app = QApplication.instance() or QApplication([])
+    w = MainWindow()
+    w.load_aircraft(load_jsonc(models_dir() / "Cessna 172.jsonc"))
+    n0 = w.view3d.mesh_count()
+    edit = w._field_edits["F.DELTA"]
+    edit.setText("20")
+    edit.editingFinished.emit()
+    assert float(w.aircraft.F["DELTA"]) == 20
+    assert w.view3d.mesh_count() > n0

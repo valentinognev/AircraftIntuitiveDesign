@@ -1,7 +1,7 @@
 """Aircraft display meshes from existing planform/body fields.
 
-Ports the loft in ``Plot_Planform.m`` / ``Plot_Body.m`` (no new geometry model).
-Control-surface deflection is omitted; rest geometry matches the MATLAB view.
+Ports the loft in ``Plot_Planform.m`` / ``Plot_Body.m`` (no new geometry model),
+including flap/aileron/elevator/rudder hinge deflection.
 """
 
 from __future__ import annotations
@@ -39,21 +39,25 @@ def aircraft_surfaces(
     flags = list(ac.plot_cmp) + [1] * 8
     out: list[SurfaceMesh] = []
     if flags[0]:
-        out.extend(_planform_surfaces(ac.WG, "wing", res_wing, res_wing, angle))
+        out.extend(_planform_surfaces(ac.WG, "wing", res_wing, res_wing, angle, ac))
     if flags[1]:
-        out.extend(_planform_surfaces(ac.HT, "ht", res_tail, res_tail, angle))
+        out.extend(_planform_surfaces(ac.HT, "ht", res_tail, res_tail, angle, ac))
     if flags[2]:
-        out.extend(_planform_surfaces(ac.VT, "vt", res_tail, res_tail, angle))
+        out.extend(_planform_surfaces(ac.VT, "vt", res_tail, res_tail, angle, ac))
     if flags[3]:
         out.extend(_body_surfaces(ac.BD, n=res_body))
     for i, pt in enumerate(ac.NP):
         if not pt:
             continue
+        if not flags[4 + i]:
+            continue
         kind = _NP_TYPES[i] if i < len(_NP_TYPES) else "wing 2"
         ni = res_wing if i == 0 else res_tail
-        out.extend(_planform_surfaces(pt, kind, ni, ni, angle))
+        out.extend(_planform_surfaces(pt, kind, ni, ni, angle, ac))
     for i, pt in enumerate(ac.NB):
         if not pt:
+            continue
+        if not flags[8 + i]:
             continue
         out.extend(_body_surfaces(pt, n=res_body, extra_index=i + 1))
     return out
@@ -216,22 +220,205 @@ def _loft(pt: dict, kind: str, ni: int, nj: int, angle: bool) -> tuple[np.ndarra
     Xtip = np.column_stack([XL, XU[::-1]])
     Ztip = np.column_stack([ZL, ZU[::-1]])
     Ytip = np.column_stack([YL, YU])
-    return X, Y, Z, Xtip, Ytip, Ztip, pt
+    return X, Y, Z, Xtip, Ytip, Ztip, pt, x, c, le
 
 
 def _add(out: list[SurfaceMesh], name: str, x, y, z) -> None:
     out.append(SurfaceMesh(name=name, x=np.asarray(x, dtype=float), y=np.asarray(y, dtype=float), z=np.asarray(z, dtype=float)))
 
 
-def _planform_surfaces(pt: dict, kind: str, ni: int, nj: int, angle: bool) -> list[SurfaceMesh]:
-    X, Y, Z, Xtip, Ytip, Ztip, pt_swapped = _loft(pt, kind, ni, nj, angle)
+def _delta_mean(val) -> float:
+    arr = np.atleast_1d(np.asarray(val, dtype=float).reshape(-1))
+    if arr.size == 0 or not np.max(np.abs(arr)):
+        return 0.0
+    return float(np.mean(arr))
+
+
+def _control_masks(x: np.ndarray, chrdr: float, chrdfi: float, y0: np.ndarray, spanfi: float, spanfo: float):
+    xc = np.asarray(x, dtype=float)
+    x_le = xc[:, 0] if xc.ndim > 1 else xc
+    denom = float(chrdr) if chrdr else 1.0
+    i_mask = x_le > (denom - float(chrdfi or 0)) / denom
+    j_mask = (float(spanfi or 0) < y0) & (y0 <= float(spanfo or 0))
+    first = np.flatnonzero(j_mask)
+    if first.size and first[0] > 0:
+        j_mask = j_mask.copy()
+        j_mask[first[0] - 1] = True
+    return i_mask, j_mask
+
+
+def _rotate_control(X, Z, i_mask, j_mask, c, delta_deg: float, *, z_sign: float):
+    """Hinge rotation from ``Plot_Planform.m`` (uses inboard columns 0:nctrl for f)."""
+    nctrl = int(np.count_nonzero(j_mask))
+    Xc = X[np.ix_(i_mask, j_mask)].copy()
+    Zc = Z[np.ix_(i_mask, j_mask)].copy()
+    dX_last = np.zeros(int(np.count_nonzero(i_mask)))
+    dZ_last = np.zeros_like(dX_last)
+    rad = np.radians(delta_deg)
+    cos_d, sin_d = np.cos(rad), np.sin(rad)
+    for k in range(nctrl):
+        x_ctrl = X[i_mask, k]
+        span = float(np.max(X[:, k]) - np.min(X[:, k]))
+        if span == 0:
+            f = np.zeros_like(x_ctrl)
+        else:
+            f = c[k] * (x_ctrl - np.min(x_ctrl)) / span
+        dX = f - f * cos_d
+        dZ = f * sin_d
+        Xc[:, k] = Xc[:, k] - dX
+        Zc[:, k] = Zc[:, k] + z_sign * dZ
+        dX_last, dZ_last = dX, dZ
+    return Xc, Zc, dX_last, dZ_last
+
+
+def _blank_parent(X, Z, i_mask, j_mask, *, blank_x: bool) -> None:
+    jblank = j_mask.copy()
+    first = np.flatnonzero(j_mask)
+    if first.size:
+        jblank[first[0]] = False
+        if not j_mask[-1]:
+            jblank[first[-1]] = False
+    iblank = i_mask.copy()
+    ni_idx = np.flatnonzero(~i_mask)
+    if ni_idx.size:
+        punch = list(ni_idx)
+        if ni_idx[0] > 0:
+            punch.append(ni_idx[0] - 1)
+        if ni_idx[-1] + 1 < iblank.size:
+            punch.append(ni_idx[-1] + 1)
+        iblank[np.array(punch, dtype=int)] = False
+    if not np.any(iblank) or not np.any(jblank):
+        return
+    ii, jj = np.ix_(iblank, jblank)
+    Z[ii, jj] = np.nan
+    if blank_x:
+        X[ii, jj] = np.nan
+
+
+def _apply_tip_defl(Xtip, Ztip, i_mask, le: int, dX, dZ, *, z_sign: float) -> None:
+    if dX is None or not np.any(i_mask[:le]):
+        return
+    half_n = dX.size // 2
+    if half_n == 0:
+        return
+    half_x = dX[:half_n]
+    half_z = dZ[:half_n]
+    rows = i_mask[:le]
+    n_rows = int(np.count_nonzero(rows))
+    if n_rows != half_n:
+        n = min(n_rows, half_n)
+        if n == 0:
+            return
+        idx = np.flatnonzero(rows)[:n]
+        Xtip[idx, :] = Xtip[idx, :] - np.column_stack([half_x[:n], half_x[:n]])
+        Ztip[idx, :] = Ztip[idx, :] + z_sign * np.column_stack([half_z[:n], half_z[:n]])
+        return
+    Xtip[rows, :] = Xtip[rows, :] - np.column_stack([half_x, half_x])
+    Ztip[rows, :] = Ztip[rows, :] + z_sign * np.column_stack([half_z, half_z])
+
+
+def _planform_surfaces(
+    pt: dict, kind: str, ni: int, nj: int, angle: bool, ac: Aircraft | None = None
+) -> list[SurfaceMesh]:
+    X, Y, Z, Xtip, Ytip, Ztip, pt_swapped, x_af, c, le = _loft(pt, kind, ni, nj, angle)
+    X, Y, Z = np.array(X, copy=True), np.array(Y, copy=True), np.array(Z, copy=True)
+    Xtip, Ytip, Ztip = np.array(Xtip, copy=True), np.array(Ytip, copy=True), np.array(Ztip, copy=True)
+    Xtl, Xtr = Xtip.copy(), Xtip.copy()
+    Ztl, Ztr = Ztip.copy(), Ztip.copy()
     out: list[SurfaceMesh] = []
+    controls: list[SurfaceMesh] = []
+    sspn = float(pt.get("SSPN", 0) or 0)
+    y0 = np.linspace(0.0, sspn, X.shape[1])
+    chrdr = float(pt.get("CHRDR", 0) or 0)
+
+    if kind == "wing" and ac is not None:
+        flap_d = _delta_mean(ac.F.get("DELTA", 0))
+        if flap_d:
+            i_m, j_m = _control_masks(
+                x_af, chrdr, float(ac.F.get("CHRDFI", 0) or 0), y0,
+                float(ac.F.get("SPANFI", 0) or 0), float(ac.F.get("SPANFO", 0) or 0),
+            )
+            if np.any(i_m) and np.any(j_m):
+                Xf, Zf, dX, dZ = _rotate_control(X, Z, i_m, j_m, c, flap_d, z_sign=-1.0)
+                Yf = Y[np.ix_(i_m, j_m)]
+                _add(controls, "F", Xf, Yf, Zf)
+                _add(controls, "F", Xf, -Yf, Zf)
+                if j_m[-1]:
+                    _apply_tip_defl(Xtip, Ztip, i_m, le, dX, dZ, z_sign=-1.0)
+                _blank_parent(X, Z, i_m, j_m, blank_x=False)
+                Xtl, Xtr = Xtip.copy(), Xtip.copy()
+                Ztl, Ztr = Ztip.copy(), Ztip.copy()
+
+        al, ar = _delta_mean(ac.A.get("DELTAL", 0)), _delta_mean(ac.A.get("DELTAR", 0))
+        if al or ar:
+            i_m, j_m = _control_masks(
+                x_af, chrdr, float(ac.A.get("CHRDFI", 0) or 0), y0,
+                float(ac.A.get("SPANFI", 0) or 0), float(ac.A.get("SPANFO", 0) or 0),
+            )
+            if np.any(i_m) and np.any(j_m):
+                Xal, Zal, dXl, dZl = _rotate_control(X, Z, i_m, j_m, c, al, z_sign=-1.0)
+                Xar, Zar, dXr, dZr = _rotate_control(X, Z, i_m, j_m, c, ar, z_sign=1.0)
+                Ya = Y[np.ix_(i_m, j_m)]
+                _add(controls, "A", Xar, Ya, Zar)
+                _add(controls, "A", Xal, -Ya, Zal)
+                if j_m[-1]:
+                    _apply_tip_defl(Xtl, Ztl, i_m, le, dXl, dZl, z_sign=-1.0)
+                    _apply_tip_defl(Xtr, Ztr, i_m, le, dXr, dZr, z_sign=1.0)
+                _blank_parent(X, Z, i_m, j_m, blank_x=False)
+
+    elif kind == "ht" and ac is not None:
+        el_d = _delta_mean(ac.E.get("DELTA", 0))
+        if el_d:
+            i_m, j_m = _control_masks(
+                x_af, chrdr, float(ac.E.get("CHRDFI", 0) or 0), y0,
+                float(ac.E.get("SPANFI", 0) or 0), float(ac.E.get("SPANFO", 0) or 0),
+            )
+            if np.any(i_m) and np.any(j_m):
+                Xe, Ze, dX, dZ = _rotate_control(X, Z, i_m, j_m, c, el_d, z_sign=-1.0)
+                Ye = Y[np.ix_(i_m, j_m)]
+                _add(controls, "E", Xe, Ye, Ze)
+                _add(controls, "E", Xe, -Ye, Ze)
+                if j_m[-1]:
+                    _apply_tip_defl(Xtip, Ztip, i_m, le, dX, dZ, z_sign=-1.0)
+                _blank_parent(X, Z, i_m, j_m, blank_x=True)
+                Xtl, Xtr = Xtip.copy(), Xtip.copy()
+                Ztl, Ztr = Ztip.copy(), Ztip.copy()
+
+    elif kind == "vt" and ac is not None:
+        rd = _delta_mean(ac.R.get("DELTA", 0))
+        if rd:
+            i_m, j_m = _control_masks(
+                x_af, chrdr, float(ac.R.get("CHRDFI", 0) or 0), y0,
+                float(ac.R.get("SPANFI", 0) or 0), float(ac.R.get("SPANFO", 0) or 0),
+            )
+            if np.any(i_m) and np.any(j_m):
+                Xr, Zr, dX, dZ = _rotate_control(X, Z, i_m, j_m, c, rd, z_sign=1.0)
+                Yr = Y[np.ix_(i_m, j_m)]
+                Zr2 = Z[np.ix_(i_m, j_m)].copy()
+                nctrl = int(np.count_nonzero(j_m))
+                rad = np.radians(rd)
+                for k in range(nctrl):
+                    x_ctrl = X[i_m, k]
+                    span = float(np.max(X[:, k]) - np.min(X[:, k]))
+                    f = np.zeros_like(x_ctrl) if span == 0 else c[k] * (x_ctrl - np.min(x_ctrl)) / span
+                    Zr2[:, k] = Zr2[:, k] - f * np.sin(rad)
+                _add(controls, "R", Xr, Zr, Yr)
+                if pt_swapped.get("Z"):
+                    _add(controls, "R", Xr, -Zr2, Yr)
+                if j_m[-1]:
+                    _apply_tip_defl(Xtip, Ztip, i_m, le, dX, dZ, z_sign=1.0)
+                _blank_parent(X, Z, i_m, j_m, blank_x=True)
+
     if kind in ("wing", "wing 2"):
         tag = "WG" if kind == "wing" else "NP{1}"
         _add(out, tag, X, Y, Z)
         _add(out, tag, X, -Y, Z)
-        _add(out, tag + "tip", Xtip, Ytip, Ztip)
-        _add(out, tag + "tip", Xtip, -Ytip, Ztip)
+        if kind == "wing":
+            _add(out, tag + "tip", Xtr, Ytip, Ztr)
+            _add(out, tag + "tip", Xtl, -Ytip, Ztl)
+        else:
+            _add(out, tag + "tip", Xtip, Ytip, Ztip)
+            _add(out, tag + "tip", Xtip, -Ytip, Ztip)
     elif kind in ("ht", "ht 2"):
         tag = "HT" if kind == "ht" else "NP{2}"
         _add(out, tag, X, Y, Z)
@@ -257,6 +444,7 @@ def _planform_surfaces(pt: dict, kind: str, ni: int, nj: int, angle: bool) -> li
         _add(out, "prop", Zt, Xtip - px + pz - chrdr / 2, Ytip)
         _add(out, "prop", Zp, -X + px + pz + chrdr / 2, -Y + 2 * py)
         _add(out, "prop", Zt, -Xtip + px + pz + chrdr / 2, -Ytip + 2 * py)
+    out.extend(controls)
     return out
 
 

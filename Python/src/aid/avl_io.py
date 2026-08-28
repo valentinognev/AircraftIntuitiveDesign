@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 
 from aid.aircraft import Aircraft
-from aid.avl_parse import parse_st
+from aid.avl_parse import parse_run_case_header, parse_st
 from aid.paths import avl_bin
 from aid.tornado_io import tornado_io
 
@@ -59,16 +59,25 @@ def _write_surface(
     k: int,
     ni: int,
     nj: int,
+    *,
+    cspace: float | None = None,
+    sspace: float | None = None,
 ) -> None:
     n = int(geo["nelem"][k])
 
     fid.write("\n#======================================================\n")
     fid.write("SURFACE\n")
     fid.write(f"{label}\n")
-    if n >= 4 or n == nj - 1:
-        fid.write(f"{ni} 1 {nj} -2\n")
-    else:
-        fid.write(f"{ni} 1.0 {nj} -1.1\n")
+    if cspace is None or sspace is None:
+        if n >= 4 or n == nj - 1:
+            c_use, s_use = 1.0, -2.0
+        else:
+            c_use, s_use = 1.0, -1.1
+        if cspace is None:
+            cspace = c_use
+        if sspace is None:
+            sspace = s_use
+    fid.write(f"{ni} {cspace} {nj} {sspace}\n")
 
     fid.write("\nCOMPONENT\n1\n")
 
@@ -170,6 +179,9 @@ def write_avl_geometry(
     run_dir: Path,
     ni: int,
     nj: int,
+    *,
+    cspace: float | None = None,
+    sspace: float | None = None,
 ) -> None:
     run_dir = Path(run_dir)
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -184,6 +196,7 @@ def write_avl_geometry(
     labels = ["WG", "HT", "VT"] + [f"Planform {i + 4}" for i in range(3)]
     control_names = ["flap", "elevator", "rudder", "", "", ""]
 
+    # AVL cannot use NP{4} propeller; keep WG/HT/VT only (MATLAB AVL_IO nwing<=3).
     nwing = min(int(geo["nwing"]), 3)
 
     with avl_path.open("w", encoding="ascii") as fid:
@@ -211,6 +224,8 @@ def write_avl_geometry(
                 i,
                 ni,
                 nj,
+                cspace=cspace,
+                sspace=sspace,
             )
 
 
@@ -242,6 +257,39 @@ def write_case(case_id: str, state: dict, run_dir: Path) -> None:
         fid.write("Quit\n")
 
 
+_AVL_RUN_KEYS = (
+    "alpha",
+    "beta",
+    "mach",
+    "CXtot",
+    "CYtot",
+    "CZtot",
+    "Cltot",
+    "Cmtot",
+    "Cntot",
+    "CLtot",
+    "CDtot",
+    "CDvis",
+    "CDind",
+    "CDff",
+    "CLff",
+    "e",
+    "surface",
+)
+
+
+def merge_avl_st(path: Path) -> dict:
+    """Stability-axis derivatives plus run-case totals from one ``.st`` file."""
+    st = parse_st(path)
+    rc = parse_run_case_header(path)
+    for key in _AVL_RUN_KEYS:
+        if key not in rc:
+            continue
+        if key not in st or st[key] in ([], None):
+            st[key] = rc[key]
+    return st
+
+
 def run_avl(run_dir: Path, *, timeout: float = 120) -> None:
     """Run AVL in ``run_dir`` with ``geometry.run`` on stdin."""
     run_dir = Path(run_dir)
@@ -251,22 +299,63 @@ def run_avl(run_dir: Path, *, timeout: float = 120) -> None:
             [str(avl_bin())],
             stdin=run_in,
             cwd=run_dir,
-            check=True,
+            check=False,
             timeout=timeout,
+            capture_output=True,
+            text=True,
         )
 
 
+def _avl_spacing_attempts(ni: int, nj: int) -> list[tuple[int, int, float | None, float | None]]:
+    """Primary mesh, then documented fallbacks used only when geometry.st is missing.
+
+    Each tuple is (ni, nj, cspace, sspace). None spacing keeps the writer default
+    (cosine -2 when nelem>=4, else weighted outboard -1.1).
+    """
+    nj2 = max(nj + 2, min(nj * 2, nj + 8))
+    nj_lo = max(4, nj - 2)
+    return [
+        (ni, nj, None, None),
+        (ni, nj, 1.0, -1.1),
+        (ni, nj, 1.0, 0.0),
+        (ni, nj2, 1.0, -2.0),
+        (ni, nj2, 1.0, 0.0),
+        (ni, nj_lo, 1.0, 0.0),
+    ]
+
+
 def run_avl_full(ac: Aircraft, mesh: tuple[str, str], run_dir: Path) -> dict:
-    """Tornado geo → AVL geometry/case → run → parse stability derivatives."""
+    """Tornado geo → AVL geometry/case → run → parse stability derivatives.
+
+    If AVL rejects the primary cosine mesh (no ``geometry.st``), retry with
+    weighted-outboard / equal spanwise spacing and slightly finer or coarser
+    nj from the same dialog values. Coefficients are never invented.
+    """
     run_dir = Path(run_dir)
     geo, state = tornado_io(ac, mesh)
     nj = int(mesh[0])
     ni = int(mesh[1])
-    write_avl_geometry(ac, geo, state, run_dir, ni, nj)
-    write_case("geometry", state, run_dir)
-    for stale in ("geometry.st", "geometry.sb"):
-        path = run_dir / stale
-        if path.is_file():
-            path.unlink()
-    run_avl(run_dir)
-    return parse_st(run_dir / "geometry.st")
+    last_exc: Exception | None = None
+    for try_ni, try_nj, cspace, sspace in _avl_spacing_attempts(ni, nj):
+        write_avl_geometry(
+            ac, geo, state, run_dir, try_ni, try_nj, cspace=cspace, sspace=sspace
+        )
+        write_case("geometry", state, run_dir)
+        for stale in ("geometry.st", "geometry.sb"):
+            path = run_dir / stale
+            if path.is_file():
+                path.unlink()
+        try:
+            run_avl(run_dir)
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+            last_exc = exc
+            if not (run_dir / "geometry.st").is_file():
+                continue
+            raise
+        st_path = run_dir / "geometry.st"
+        if st_path.is_file():
+            return merge_avl_st(st_path)
+        last_exc = FileNotFoundError(f"AVL produced no {st_path}")
+    if last_exc is not None:
+        raise last_exc
+    raise FileNotFoundError(f"AVL produced no geometry.st in {run_dir}")

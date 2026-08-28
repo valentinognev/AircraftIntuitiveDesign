@@ -643,49 +643,36 @@ if strcmp(type,'case')
     if get(cmp(4),'Value')
         body = struct('NX', BD.NX, 'X', BD.X, 'ZU', BD.ZU, 'ZL', BD.ZL, ...
             'R', BD.R, 'P', BD.P, 'S', BD.S);
-        body_max = 18; % DATCOM namelist: one 12-value line + one 6-value continuation
+        body_max = 200; % DATCOM NX limit (Task 2); wrap continuations at 80 cols
         if body.NX > body_max
             idx = round(linspace(1, body.NX, body_max));
             body.X = body.X(idx); body.ZU = body.ZU(idx); body.ZL = body.ZL(idx);
             body.R = body.R(idx); body.P = body.P(idx); body.S = body.S(idx);
             body.NX = body_max;
         end
-        lim = 12;
         fprintf(fid,'\n $BODY NX=%.1f,ITYPE=1.0,',body.NX);
         if cg_calc, fprintf(fid,'\n  XCG=%.2f,ZCG=%.2f,WT=%.2f,',...
                 BD.XCG,BD.ZCG,BD.WT); end
         if min(body.S)<0.01, precision='%.3f,'; else, precision = '%.2f,';end
-        if body.NX<=lim
-            write_namelist_array(fid, 'X', body.X, '%.2f,');
-            write_namelist_array(fid, 'ZU', body.ZU, '%.2f,');
-            write_namelist_array(fid, 'ZL', body.ZL, '%.2f,');
-            write_namelist_array(fid, 'R', body.R, '%.2f,');
-            write_namelist_array(fid, 'P', body.P, '%.2f,');
-            write_namelist_array(fid, 'S', body.S, precision);
-        else
-            write_namelist_array(fid, 'X', body.X, '%.2f,');
-            write_namelist_array(fid, 'ZU', body.ZU, '%.2f,');
-            write_namelist_array(fid, 'ZL', body.ZL, '%.2f,');
-            write_namelist_array(fid, 'R', body.R, '%.2f,');
-            write_namelist_array(fid, 'P', body.P, '%.2f,');
-            write_namelist_array(fid, 'S', body.S, precision);
-        end
+        write_namelist_array(fid, 'X', body.X, '%.2f,');
+        write_namelist_array(fid, 'ZU', body.ZU, '%.2f,');
+        write_namelist_array(fid, 'ZL', body.ZL, '%.2f,');
+        write_namelist_array(fid, 'R', body.R, '%.2f,');
+        write_namelist_array(fid, 'P', body.P, '%.2f,');
+        write_namelist_array(fid, 'S', body.S, precision);
     end
     fprintf(fid,'$\n');
     
     %Save Planform Parameters (WGPLNF/HTPLNF/VTPLNF)
     
     %Wing Planform Data
-    if length(WG.NACA{1})==6
-        airfoil = str2double(WG.NACA{1}([1:2,4:6]));
-    else
-        airfoil = str2double(WG.NACA{1});
-    end
-    if isnan(airfoil) && isfield(WG,'DATA')
+    naca_code = naca_airfoil_code(WG.NACA);
+    use_table = isempty(naca_code) && isfield(WG,'DATA') && ~isempty(WG.DATA);
+    if use_table
         fprintf(fid,' $WGPLNF ');
     else
-        if isnan(airfoil), WG.NACA{1}='2412'; end
-        fprintf(fid,'NACA-W-%d-%s\n $WGPLNF ',length(WG.NACA{1}),WG.NACA{1});
+        if isempty(naca_code), naca_code = '2412'; end
+        fprintf(fid,'NACA-W-%d-%s\n $WGPLNF ',length(naca_code),naca_code);
     end
     for i=1:length(RP)-5
         fprintf(fid,'%s=%.2f,',RP{i},WG.(RP{i}));
@@ -693,43 +680,26 @@ if strcmp(type,'case')
     end
     fprintf(fid,'TYPE=1.0$\n');
     
-    %Wing airfoil Data
-    if isnan(airfoil)
-        for n=1:length(WG.DATA)
-            fprintf(fid,' $WGSCHR NPTS=%d,\n  XCORD=',floor(length(WG.DATA{n}/2)));
-            XCORD = flipud(WG.DATA{n}(1:floor(end/2),1));
-            for i=1:length(XCORD)
-                fprintf(fid,'%.3f,',XCORD(i));
-                if mod(i,10)==0, fprintf(fid,'\n  '); end
+    %Wing airfoil Data (tabulated only when no numeric NACA, including NACA{2})
+    if use_table
+        if iscell(WG.DATA)
+            for n=1:numel(WG.DATA)
+                write_section_airfoil(fid, 'WGSCHR', WG.DATA{n});
             end
-            YUPPER = flipud(WG.DATA{n}(1:floor(end/2),2));
-            fprintf(fid,'\n  YUPPER=');
-            for i=1:length(YUPPER)
-                fprintf(fid,'%.3f,',YUPPER(i));
-                if mod(i,10)==0, fprintf(fid,'\n  '); end
-            end
-            YLOWER = WG.DATA{n}(end-floor(end/2)+1:end,2);
-            fprintf(fid,'\n  YLOWER=');
-            for i=1:length(YLOWER)
-                fprintf(fid,'%.3f,',YLOWER(i));
-                if mod(i,10)==0, fprintf(fid,'\n  '); end
-            end
-            fprintf(fid,'CLMAX=1.5$\n');
+        else
+            write_section_airfoil(fid, 'WGSCHR', WG.DATA);
         end
     end
     
     %Horizontal Tail Planform Data
     if get(cmp(2),'Value') && ~strcmp(owg,'Yes')
-        if length(HT.NACA{1})==6
-            airfoil = str2double(HT.NACA{1}([1:2,4:6]));
-        else
-            airfoil = str2double(HT.NACA{1});
-        end
-        if isnan(airfoil) && isfield(HT,'DATA')
+        naca_code = naca_airfoil_code(HT.NACA);
+        use_table = isempty(naca_code) && isfield(HT,'DATA') && ~isempty(HT.DATA);
+        if use_table
             fprintf(fid,' $HTPLNF ');
         else
-            if isnan(airfoil), WG.NACA{1}='2412'; end
-            fprintf(fid,'NACA-H-%d-%s\n $HTPLNF ',length(HT.NACA{1}),HT.NACA{1});
+            if isempty(naca_code), naca_code = '2412'; end
+            fprintf(fid,'NACA-H-%d-%s\n $HTPLNF ',length(naca_code),naca_code);
         end
         for i=1:length(RP)-5
             fprintf(fid,'%s=%.2f,',RP{i},HT.(RP{i}));
@@ -738,41 +708,20 @@ if strcmp(type,'case')
         fprintf(fid,'TYPE=1.0$\n');
         
         %Horizontal Tail airfoil Data
-        if isnan(airfoil) && isfield(HT,'DATA')
-            fprintf(fid,' $HTSCHR NPTS=%d,\n  XCORD=',floor(length(HT.DATA/2)));
-            XCORD = flipud(HT.DATA(1:floor(end/2),1));
-            for i=1:length(XCORD)
-                fprintf(fid,'%.3f,',XCORD(i));
-                if mod(i,10)==0, fprintf(fid,'\n  '); end
-            end
-            YUPPER = flipud(HT.DATA(1:floor(end/2),2));
-            fprintf(fid,'\n  YUPPER=');
-            for i=1:length(YUPPER)
-                fprintf(fid,'%.3f,',YUPPER(i));
-                if mod(i,10)==0, fprintf(fid,'\n  '); end
-            end
-            YLOWER = HT.DATA(end-floor(end/2)+1:end,2);
-            fprintf(fid,'\n  YLOWER=');
-            for i=1:length(YLOWER)
-                fprintf(fid,'%.3f,',YLOWER(i));
-                if mod(i,10)==0, fprintf(fid,'\n  '); end
-            end
-            fprintf(fid,'CLMAX=1.5$\n');
+        if use_table
+            write_section_airfoil(fid, 'HTSCHR', HT.DATA);
         end
     end
     
     %Vertical Tail Planform Data
     if get(cmp(3),'Value') && ~strcmp(owg,'Yes')
-        if length(VT.NACA{1})==6
-            airfoil = str2double(VT.NACA{1}([1:2,4:6]));
-        else
-            airfoil = str2double(VT.NACA{1});
-        end
-        if isnan(airfoil) && isfield(VT,'DATA')
+        naca_code = naca_airfoil_code(VT.NACA);
+        use_table = isempty(naca_code) && isfield(VT,'DATA') && ~isempty(VT.DATA);
+        if use_table
             fprintf(fid,' $VTPLNF ');
         else
-            if isnan(airfoil), VT.NACA{1}='0012'; end
-            fprintf(fid,'NACA-V-%d-%s\n $VTPLNF ',length(VT.NACA{1}),VT.NACA{1});
+            if isempty(naca_code), naca_code = '0012'; end
+            fprintf(fid,'NACA-V-%d-%s\n $VTPLNF ',length(naca_code),naca_code);
         end
         for i=1:length(RP)-5
             fprintf(fid,'%s=%.2f,',RP{i},VT.(RP{i}));
@@ -781,26 +730,8 @@ if strcmp(type,'case')
         fprintf(fid,'TYPE=1.0$\n');
         
         %Vertical Tail airfoil Data
-        if isnan(airfoil) && isfield(VT,'DATA')
-            fprintf(fid,' $VTSCHR NPTS=%d,\n  XCORD=',floor(length(VT.DATA/2)));
-            XCORD = flipud(VT.DATA(1:floor(end/2),1));
-            for i=1:length(XCORD)
-                fprintf(fid,'%.3f,',XCORD(i));
-                if mod(i,10)==0, fprintf(fid,'\n  '); end
-            end
-            YUPPER = flipud(VT.DATA(1:floor(end/2),2));
-            fprintf(fid,'\n  YUPPER=');
-            for i=1:length(YUPPER)
-                fprintf(fid,'%.3f,',YUPPER(i));
-                if mod(i,10)==0, fprintf(fid,'\n  '); end
-            end
-            YLOWER = VT.DATA(end-floor(end/2)+1:end,2);
-            fprintf(fid,'\n  YLOWER=');
-            for i=1:length(YLOWER)
-                fprintf(fid,'%.3f,',YLOWER(i));
-                if mod(i,10)==0, fprintf(fid,'\n  '); end
-            end
-            fprintf(fid,'CLMAX=1.5$\n');
+        if use_table
+            write_section_airfoil(fid, 'VTSCHR', VT.DATA);
         end
     end
     
@@ -912,26 +843,8 @@ elseif strcmp(type,'parts')
                 if ~mod(i,4), fprintf(fid,'\n  '); end
             end
             fprintf(fid,'TYPE=1.0$\n');
-            if isfield(NP{j},'DATA')
-                fprintf(fid,' $%sSCHR NPTS=%d,\n  XCORD=',plnf{j},floor(length(NP{j}.DATA{1}/2)));
-                XCORD = flipud(NP{j}.DATA{1}(1:floor(end/2),1));
-                for i=1:length(XCORD)
-                    fprintf(fid,'%.3f,',XCORD(i));
-                    if mod(i,10)==0, fprintf(fid,'\n  '); end
-                end
-                YUPPER = flipud(NP{j}.DATA{1}(1:floor(end/2),2));
-                fprintf(fid,'\n  YUPPER=');
-                for i=1:length(YUPPER)
-                    fprintf(fid,'%.3f,',YUPPER(i));
-                    if mod(i,10)==0, fprintf(fid,'\n  '); end
-                end
-                YLOWER = NP{j}.DATA{1}(end-floor(end/2)+1:end,2);
-                fprintf(fid,'\n  YLOWER=');
-                for i=1:length(YLOWER)
-                    fprintf(fid,'%.3f,',YLOWER(i));
-                    if mod(i,10)==0, fprintf(fid,'\n  '); end
-                end
-                fprintf(fid,'CLMAX=1.5$\n');
+            if isfield(NP{j},'DATA') && ~isempty(NP{j}.DATA)
+                write_section_airfoil(fid, [plnf{j},'SCHR'], NP{j}.DATA);
             end
         end
     end
@@ -947,22 +860,99 @@ end
 end
 
 function write_namelist_array(fid, name, vals, fmt)
-first_lim = 12;
-cont_lim = 6; % DATCOM allows one continuation line per array (12+6 max)
-n = numel(vals);
-if n > first_lim + cont_lim
-    idx = round(linspace(1, n, first_lim + cont_lim));
-    vals = vals(idx);
-    n = numel(vals);
+%WRITE_NAMELIST_ARRAY  Dump a DATCOM namelist array; wrap at <=80 columns.
+%  No 18-point downsample. As many continuation lines as needed.
+    fprintf(fid, '\n%s', format_wrapped_array(name, vals, fmt));
 end
-i = 1;
-fprintf(fid,'\n  %s=', name);
-chunk = vals(i:min(i+first_lim-1,n));
-fprintf(fid, fmt, chunk);
-i = i + numel(chunk);
-if i <= n
-    fprintf(fid,'\n  ');
-    chunk = vals(i:min(i+cont_lim-1,n));
-    fprintf(fid, fmt, chunk);
+
+function s = format_wrapped_array(name, vals, fmt)
+%FORMAT_WRAPPED_ARRAY  10 values/line, wrap at <=80 columns, 2-space indent.
+    vals = vals(:)';
+    header = sprintf('  %s=', name);
+    chunks = {};
+    line = header;
+    n_on_line = 0;
+    for i = 1:numel(vals)
+        tok = sprintf(fmt, vals(i));
+        would = numel(line) + numel(tok);
+        if n_on_line > 0 && (n_on_line >= 10 || would > 80)
+            chunks{end+1} = line; %#ok<AGROW>
+            line = ['  ', tok];
+            n_on_line = 1;
+        else
+            line = [line, tok];
+            n_on_line = n_on_line + 1;
+        end
+    end
+    chunks{end+1} = line;
+    s = strjoin(chunks, sprintf('\n'));
 end
+
+function code = naca_airfoil_code(naca)
+%NACA_AIRFOIL_CODE  First cell that parses as a NACA series (skip .SHP paths).
+%  737Max: NACA{1} is a Windows path (NaN), NACA{2} is '2412'.
+    code = '';
+    if isempty(naca)
+        return
+    end
+    if ~iscell(naca)
+        naca = {naca};
+    end
+    for k = 1:numel(naca)
+        s = naca{k};
+        if isempty(s)
+            continue
+        end
+        if isstring(s)
+            s = char(s);
+        end
+        if ~ischar(s)
+            continue
+        end
+        if numel(s) == 6
+            airfoil = str2double(s([1:2, 4:6]));
+        else
+            airfoil = str2double(s);
+        end
+        if ~isnan(airfoil)
+            if k > 1
+                fprintf(['Warning: NACA{1} is not a numeric code (file path); ', ...
+                    'imported section DATA is not sent to DATCOM ', ...
+                    '(NACA card %s used instead).\n'], s);
+            end
+            code = s;
+            return
+        end
+    end
+end
+
+function write_section_airfoil(fid, schr_name, DATA)
+%WRITE_SECTION_AIRFOIL  $WGSCHR-style namelist via datcom_airfoil_xy.
+%  NPTS is a real literal (%.1f). Lines wrap at <=80 columns, 10 values/line.
+%  WGSCHR cap 60 (SECI /IWING/); HT/VT/extra planforms cap 50.
+    api = datcom_interp_sections();
+    [xcord, yupper, ylower] = api.datcom_airfoil_xy(DATA);
+    if strcmp(schr_name, 'WGSCHR')
+        cap = 60;
+    else
+        cap = 50;
+    end
+    [xcord, yupper, ylower] = api.clamp_section_npts(xcord, yupper, ylower, cap);
+    fprintf(fid, ' $%s TYPEIN=1.0,NPTS=%.1f,\n', schr_name, numel(xcord));
+    fprintf(fid, '%s\n', format_wrapped_array('XCORD', xcord, '%.3f,'));
+    fprintf(fid, '%s\n', format_wrapped_array('YUPPER', yupper, '%.3f,'));
+    yline = format_wrapped_array('YLOWER', ylower, '%.3f,');
+    tail = 'CLMAX=1.5$';
+    last_nl = find(yline == sprintf('\n'), 1, 'last');
+    if isempty(last_nl)
+        last_len = numel(yline);
+    else
+        last_len = numel(yline) - last_nl;
+    end
+    if last_len + numel(tail) <= 80
+        yline = [yline, tail];
+    else
+        yline = sprintf('%s\n  %s', yline, tail);
+    end
+    fprintf(fid, '%s\n', yline);
 end

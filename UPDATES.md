@@ -1,5 +1,21 @@
 # Updates
 
+## 1.4.1 - DATCOM writer NPTS clamp
+- `$WGSCHR` NPTS clamped to 60 (SECI `/IWING/`); `$HTSCHR`/`$VTSCHR`/extra planforms to 50. Downsample XCORD/YUPPER/YLOWER together, keep 0 and 1, so Analyze cannot hang on 100–500-pt sections
+- Harness: 60s Linux `timeout` on `./datcom` (MATLAB `system` has no Timeout option); non-zero/timeout fails the case
+- NACA cell fallback: warn when `NACA{1}` is a file path and a later numeric code is used (section DATA not sent; NACA card used instead)
+
+## 1.4.0 - DATCOM MAXNX=200 / MAXNPTS=500 namelist
+- Fortran `datcom.f`: body NX 20→200, airfoil namelist NPTS 50→500; COMMON overlays resized; rebuild `DATCOM/datcom.bin`. Analysis still uses the first 60 airfoil points (`SECI` `/IWING/`); 500-pt input is not used
+- TBFUNX: `L=1` before the XA search so tabulated `$WGSCHR` no longer SIGSEGVs when X is below all XA(I)
+- MATLAB writer: `body_max` 200, NACA cell fallback (737Max), `NPTS` real, `TYPEIN=1.0` on `$WGSCHR`, no 18-pt downsample
+- Harness: NX=25 CM atol 2e-3 (DATCOM body pitching-moment quadrature vs station count, not interpolator round-trip); NX=160 / NPTS=60 / 737Max pass
+
+## 1.3.1 - MATLAB DATCOM_IO section-limit writer
+- `DATCOM_IO.m`: NACA cell fallback (`NACA{2}='2412'` → `NACA-W-4-2412`); no `$WGSCHR` when a numeric code exists (737Max)
+- Body `body_max` 18→200; `write_namelist_array` no longer downsamples; wrap ≤80 cols, 10 values/line
+- Tabulated `$WGSCHR` uses `datcom_airfoil_xy` and real `NPTS=%.1f` (same NPTS fix in `datcom_write_wgschr`)
+
 ## 1.3.0 - GUI MATLAB parity
 - Wing Mesh Parameters dialog on Analyze Tornado/AVL; batch/compare unchanged (10×5 / 10×10, no dialogs)
 - Initial 3D camera matches MATLAB `view(3)` nose-on

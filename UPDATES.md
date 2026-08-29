@@ -1,5 +1,12 @@
 # Updates
 
+## 1.14.1 - Sections header contrast
+- Column and group headers use dark bars with light bold 11pt text so they stay readable on dark KDE/Breeze themes
+
+## 1.14.0 - Sections leftover table
+- Sections leftover dump is a scrollable Qt table (not a matplotlib overlay): solver group headers, vector values in numbered columns, near-zeros shown as 0
+- DATCOM section definitions stay a Wing/HT/VT grid above leftover when both exist
+
 ## 1.13.0 - Spanwise Tornado surface legend
 - Spanwise tab labels each Tornado curve by surface (`Tornado Wing` / `HT` / `VT` / `Wing 2` / …) instead of `Tornado 2`
 - Distinct linestyle and linewidth per surface (solid/dashed/dash-dot/dotted, decreasing width)

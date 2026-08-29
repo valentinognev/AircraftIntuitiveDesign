@@ -5,7 +5,20 @@ from __future__ import annotations
 import numpy as np
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
-from PySide6.QtWidgets import QSizePolicy, QTabWidget
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QBrush, QColor, QFont
+from PySide6.QtWidgets import (
+    QAbstractItemView,
+    QHeaderView,
+    QLabel,
+    QSizePolicy,
+    QSplitter,
+    QTableWidget,
+    QTableWidgetItem,
+    QTabWidget,
+    QVBoxLayout,
+    QWidget,
+)
 
 from aid.lifting_line import lifting_line
 from aid.solver_overlay import alpha_grid, overlay_derivative, overlay_vs_alpha
@@ -24,6 +37,19 @@ TAB_NAMES = (
 _STYLE_COLOR = {"g": "g", "c": "c", "m": "m", "b": "b"}
 _TORNADO_SPANWISE_LS = ("-", "--", "-.", ":")
 _TORNADO_SPANWISE_LW = (2.2, 1.7, 1.4, 1.1)
+_HEADER_BG = QColor("#3d444c")
+_HEADER_FG = QColor("#f4f6f8")
+_HEADER_STYLE = (
+    "QHeaderView::section {"
+    " background-color: #3d444c;"
+    " color: #f4f6f8;"
+    " font-weight: 600;"
+    " font-size: 11pt;"
+    " padding: 6px 8px;"
+    " border: none;"
+    " border-right: 1px solid #5c646e;"
+    "}"
+)
 
 
 class _TabCanvas(FigureCanvasQTAgg):
@@ -49,15 +75,53 @@ class _TabCanvas(FigureCanvasQTAgg):
         fill_figure(self.figure)
 
 
+class _SectionsPage(QWidget):
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.empty = QLabel("Analyze DATCOM / Tornado / AVL")
+        self.empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.defs = QTableWidget(0, 4)
+        self.leftover = QTableWidget(0, 2)
+        for table in (self.defs, self.leftover):
+            _style_table(table)
+        _apply_column_headers(self.defs, ["Quantity", "Wing", "HT", "VT"])
+        _apply_column_headers(self.leftover, ["Quantity", "Value"])
+        self.splitter = QSplitter(Qt.Orientation.Vertical)
+        self.splitter.setChildrenCollapsible(False)
+        self.splitter.addWidget(self.defs)
+        self.splitter.addWidget(self.leftover)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(6, 6, 6, 6)
+        layout.setSpacing(8)
+        layout.addWidget(self.empty, 1)
+        layout.addWidget(self.splitter, 1)
+        self.defs.hide()
+        self.leftover.hide()
+        self.splitter.hide()
+
+
 class CompareTabs(QTabWidget):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self._canvases: dict[str, _TabCanvas] = {}
+        self._sections = _SectionsPage()
         for name in TAB_NAMES:
-            canvas = _TabCanvas()
-            self._canvases[name] = canvas
-            self.addTab(canvas, name)
+            if name == "Sections":
+                self.addTab(self._sections, name)
+            else:
+                canvas = _TabCanvas()
+                self._canvases[name] = canvas
+                self.addTab(canvas, name)
         self.hide()
+
+    @property
+    def leftover_table(self) -> QTableWidget:
+        return self._sections.leftover
+
+    @property
+    def section_defs_table(self) -> QTableWidget:
+        return self._sections.defs
 
     def figure(self, name: str):
         return self._canvases[name].figure
@@ -266,57 +330,32 @@ class CompareTabs(QTabWidget):
         self._finish("Spanwise")
 
     def _plot_sections(self, results: dict) -> None:
-        fig = self._clear("Sections")
-        leftover = _leftover_rows(results)
-        dres = results.get("datcom") or {}
-        sections = dres.get("sections") or {}
-        n_axes = 2 if sections and leftover else 1
-        ax0 = fig.add_subplot(n_axes, 1, 1)
-        ax0.axis("off")
+        page = self._sections
+        sections = (results.get("datcom") or {}).get("sections") or {}
+        groups = _leftover_groups(results)
         if sections:
-            fields = (
-                "alpha_ideal",
-                "alpha_zl",
-                "cl_ideal",
-                "cm0",
-                "cla",
-                "cla_mach0",
-                "xac",
-                "t_c",
-                "le_radius",
-                "delta_y",
-            )
-            cols = ["wing", "ht", "vt"]
-            col_labels = ["", "Wing", "HT", "VT"]
-            cell = []
-            for field in fields:
-                row = [field]
-                for col in cols:
-                    val = (sections.get(col) or {}).get(field)
-                    row.append("" if val is None else f"{val:.5g}")
-                cell.append(row)
-            table = ax0.table(cellText=cell, colLabels=col_labels, loc="center")
-            table.auto_set_font_size(False)
-            table.set_fontsize(10)
-            table.scale(1.2, 1.5)
-            ax0.set_title("DATCOM section definitions")
-            ax_left = fig.add_subplot(n_axes, 1, 2) if leftover else None
+            _fill_section_defs(page.defs, sections)
+            page.defs.show()
         else:
-            ax0.set_title("Other solver outputs")
-            ax_left = ax0
-        if leftover:
-            if ax_left is None:
-                ax_left = ax0
-            ax_left.axis("off")
-            table = ax_left.table(cellText=leftover, colLabels=["quantity", "value"], loc="center")
-            table.auto_set_font_size(False)
-            table.set_fontsize(8)
-            table.scale(1.0, 1.2)
-            if ax_left is not ax0:
-                ax_left.set_title("Other solver outputs")
-        elif not sections:
-            ax0.text(0.5, 0.5, "Analyze DATCOM / Tornado / AVL", ha="center", va="center", transform=ax0.transAxes)
-        self._finish("Sections")
+            page.defs.setRowCount(0)
+            page.defs.hide()
+        if groups:
+            _fill_leftover(page.leftover, groups)
+            page.leftover.show()
+        else:
+            page.leftover.setRowCount(0)
+            page.leftover.hide()
+        page.splitter.setVisible(bool(sections or groups))
+        if sections and groups:
+            page.splitter.setStretchFactor(0, 1)
+            page.splitter.setStretchFactor(1, 2)
+        elif sections:
+            page.splitter.setStretchFactor(0, 1)
+            page.splitter.setStretchFactor(1, 0)
+        elif groups:
+            page.splitter.setStretchFactor(0, 0)
+            page.splitter.setStretchFactor(1, 1)
+        page.empty.setVisible(not sections and not groups)
 
     def _clear(self, name: str) -> Figure:
         fig = self._canvases[name].figure
@@ -507,19 +546,30 @@ _SKIP_LEFTOVER = frozenset(
 )
 
 
-def _fmt_scalar(val) -> str:
-    arr = np.asarray(val, dtype=float).reshape(-1)
-    return " ".join(f"{v:.5g}" for v in arr[:6])
+def _fmt_number(val) -> str:
+    x = float(val)
+    if not np.isfinite(x):
+        return ""
+    if abs(x) < 1e-10:
+        return "0"
+    if 1e-5 <= abs(x) < 1e4:
+        return f"{x:.6f}".rstrip("0").rstrip(".")
+    return f"{x:.4e}"
 
 
-def _leftover_rows(results: dict) -> list[list[str]]:
-    rows: list[list[str]] = []
-    dres = results.get("datcom") or {}
-    for i, block in enumerate(dres.get("high_lift") or []):
+def _leftover_groups(results: dict) -> list[tuple[str, list[tuple[str, list[float]]]]]:
+    groups: list[tuple[str, list[tuple[str, list[float]]]]] = []
+    hl_rows: list[tuple[str, list[float]]] = []
+    for i, block in enumerate((results.get("datcom") or {}).get("high_lift") or []):
         for key in ("delta", "dcl_max", "dcd_min", "clad", "cha", "chd"):
-            if key in block:
-                rows.append([f"DATCOM HL{i} {key}", _fmt_scalar(block[key])])
+            if key not in block:
+                continue
+            arr = np.asarray(block[key], dtype=float).reshape(-1)
+            hl_rows.append((f"HL{i} {key}", [float(v) for v in arr[:8]]))
+    if hl_rows:
+        groups.append(("DATCOM high-lift", hl_rows))
     for prefix, src in (("Tornado", results.get("tornado") or {}), ("AVL", results.get("avl") or {})):
+        rows: list[tuple[str, list[float]]] = []
         for key in sorted(src):
             if key in _SKIP_LEFTOVER:
                 continue
@@ -531,8 +581,122 @@ def _leftover_rows(results: dict) -> list[list[str]]:
                 arr_ok = False
             if not arr_ok:
                 continue
-            rows.append([f"{prefix} {key}", _fmt_scalar(val)])
-    return rows
+            rows.append((str(key), [float(v) for v in np.asarray(val, dtype=float).reshape(-1)[:8]]))
+        if rows:
+            groups.append((prefix, rows))
+    return groups
+
+
+def _style_table(table: QTableWidget) -> None:
+    table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+    table.setAlternatingRowColors(True)
+    table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+    table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+    table.verticalHeader().setVisible(False)
+    table.setShowGrid(True)
+    header = table.horizontalHeader()
+    header.setHighlightSections(False)
+    header.setStyleSheet(_HEADER_STYLE)
+    header.setMinimumHeight(32)
+    table.verticalHeader().setDefaultSectionSize(26)
+    table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+
+
+def _header_font(base: QFont | None = None) -> QFont:
+    font = QFont(base) if base is not None else QFont()
+    font.setBold(True)
+    font.setPointSize(11)
+    return font
+
+
+def _apply_column_headers(table: QTableWidget, labels: list[str]) -> None:
+    table.setHorizontalHeaderLabels(labels)
+    for col, text in enumerate(labels):
+        item = table.horizontalHeaderItem(col)
+        if item is None:
+            item = QTableWidgetItem(text)
+            table.setHorizontalHeaderItem(col, item)
+        item.setFont(_header_font(item.font()))
+        item.setForeground(QBrush(_HEADER_FG))
+        item.setBackground(QBrush(_HEADER_BG))
+        item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+
+
+def _resize_table_columns(table: QTableWidget) -> None:
+    header = table.horizontalHeader()
+    n = table.columnCount()
+    if n <= 1:
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        return
+    header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+    for col in range(1, n):
+        header.setSectionResizeMode(col, QHeaderView.ResizeMode.Stretch)
+
+
+def _item(text: str, *, header: bool = False, numeric: bool = False) -> QTableWidgetItem:
+    item = QTableWidgetItem(text)
+    item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+    if header:
+        item.setFont(_header_font(item.font()))
+        item.setBackground(QBrush(_HEADER_BG))
+        item.setForeground(QBrush(_HEADER_FG))
+        item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsSelectable)
+    if numeric:
+        item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+    return item
+
+
+def _fill_section_defs(table: QTableWidget, sections: dict) -> None:
+    fields = (
+        "alpha_ideal",
+        "alpha_zl",
+        "cl_ideal",
+        "cm0",
+        "cla",
+        "cla_mach0",
+        "xac",
+        "t_c",
+        "le_radius",
+        "delta_y",
+    )
+    cols = ("wing", "ht", "vt")
+    table.clearSpans()
+    table.setColumnCount(4)
+    _apply_column_headers(table, ["Quantity", "Wing", "HT", "VT"])
+    table.setRowCount(len(fields))
+    for row, field in enumerate(fields):
+        table.setItem(row, 0, _item(field))
+        for col, name in enumerate(cols, start=1):
+            val = (sections.get(name) or {}).get(field)
+            text = "" if val is None else _fmt_number(val)
+            table.setItem(row, col, _item(text, numeric=True))
+    _resize_table_columns(table)
+
+
+def _fill_leftover(table: QTableWidget, groups: list[tuple[str, list[tuple[str, list[float]]]]]) -> None:
+    max_n = 1
+    for _, rows in groups:
+        for _, vals in rows:
+            max_n = max(max_n, len(vals))
+    ncols = 1 + max_n
+    headers = ["Quantity"] + (["Value"] if max_n == 1 else [str(i) for i in range(1, max_n + 1)])
+    table.clearSpans()
+    table.setColumnCount(ncols)
+    _apply_column_headers(table, headers)
+    table.setRowCount(sum(1 + len(rows) for _, rows in groups))
+    row = 0
+    for title, rows in groups:
+        for col in range(ncols):
+            table.setItem(row, col, _item(title if col == 0 else "", header=True))
+        if ncols > 1:
+            table.setSpan(row, 0, 1, ncols)
+        row += 1
+        for qty, vals in rows:
+            table.setItem(row, 0, _item(qty))
+            for i, val in enumerate(vals):
+                table.setItem(row, 1 + i, _item(_fmt_number(val), numeric=True))
+            row += 1
+    _resize_table_columns(table)
 
 
 def _plot_rate_bars(ax, results: dict) -> None:

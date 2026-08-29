@@ -3,7 +3,8 @@ import os
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ.setdefault("PYVISTA_OFF_SCREEN", "true")
 import numpy as np
-from PySide6.QtWidgets import QApplication
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QApplication, QTableWidget
 
 from aid.aircraft import load_jsonc
 from aid.datcom_parse import parse_for006
@@ -82,6 +83,50 @@ def _axis_has_data(ax) -> bool:
     if ax.lines or ax.patches or ax.tables or ax.collections:
         return True
     return False
+
+
+def _table_text(table: QTableWidget) -> str:
+    parts = []
+    for r in range(table.rowCount()):
+        for c in range(table.columnCount()):
+            item = table.item(r, c)
+            if item is not None and item.text():
+                parts.append(item.text())
+    for c in range(table.columnCount()):
+        header = table.horizontalHeaderItem(c)
+        if header is not None and header.text():
+            parts.append(header.text())
+    return " ".join(parts)
+
+
+def _leftover_map(table: QTableWidget) -> dict[str, list[str]]:
+    out: dict[str, list[str]] = {}
+    for r in range(table.rowCount()):
+        if table.columnSpan(r, 0) > 1:
+            continue
+        qty = table.item(r, 0)
+        if qty is None or not qty.text():
+            continue
+        vals = []
+        for c in range(1, table.columnCount()):
+            item = table.item(r, c)
+            vals.append("" if item is None else item.text())
+        out[qty.text()] = vals
+    return out
+
+
+def _group_headers(table: QTableWidget) -> list[str]:
+    names = []
+    for r in range(table.rowCount()):
+        if table.columnSpan(r, 0) > 1:
+            item = table.item(r, 0)
+            if item is not None:
+                names.append(item.text())
+    return names
+
+
+def _sections_have_data(tabs) -> bool:
+    return tabs.leftover_table.rowCount() > 0 or tabs.section_defs_table.rowCount() > 0
 
 
 def _tornado_sample() -> dict:
@@ -185,6 +230,10 @@ def test_all_solver_outputs_appear_on_compare_tabs():
     app.processEvents()
     empty = []
     for name in _TABS:
+        if name == "Sections":
+            if not _sections_have_data(w.compare_tabs):
+                empty.append("Sections")
+            continue
         for i, ax in enumerate(w.compare_tabs.figure(name).axes):
             if not _axis_has_data(ax):
                 empty.append(f"{name}[{i}] {ax.get_title() or ax.get_ylabel()}")
@@ -201,14 +250,12 @@ def test_all_solver_outputs_appear_on_compare_tabs():
     ]
     assert any("CL_d" in str(lab) or "Tornado" in str(lab) for lab in clabels)
     assert any("Cm_d" in str(lab) for lab in clabels)
-    section_text = " ".join(
-        cell.get_text().get_text()
-        for ax in w.compare_tabs.figure("Sections").axes
-        for table in ax.tables
-        for cell in table.get_celld().values()
-    )
-    assert "CDwing" in section_text
-    assert "CYa" in section_text
+    leftover = _leftover_map(w.compare_tabs.leftover_table)
+    assert "CDwing" in leftover
+    assert "CYa" in leftover
+    defs = _table_text(w.compare_tabs.section_defs_table)
+    assert "Wing" in defs
+    assert "alpha_ideal" in defs
 
 
 def test_derivative_cyb_uses_full_alpha_range():
@@ -266,8 +313,127 @@ def test_cessna_all_solvers_fill_compare_axes():
     app.processEvents()
     empty = []
     for name in _TABS:
+        if name == "Sections":
+            if not _sections_have_data(w.compare_tabs):
+                empty.append("Sections")
+            continue
         for i, ax in enumerate(w.compare_tabs.figure(name).axes):
             if not _axis_has_data(ax):
                 empty.append(f"{name}[{i}] {ax.get_title() or ax.get_ylabel()}")
     assert empty == [], empty
     assert w.last_results["datcom"].get("high_lift")
+
+
+def test_sections_leftover_splits_vectors_into_columns():
+    app = QApplication.instance() or QApplication([])
+    w = MainWindow()
+    w.show()
+    w.load_aircraft(load_jsonc(models_dir() / "Cessna 172.jsonc"))
+    w.last_results["tornado"] = _tornado_sample()
+    w.set_plot_mode("Aerodynamics")
+    app.processEvents()
+    table = w.compare_tabs.leftover_table
+    assert isinstance(table, QTableWidget)
+    leftover = _leftover_map(table)
+    assert leftover["CDwing"][0] == "0.02"
+    assert leftover["CDwing"][1] == "0.005"
+    assert leftover["CYwing"][0] == "0"
+    assert leftover["CYwing"][1] == "0.01"
+
+
+def test_sections_leftover_groups_by_solver():
+    app = QApplication.instance() or QApplication([])
+    w = MainWindow()
+    w.show()
+    w.load_aircraft(load_jsonc(models_dir() / "Cessna 172.jsonc"))
+    w.last_results["tornado"] = _tornado_sample()
+    w.last_results["avl"] = _avl_sample()
+    w.set_plot_mode("Aerodynamics")
+    app.processEvents()
+    table = w.compare_tabs.leftover_table
+    assert _group_headers(table) == ["Tornado", "AVL"]
+    leftover = _leftover_map(table)
+    assert "CDwing" in leftover
+    assert "CYa" in leftover
+    assert all(not key.startswith("Tornado ") for key in leftover)
+
+
+def test_sections_leftover_zeroes_tiny_values():
+    app = QApplication.instance() or QApplication([])
+    w = MainWindow()
+    w.show()
+    w.load_aircraft(load_jsonc(models_dir() / "Cessna 172.jsonc"))
+    sample = _tornado_sample()
+    sample["CX_P"] = 6.9042e-14
+    w.last_results["tornado"] = sample
+    w.set_plot_mode("Aerodynamics")
+    app.processEvents()
+    leftover = _leftover_map(w.compare_tabs.leftover_table)
+    assert leftover["CX_P"][0] == "0"
+
+
+def _luminance(color) -> float:
+    def channel(v: int) -> float:
+        x = v / 255.0
+        return x / 12.92 if x <= 0.04045 else ((x + 0.055) / 1.055) ** 2.4
+
+    return 0.2126 * channel(color.red()) + 0.7152 * channel(color.green()) + 0.0722 * channel(color.blue())
+
+
+def _contrast_ratio(fg, bg) -> float:
+    lighter = max(_luminance(fg), _luminance(bg))
+    darker = min(_luminance(fg), _luminance(bg))
+    return (lighter + 0.05) / (darker + 0.05)
+
+
+def _assert_readable_headers(table: QTableWidget) -> None:
+    for col in range(table.columnCount()):
+        item = table.horizontalHeaderItem(col)
+        assert item is not None
+        assert item.foreground().style() != Qt.BrushStyle.NoBrush
+        assert item.background().style() != Qt.BrushStyle.NoBrush
+        assert _contrast_ratio(item.foreground().color(), item.background().color()) >= 4.5
+        assert item.font().bold()
+        assert item.font().pointSize() >= 10
+    for row in range(table.rowCount()):
+        if table.columnSpan(row, 0) <= 1:
+            continue
+        item = table.item(row, 0)
+        assert item is not None
+        assert item.foreground().style() != Qt.BrushStyle.NoBrush
+        assert _contrast_ratio(item.foreground().color(), item.background().color()) >= 4.5
+        assert item.font().bold()
+        assert item.font().pointSize() >= 10
+
+
+def test_sections_headers_are_readable():
+    app = QApplication.instance() or QApplication([])
+    w = MainWindow()
+    w.show()
+    w.load_aircraft(load_jsonc(models_dir() / "Cessna 172.jsonc"))
+    w.last_results["datcom"] = parse_for006(_FOR006)
+    w.last_results["tornado"] = _tornado_sample()
+    w.last_results["avl"] = _avl_sample()
+    w.set_plot_mode("Aerodynamics")
+    app.processEvents()
+    _assert_readable_headers(w.compare_tabs.leftover_table)
+    _assert_readable_headers(w.compare_tabs.section_defs_table)
+
+
+def test_sections_datcom_defs_is_qt_table():
+    app = QApplication.instance() or QApplication([])
+    w = MainWindow()
+    w.show()
+    w.load_aircraft(load_jsonc(models_dir() / "Cessna 172.jsonc"))
+    w.last_results["datcom"] = parse_for006(_FOR006)
+    w.set_plot_mode("Aerodynamics")
+    w.compare_tabs.setCurrentIndex(list(_TABS).index("Sections"))
+    app.processEvents()
+    table = w.compare_tabs.section_defs_table
+    assert isinstance(table, QTableWidget)
+    text = _table_text(table)
+    assert "Wing" in text
+    assert "HT" in text
+    assert "VT" in text
+    assert "alpha_ideal" in text
+    assert table.isVisible()

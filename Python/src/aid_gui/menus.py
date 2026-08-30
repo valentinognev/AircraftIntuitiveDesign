@@ -24,7 +24,7 @@ QUICK_START_TEXT = (
     "1. File → Load an aircraft, or Help → Examples for bundled JSONC models.\n\n"
     "2. Edit geometry and flight condition on the Wing, HT, VT, Control, Body, "
     "and Aero tabs.\n\n"
-    "3. Analyze → DATCOM, Tornado, or AVL.\n\n"
+    "3. Analyze → DATCOM, Tornado, AVL, or flow5.\n\n"
     "4. Results: Geometry, Stability, or Aerodynamics."
 )
 
@@ -153,6 +153,10 @@ def _build_analyze_menu(window: QMainWindow) -> None:
     avl_action = QAction("AVL", window)
     avl_action.triggered.connect(lambda: window.run_avl())
     analyze_menu.addAction(avl_action)
+
+    flow5_action = QAction("flow5", window)
+    flow5_action.triggered.connect(lambda: window.run_flow5())
+    analyze_menu.addAction(flow5_action)
 
 
 def _build_settings_menu(window: QMainWindow) -> None:

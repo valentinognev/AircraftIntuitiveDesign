@@ -11,6 +11,8 @@ from aid.stability import stability_lines
 _DATCOM_STYLE = "g.-"
 _TORNADO_STYLE = "c-"
 _AVL_STYLE = "m-"
+_FLOW5_STYLE = "y.-"
+_FLOW5_DERIV_STYLE = "y-"
 _ND = 99998.0
 
 
@@ -31,6 +33,7 @@ def overlay_vs_alpha(
     datcom: str | None = None,
     tornado: tuple[str, str | None] | None = None,
     avl: tuple[str, str | None] | None = None,
+    flow5: str | None = None,
 ) -> list[dict]:
     """Same quantity vs α from each solver that has been run."""
     grid = alpha_grid(results, st)
@@ -76,6 +79,17 @@ def overlay_vs_alpha(
                     "kind": kind,
                 }
             )
+    fres = results.get("flow5") or {}
+    if flow5 and flow5 in fres and "alpha" in fres:
+        series.append(
+            {
+                "label": "flow5",
+                "x": np.asarray(fres["alpha"], dtype=float),
+                "y": np.asarray(fres[flow5], dtype=float),
+                "style": _FLOW5_STYLE,
+                "kind": "line",
+            }
+        )
     return series
 
 
@@ -86,6 +100,7 @@ def overlay_derivative(
     datcom: str | None = None,
     tornado: str | None = None,
     avl: str | None = None,
+    flow5: str | None = None,
 ) -> list[dict]:
     """DATCOM derivative vs α (per deg) with Tornado/AVL as per-deg horizontals."""
     grid = alpha_grid(results, st)
@@ -121,6 +136,17 @@ def overlay_derivative(
                 "x": grid,
                 "y": float(ares[avl]) * math.pi / 180.0,
                 "style": _AVL_STYLE,
+                "kind": "hline",
+            }
+        )
+    fres = results.get("flow5") or {}
+    if flow5 and flow5 in fres:
+        series.append(
+            {
+                "label": "flow5",
+                "x": grid,
+                "y": float(fres[flow5]) * math.pi / 180.0,
+                "style": _FLOW5_DERIV_STYLE,
                 "kind": "hline",
             }
         )

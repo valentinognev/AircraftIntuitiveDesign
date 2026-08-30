@@ -1,0 +1,7 @@
+cmake_minimum_required(VERSION 3.16)
+project(XFoil LANGUAGES CXX)
+add_library(XFoil SHARED xfoil.cpp)
+target_compile_features(XFoil PUBLIC cxx_std_20)
+target_compile_definitions(XFoil PUBLIC XFOIL_LIBRARY)
+target_include_directories(XFoil PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+set_target_properties(XFoil PROPERTIES VERSION 1.1.0 SOVERSION 1)

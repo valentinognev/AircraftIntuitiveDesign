@@ -1,6 +1,6 @@
 # Aircraft Intuitive Design
 
-Conceptual aircraft geometry editor and aerodynamic analysis tool. Enter a wing, tails, body, controls, and flight condition; get lift, drag, and moment coefficients from three independent solvers: USAF Digital DATCOM, Tornado (vortex lattice), and AVL 3.52.
+Conceptual aircraft geometry editor and aerodynamic analysis tool. Enter a wing, tails, body, controls, and flight condition; get lift, drag, and moment coefficients from four independent solvers: USAF Digital DATCOM, Tornado (vortex lattice), AVL 3.52, and flow5 (vortex-lattice panel).
 
 The original application is a MATLAB GUI (`AID.m`). This repository also ships a Python twin: the same aircraft data, the same DATCOM/AVL binaries, a port of Tornado’s VLM, and a PySide6 desktop GUI. MATLAB `.mat` dumps are the oracle; Python is required to match those coefficients.
 
@@ -16,40 +16,45 @@ This repository is a Linux MATLAB + Python port of the original AID application 
 | **USAF Digital DATCOM** | USAF Stability and Control DATCOM (AFFDL-TR-79-3032); Fortran via Public Domain Aeronautical Software (PDAS) | [PDAS Digital Datcom](https://www.pdas.com/datcom.html) |
 | **Tornado** | Tomas Melin, KTH Royal Institute of Technology (GNU GPL vortex-lattice code) | [tornado.redhammer.se](https://tornado.redhammer.se/) |
 | **AVL** (Athena Vortex Lattice) 3.52 | Mark Drela and Harold Youngren, MIT | [web.mit.edu/drela/Public/web/avl](https://web.mit.edu/drela/Public/web/avl/) |
+| **flow5** | André Deperrois (GNU GPL v3 vortex-lattice / panel code) | Vendored under `FLOW5/` in this repo |
 
-AID also uses Joseph Moster’s AVL MATLAB I/O helpers (bundled under `Matlab/fsroot/code/AVL/`) and MathWorks Aerospace Toolbox `datcomimport` for MATLAB gold DATCOM dumps.
+AID also uses Joseph Moster’s AVL MATLAB I/O helpers (bundled under `Matlab/fsroot/code/AVL/`) and MathWorks Aerospace Toolbox `datcomimport` for MATLAB gold DATCOM dumps. flow5 has no MATLAB gold runner; coefficients come only from the native helper subprocess.
 
 ## Idea
 
 AID is a conceptual-design workbench, not a CAD or CFD package. Geometry is stored in DATCOM-style planform fields (root/tip chord, semi-span, sweep, dihedral, NACA sections, apex position). Derived quantities — area, MAC, aspect ratio, CD0, lift-curve slope — are recomputed, not treated as independent inputs.
 
-Analyze runs one of three methods and overlays coefficients vs angle of attack:
+Analyze runs one of four methods and overlays coefficients vs angle of attack:
 
 | Solver | Kind | How it runs |
 |--------|------|-------------|
 | **DATCOM** | Empirical / handbook (PDAS Digital DATCOM Fortran) | Shared Linux binary via a stdin wrapper |
 | **Tornado** | Vortex-lattice method | MATLAB `.m` in `Tornado/`; rewritten in Python |
 | **AVL 3.52** | Vortex-lattice (Drela/Youngren) | Shared binary; AID writes `.avl`/`.run` and parses `geometry.st` |
+| **flow5** | Vortex-lattice panel (Deperrois GPL-3) | Vendored `FLOW5/` native helper `flow5_run` subprocess; Python writes a JSON deck only |
 
 MATLAB remains the gold runner. Python `aid` is a headless engine; `aid_gui` is the only widget layer and calls `aid` for load, save, and Analyze.
 
 ## Architecture
 
-Two stacks, one repo. DATCOM and AVL are compiled once and invoked as subprocesses from both languages. Tornado is a source port, so coefficient compare uses looser tolerances than the shared Fortran parsers.
+Two stacks, one repo. DATCOM, AVL, and flow5 are compiled once and invoked as subprocesses from both languages (flow5 is Python-only today). Tornado is a source port, so coefficient compare uses looser tolerances than the shared Fortran parsers. flow5 is GPL-3: the PySide GUI never links `flow5-lib`; only `FLOW5/run/flow5_run` runs as a subprocess (same pattern as AVL).
 
 ```
 Aircraft (WG/HT/VT/F/A/E/R/BD/AERO)
         │
         ├─ MATLAB AID.m  ── DATCOM_IO / Tornado_IO / AVL_IO ──► Results/matlab/
         │
-        └─ Python aid    ── datcom_io / tornado_io / avl_io ──► Results/python/
+        └─ Python aid    ── datcom_io / tornado_io / avl_io / flow5_io ──► Results/python/
                     │
                     └─ aid_gui (PySide6 + pyvistaqt 3D)  +  compare.py vs MATLAB gold
 ```
 
+Vendored flow5 source lives under `FLOW5/` (`XFoil-lib/`, `flow5-lib/`, superbuild `CMakeLists.txt`). Build the helper with `cmake -S FLOW5 -B FLOW5/build` then `cmake --build FLOW5/build` (installs executable to `FLOW5/run/flow5_run`, gitignored). System packages (Ubuntu): `libocct-foundation-dev`, `libocct-modeling-algorithms-dev`, `libocct-modeling-data-dev`, `libocct-ocaf-dev`, `libocct-data-exchange-dev`, `libopenblas-dev`. `write_flow5_deck` maps AID JSONC → deck JSON (T1 VLM2, inviscid, thin surfaces, no fuselage). `run_flow5` invokes the native helper from Analyze → flow5; Cessna 172 e2e matches native within atol=1e-6 (`test_e2e_flow5_cessna.py`).
+
 - `Matlab/fsroot/code` — AID GUI, geometry/aero/drag, Tornado VLM, AVL I/O, 23 `.mat` models, user manual PDF.
 - DATCOM Fortran lives beside this repo at `../datcom/datcom.f` (namelist MAXNX=200 body stations, MAXNPTS=500 airfoil points; analysis uses the first 60 section points). AID writers clamp wing `$WGSCHR` to 60 and HT/VT/extra to 50 so Analyze cannot hang. Python `write_for005` wraps BODY arrays at 80 columns (`body_max=200`, no 18-station downsample), clamps MACH>0.6 to STMACH 0.6, omits DATCOM-illegal HT/VT (buried/negative SSPNE, SSPNE>SSPN, zero area) and inverted control spans (SPANFO<=SPANFI; no elevator namelist without HT). SPANFO past parent SSPN is still written, clamped to parent SSPN so DATCOM does not SIGSEGV (DA20 elevator). Uses a later numeric NACA when the first cell is `Data.`/a path (stored JSONC unchanged). Linux binary `DATCOM/datcom.bin` is gitignored; wrapper `DATCOM/datcom` feeds `for005.dat` on stdin and copies `datcom.out` → `for006.dat` even if the binary later SIGSEGVs (AID/`datcomimport` expect that name). AVL `run_avl_full` retries weighted-outboard / equal spanwise spacing if `geometry.st` is missing (GUI Analyze AVL with Inputs/Outputs uses the same retry, then previews the successful files).
 - AVL 3.52 source: `Matlab/fsroot/code/AVL/AVL3.52rel09032025/`. Install executable to `AVL/run/avl` (gitignored).
+- `FLOW5/` — vendored flow5 back-end (`XFoil-lib`, `flow5-lib`, CMake superbuild). Helper `FLOW5/run/flow5_run` (gitignored). Python `flow5_io.write_flow5_deck` + `run_flow5`; no MATLAB gold.
 - `Python/` — package `aid` (engine) + `aid_gui` (PySide6). Models: `Python/models/*.jsonc`.
 - `Results/` — solver dumps, not versioned (`matlab/`, `python/`, `compare/`).
 - Spec/plan: `Docs/2026-08-26-aid-linux-python-port-spec.md` (binding), atomic tasks, implementation plan.
@@ -93,14 +98,14 @@ Primary compare aircraft: **Cessna 172**, **Navion**, **DA20-C1**, **Learjet 23*
 | `Models/*.mat` | 23 aircraft (decoded names with spaces) |
 | `AID_Documentation.pdf` | User manual (Help → User's Manual) |
 
-Results cell: `{DATCOM, ASCDM, Tornado, AVL}`. Default batch meshes: Tornado 10×5, AVL 10×10.
+Results cell: `{DATCOM, ASCDM, Tornado, AVL}` (MATLAB); Python GUI also stores `flow5` after Analyze. Default batch meshes: Tornado 10×5, AVL 10×10, flow5 10×10.
 
 GUI Analyze Tornado matches `AID.m` (handbook trim α, moments about 25% MAC, `CL0=CL-CL_a*α`). GUI Analyze DATCOM recomputes exposed span `SSPNE` from body radius at each planform LE/TE (`AID.m` spline interp) before writing `for005`. Batch gold (`run_aid_batch`) uses stored `.mat` SSPNE, mid-`ALSCHD`, and origin `ref_point`.
 
 ## Python package (`Python/`)
 
-- `aid/` — `aircraft` (`.mat`/JSONC), `geometry`/`atmosphere`/`drag`, `stability` (CG % MAC, static margin, handbook CL/Cm), `viz` (Plot_Planform/Plot_Body loft meshes, including control-surface hinge deflection), DATCOM write/parse/run, Tornado lattice/boundary/solver/coeff, AVL write/parse/run, `compare` vs MATLAB gold. No widgets.
-- `aid_gui/` — window **Aircraft Intuitive Design Tool** (960×600): File New/Load/Save/Recent (last 5 JSONC, QSettings); Analyze DATCOM/Tornado/AVL (Tornado/AVL always prompt Wing Mesh Parameters); Settings live (plot options, scale, units, calculations, Estimate CG, error check, scroll sensitivity); Help (Examples → `Python/models/*.jsonc`; Quick Start dialog; User's Manual PDF; disabled MATLAB control-legend labels); tabs Wing/HT/VT/Control/Body/Aero/`+` laid out like MATLAB `Initialize_GUI.m` (right-aligned label, edit, unit; gray section breaks; visibility checkbox). Wing/HT/VT: 16 planform rows. Control: Flaps/Ailerons/Elevator/Rudder Inboard|Outboard grids. Body: Adjust, Station|Position|Shape table (11 rows; extra bodies 7 + X0/Y0/Z0), Circular Cross-Section. Aero: MATLAB `AP` (α/alt/Mach/WT/XCG/ZCG/XI/YI + root/tip/tail NACA, `%MAC` slider). `+` adds MATLAB `addPart` extras — Body 2/3 (`NB` 1×2), Prop / Wing 2 / HT 2 / VT 2 (`NP` 1×4); Load recreates those tabs when slots are filled. Estimate CG stores 3×10 `cg_data`, click-part X/Z/weight dialog, recomputes WT/XCG/ZCG; Results radios Geometry / Stability / Aerodynamics plus CG/static-margin text; PyVista/VTK 3D aircraft view (initial camera MATLAB `view(3)` nose-on; right-click context menu Reset Plot / View Side-Top-Front / Background load-hide; key isolates the selected-tab component until Reset Plot; Body Adjust edits station X/ZU/ZL/R/P). Control-tab δ rotates flaps/ailerons/elevator/rudder; Aerodynamics 60/40 splitter with Prandtl lift overlay, Tornado red after Analyze, handbook drag vs speed, and comparison tabs Forces/Moments/Derivatives/Downwash/Controls/Spanwise (Tornado per surface: Wing/HT/VT/Wing 2…, distinct linestyle and width)/Sections (DATCOM Wing/HT/VT defs plus leftover solver scalars in a grouped scrollable table; vector quantities as columns). Batch/compare stays headless 10×5 / 10×10 (no mesh dialogs).
+- `aid/` — `aircraft` (`.mat`/JSONC), `geometry`/`atmosphere`/`drag`, `stability` (CG % MAC, static margin, handbook CL/Cm), `viz` (Plot_Planform/Plot_Body loft meshes, including control-surface hinge deflection), DATCOM write/parse/run, Tornado lattice/boundary/solver/coeff, AVL write/parse/run, flow5 deck writer (`flow5_io`, `flow5_sections`, `flow5_foils`, `flow5_units`), `compare` vs MATLAB gold. No widgets.
+- `aid_gui/` — window **Aircraft Intuitive Design Tool** (960×600): File New/Load/Save/Recent (last 5 JSONC, QSettings); Analyze DATCOM/Tornado/AVL/flow5 (Tornado/AVL/flow5 prompt Wing Mesh Parameters); Settings live (plot options, scale, units, calculations, Estimate CG, error check, scroll sensitivity); Help (Examples → `Python/models/*.jsonc`; Quick Start dialog; User's Manual PDF; disabled MATLAB control-legend labels); tabs Wing/HT/VT/Control/Body/Aero/`+` laid out like MATLAB `Initialize_GUI.m` (right-aligned label, edit, unit; gray section breaks; visibility checkbox). Wing/HT/VT: 16 planform rows. Control: Flaps/Ailerons/Elevator/Rudder Inboard|Outboard grids. Body: Adjust, Station|Position|Shape table (11 rows; extra bodies 7 + X0/Y0/Z0), Circular Cross-Section. Aero: MATLAB `AP` (α/alt/Mach/WT/XCG/ZCG/XI/YI + root/tip/tail NACA, `%MAC` slider). `+` adds MATLAB `addPart` extras — Body 2/3 (`NB` 1×2), Prop / Wing 2 / HT 2 / VT 2 (`NP` 1×4); Load recreates those tabs when slots are filled. Estimate CG stores 3×10 `cg_data`, click-part X/Z/weight dialog, recomputes WT/XCG/ZCG; Results radios Geometry / Stability / Aerodynamics plus CG/static-margin text; PyVista/VTK 3D aircraft view (initial camera MATLAB `view(3)` nose-on; right-click context menu Reset Plot / View Side-Top-Front / Background load-hide; key isolates the selected-tab component until Reset Plot; Body Adjust edits station X/ZU/ZL/R/P). Control-tab δ rotates flaps/ailerons/elevator/rudder; Aerodynamics 60/40 splitter with Prandtl lift overlay, Tornado red after Analyze, handbook drag vs speed, and comparison tabs Forces/Moments/Derivatives/Downwash/Controls/Spanwise (Tornado per surface: Wing/HT/VT/Wing 2…, distinct linestyle and width)/Sections (DATCOM Wing/HT/VT defs plus leftover solver scalars in a grouped scrollable table; vector quantities as columns). Stability and comparison overlays include flow5 (yellow) when Analyze → flow5 has run. Batch/compare stays headless 10×5 / 10×10 (no mesh dialogs).
 - Console entry: `aid` → `aid_gui.app:main`.
 - Batch: `python scripts/run_all.py` [`--aircraft "Cessna 172"`] writes `Results/python/<name>/` and compare JSON.
 
@@ -108,7 +113,7 @@ DATCOM/AVL Python vs MATLAB should match at parser precision (shared Fortran). T
 
 ## Quick start
 
-**Prerequisites:** Linux, MATLAB R2025b (Aerospace Toolbox / `datcomimport`) for gold runs, Python 3.11+, `gfortran`, `make`, `libx11-dev`. DATCOM source at `../datcom/datcom.f`. AVL built from `AVL3.52rel09032025/` (plotlib → eispack → `bin/Makefile.gfortranDP`; Linux X11 libs, not `/opt/X11`).
+**Prerequisites:** Linux, MATLAB R2025b (Aerospace Toolbox / `datcomimport`) for gold runs, Python 3.11+, `gfortran`, `make`, `libx11-dev`, CMake ≥ 3.16, g++ C++20. DATCOM source at `../datcom/datcom.f`. AVL built from `AVL3.52rel09032025/` (plotlib → eispack → `bin/Makefile.gfortranDP`; Linux X11 libs, not `/opt/X11`). flow5 helper: OCCT + OpenBLAS dev packages (see Architecture) then `cmake -S FLOW5 -B FLOW5/build && cmake --build FLOW5/build`.
 
 **MATLAB batch (headless gold run, one aircraft):**
 

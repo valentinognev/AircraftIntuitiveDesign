@@ -34,7 +34,7 @@ TAB_NAMES = (
     "Sections",
 )
 
-_STYLE_COLOR = {"g": "g", "c": "c", "m": "m", "b": "b"}
+_STYLE_COLOR = {"g": "g", "c": "c", "m": "m", "b": "b", "y": "y"}
 _TORNADO_SPANWISE_LS = ("-", "--", "-.", ":")
 _TORNADO_SPANWISE_LW = (2.2, 1.7, 1.4, 1.1)
 _HEADER_BG = QColor("#3d444c")
@@ -138,15 +138,18 @@ class CompareTabs(QTabWidget):
     def _plot_forces(self, st: dict, results: dict) -> None:
         fig = self._clear("Forces")
         specs = (
-            (r"$C_L$", "cl", ("CL", "CL_a"), ("CLtot", "CLa")),
-            (r"$C_D$", "cd", ("CD", "CD_a"), ("CDtot", None)),
-            (r"$C_Y$", None, ("CY", "CY_a"), ("CYtot", "CYa")),
-            (r"$C_N$", "cn", ("CZ", "CZ_a"), ("CZtot", None)),
-            (r"$C_A$", "ca", ("CX", "CX_a"), ("CXtot", None)),
+            (r"$C_L$", "cl", ("CL", "CL_a"), ("CLtot", "CLa"), "CL"),
+            (r"$C_D$", "cd", ("CD", "CD_a"), ("CDtot", None), "CD"),
+            (r"$C_Y$", None, ("CY", "CY_a"), ("CYtot", "CYa"), None),
+            (r"$C_N$", "cn", ("CZ", "CZ_a"), ("CZtot", None), None),
+            (r"$C_A$", "ca", ("CX", "CX_a"), ("CXtot", None), None),
         )
-        for i, (ylabel, dkey, torn, avl) in enumerate(specs, start=1):
+        for i, (ylabel, dkey, torn, avl, flow5) in enumerate(specs, start=1):
             ax = fig.add_subplot(2, 3, i)
-            series = overlay_vs_alpha(results, st, datcom=dkey, tornado=torn, avl=avl)
+            kwargs: dict = {"datcom": dkey, "tornado": torn, "avl": avl}
+            if flow5 is not None:
+                kwargs["flow5"] = flow5
+            series = overlay_vs_alpha(results, st, **kwargs)
             _draw(ax, series, xlim=_alpha_xlim(results, st), legend=(i == 1))
             ax.set_ylabel(ylabel)
             ax.set_xlabel(r"$\alpha$ (deg)" if i > 3 else "")
@@ -157,15 +160,18 @@ class CompareTabs(QTabWidget):
     def _plot_moments(self, st: dict, results: dict) -> None:
         fig = self._clear("Moments")
         specs = (
-            (r"$C_m$", "cm", ("Cm", "Cm_a"), ("Cmtot", "Cma")),
-            (r"$C_\ell$", None, ("Cl", "Cl_a"), ("Cltot", "Cla")),
-            (r"$C_n$", None, ("Cn", "Cn_a"), ("Cntot", "Cna")),
+            (r"$C_m$", "cm", ("Cm", "Cm_a"), ("Cmtot", "Cma"), "Cm"),
+            (r"$C_\ell$", None, ("Cl", "Cl_a"), ("Cltot", "Cla"), None),
+            (r"$C_n$", None, ("Cn", "Cn_a"), ("Cntot", "Cna"), None),
         )
-        for i, (ylabel, dkey, torn, avl) in enumerate(specs, start=1):
+        for i, (ylabel, dkey, torn, avl, flow5) in enumerate(specs, start=1):
             ax = fig.add_subplot(2, 2, i)
+            kwargs: dict = {"datcom": dkey, "tornado": torn, "avl": avl}
+            if flow5 is not None:
+                kwargs["flow5"] = flow5
             _draw(
                 ax,
-                overlay_vs_alpha(results, st, datcom=dkey, tornado=torn, avl=avl),
+                overlay_vs_alpha(results, st, **kwargs),
                 xlim=_alpha_xlim(results, st),
                 legend=(i == 1),
             )
@@ -180,17 +186,20 @@ class CompareTabs(QTabWidget):
     def _plot_derivatives(self, st: dict, results: dict) -> None:
         fig = self._clear("Derivatives")
         specs = (
-            (r"$C_{L\alpha}$ /deg", "cla", "CL_a", "CLa"),
-            (r"$C_{m\alpha}$ /deg", "cma", "Cm_a", "Cma"),
-            (r"$C_{Y\beta}$ /deg", "cyb", "CY_b", "CYb"),
-            (r"$C_{n\beta}$ /deg", "cnb", "Cn_b", "Cnb"),
-            (r"$C_{\ell\beta}$ /deg", "clb", "Cl_b", "Clb"),
+            (r"$C_{L\alpha}$ /deg", "cla", "CL_a", "CLa", "CLa"),
+            (r"$C_{m\alpha}$ /deg", "cma", "Cm_a", "Cma", "Cma"),
+            (r"$C_{Y\beta}$ /deg", "cyb", "CY_b", "CYb", None),
+            (r"$C_{n\beta}$ /deg", "cnb", "Cn_b", "Cnb", None),
+            (r"$C_{\ell\beta}$ /deg", "clb", "Cl_b", "Clb", None),
         )
-        for i, (ylabel, dkey, torn, avl) in enumerate(specs, start=1):
+        for i, (ylabel, dkey, torn, avl, flow5) in enumerate(specs, start=1):
             ax = fig.add_subplot(2, 3, i)
+            kwargs: dict = {"datcom": dkey, "tornado": torn, "avl": avl}
+            if flow5 is not None:
+                kwargs["flow5"] = flow5
             _draw(
                 ax,
-                overlay_derivative(results, st, datcom=dkey, tornado=torn, avl=avl),
+                overlay_derivative(results, st, **kwargs),
                 xlim=_alpha_xlim(results, st),
                 legend=(i == 1),
             )

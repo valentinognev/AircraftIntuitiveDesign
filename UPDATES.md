@@ -1,5 +1,32 @@
 # Updates
 
+## 1.18.0 - run_flow5 Python wrapper
+- `run_flow5_native`: temp deck JSON → `flow5_run --deck` → parsed stdout dict; `FileNotFoundError` if binary missing
+- `run_flow5`: `write_flow5_deck` + `run_flow5_native` (replaces subprocess stub)
+- `test_flow5_run_wrapper.py`: native vs wrapped CL/CD/Cm exact match on Cessna 172
+- `test_e2e_flow5_cessna.py`: e2e spec — `allclose` atol=1e-6 on alpha/CL/CD/Cm, len(CL)==5
+
+## 1.17.0 - flow5_run native PlaneTask solve
+- `FLOW5/run/flow5_run.cpp`: full deck → foils/wings/`PlaneXfl`/`PlanePolar`/`PlaneTask` (T1 VLM2 inviscid); JSON from polar `getVariable`; minimal polar-only deck still returns zero skeleton
+- `makePlane(false, true, false)` produces finite CL on Cessna 172 (10×10 mesh)
+- `test_flow5_run_cessna_native.py`: asserts native CL not all zeros
+
+## 1.16.0 - flow5_run JSON I/O skeleton
+- `FLOW5/run/flow5_run`: CLI `--deck FILE` reads deck JSON, prints coefficient JSON (zeros of correct `alpha` length); usage → exit 2
+- Vendored `nlohmann/json.hpp` v3.11.3; `FLOW5/run/CMakeLists.txt` builds executable with RPATH for `flow5-lib`/gmsh staging
+- `test_flow5_run_cli.py`: usage exit 2 + deck skeleton JSON shape
+
+## 1.15.1 - flow5-lib builds on Linux
+- `FLOW5/flow5-lib/CMakeLists.txt`: OpenBLAS header compat, gmsh staging/download, `/usr/lib/x86_64-linux-gnu` link dirs, `TKXDESTEP`+`TKSTEP`, compile `gmesh_globals.cpp`
+- `test_flow5_lib_builds.py`: asserts `FLOW5/build/.../libflow5-lib.so*` after cmake build
+- `panelanalysis.cpp`: fix LAPACK `#elif`/`&info,)` typos blocking compile
+
+## 1.15.0 - flow5 fourth solver (deck + GUI)
+- Vendored GPL-3 flow5 under `FLOW5/` (`XFoil-lib`, `flow5-lib`, CMake superbuild); build with `cmake -S FLOW5 -B FLOW5/build`
+- `write_flow5_deck`: AID JSONC → deck JSON (T1 VLM2, inviscid, thin surfaces, no fuselage); `run_flow5` invokes `FLOW5/run/flow5_run` subprocess
+- Analyze menu → flow5; mesh dialog defaults 10×10; Stability/Aerodynamics overlays and Forces/Moments/Derivatives tabs plot flow5 when Analyze has run
+- GPL-3 subprocess only — PySide does not link `flow5-lib`; no MATLAB gold for flow5; Cessna 172 e2e native vs AID `allclose` atol=1e-6 (`test_e2e_flow5_cessna.py`)
+
 ## 1.14.1 - Sections header contrast
 - Column and group headers use dark bars with light bold 11pt text so they stay readable on dark KDE/Breeze themes
 

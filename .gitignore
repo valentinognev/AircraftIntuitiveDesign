@@ -31,6 +31,8 @@ Matlab/fsroot/code/AVL/AVL3.52rel09032025/binw32/
 Matlab/fsroot/code/NACA456/naca456
 Matlab/fsroot/code/NACA456/naca456.lnx
 Matlab/fsroot/code/NACA456/naca456.mac
+FLOW5/build/
+FLOW5/run/flow5_run
 
 # --- Object files, static libs, Fortran modules ---
 *.o

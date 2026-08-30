@@ -16,6 +16,9 @@ def datcom_wrapper() -> Path:
 def avl_bin() -> Path:
     return matlab_code() / "AVL" / "run" / "avl"
 
+def flow5_bin() -> Path:
+    return repo_root() / "FLOW5" / "run" / "flow5_run"
+
 def results_dir() -> Path:
     return repo_root() / "Results"
 

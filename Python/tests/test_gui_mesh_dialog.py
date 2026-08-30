@@ -88,6 +88,14 @@ def test_menu_tornado_trigger_shows_mesh_dialog(monkeypatch):
     assert "tornado" not in w.last_results
 
 
+def test_mesh_dialog_flow5_defaults():
+    app = QApplication.instance() or QApplication([])
+    ac = load_jsonc(models_dir() / "Cessna 172.jsonc")
+    dlg = MeshDialog(ac, "flow5")
+    dlg.accept()
+    assert dlg.values() == ("10", "10")
+
+
 def test_menu_avl_trigger_shows_mesh_dialog(monkeypatch):
     app = QApplication.instance() or QApplication([])
     w = MainWindow()

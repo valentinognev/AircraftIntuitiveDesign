@@ -21,7 +21,8 @@ from aid.aircraft import Aircraft
 from aid.avl_io import run_avl_full
 from aid.datcom_io import DatcomInputWarning, with_aid_exposed_spans, write_for005
 from aid.datcom_parse import datcom_user_warning, parse_for006
-from aid.paths import avl_bin, datcom_wrapper, results_dir
+from aid.flow5_io import run_flow5
+from aid.paths import avl_bin, datcom_wrapper, flow5_bin, results_dir
 from aid.geometry import geometry
 from aid.scale_geom import scale_aircraft, scale_lengths
 from aid.stability import aircraft_stability
@@ -564,4 +565,40 @@ class MainWindow(QMainWindow):
             )
             return
         self.last_results["avl"] = coeffs
+        self._refresh_plots()
+
+    def run_flow5(
+        self,
+        mesh: tuple[str, ...] | None = None,
+    ) -> None:
+        if not self._require_aircraft():
+            return
+        sync_fields_to_aircraft(self)
+        if not isinstance(mesh, tuple):
+            mesh = None
+        if mesh is None:
+            dlg = MeshDialog(self.aircraft, "flow5", self)
+            if dlg.exec() != QDialog.DialogCode.Accepted:
+                return
+            mesh = dlg.values()
+        if mesh is None:
+            return
+        workdir = self._analysis_workdir("flow5")
+        try:
+            coeffs = run_flow5(self.aircraft, mesh)
+        except (FileNotFoundError, OSError):
+            QMessageBox.critical(
+                self,
+                "flow5",
+                f"flow5 binary not found or could not be executed:\n{flow5_bin()}",
+            )
+            return
+        except subprocess.CalledProcessError:
+            QMessageBox.critical(
+                self,
+                "flow5",
+                f"flow5 run failed.\nBinary: {flow5_bin()}\nWorkdir: {workdir}",
+            )
+            return
+        self.last_results["flow5"] = coeffs
         self._refresh_plots()

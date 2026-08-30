@@ -1,0 +1,7 @@
+cmake_minimum_required(VERSION 3.16)
+project(aid-flow5 LANGUAGES C CXX)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+add_subdirectory(XFoil-lib)
+add_subdirectory(flow5-lib)
+add_subdirectory(run)

@@ -9,6 +9,9 @@ def mesh_fields(ac, solver: str) -> tuple[list[str], list[str]]:
     elif solver == "avl":
         defaults = ["10", "10"]
         twist_def, foil_def = "1", "1"
+    elif solver == "flow5":
+        defaults = ["10", "10"]
+        twist_def, foil_def = "1", "1"
     else:
         raise ValueError(solver)
     if ac.WG.get("TWISTA"):

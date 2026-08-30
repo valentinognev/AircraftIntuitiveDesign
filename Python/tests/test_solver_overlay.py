@@ -88,6 +88,54 @@ def test_overlay_masks_datcom_nd_as_nan():
     assert abs(series[0]["y"][1] + 0.012) < 1e-12
 
 
+def test_overlay_includes_flow5_cl_table():
+    st = _st()
+    results = {
+        "flow5": {"alpha": np.array([-4.0, 0.0, 4.0]), "CL": np.array([-0.1, 0.2, 0.5])},
+    }
+    series = overlay_vs_alpha(
+        results,
+        st,
+        datcom="cl",
+        tornado=("CL", "CL_a"),
+        avl=("CLtot", "CLa"),
+        flow5="CL",
+    )
+    labels = [s["label"] for s in series]
+    assert "flow5" in labels
+    f = next(s for s in series if s["label"] == "flow5")
+    assert np.allclose(f["y"], [-0.1, 0.2, 0.5])
+    assert f["style"] == "y.-"
+    assert f["kind"] == "line"
+    assert np.allclose(f["x"], [-4.0, 0.0, 4.0])
+
+
+def test_overlay_omits_flow5_when_key_missing():
+    st = _st()
+    results = {
+        "flow5": {"alpha": np.array([0.0, 4.0]), "CD": np.array([0.03, 0.04])},
+    }
+    series = overlay_vs_alpha(results, st, flow5="CL")
+    assert [s["label"] for s in series] == []
+
+
+def test_derivative_overlay_includes_flow5_hline():
+    st = _st()
+    results = {
+        "flow5": {"CLa": 5.0, "Cma": -0.8},
+    }
+    series = overlay_derivative(results, st, flow5="CLa")
+    labels = [s["label"] for s in series]
+    assert labels == ["flow5"]
+    assert series[0]["kind"] == "hline"
+    assert series[0]["style"] == "y-"
+    assert abs(series[0]["y"] - 5.0 * np.pi / 180) < 1e-12
+
+    series_cm = overlay_derivative(results, st, flow5="Cma")
+    assert len(series_cm) == 1
+    assert abs(series_cm[0]["y"] - (-0.8) * np.pi / 180) < 1e-12
+
+
 def test_derivative_overlay_datcom_curve_and_vlm_hline():
     st = _st()
     results = {

@@ -84,6 +84,13 @@ class ResultsPanel(FigureCanvasQTAgg):
                     "m-",
                     label="AVL",
                 )
+        flow5 = results.get("flow5")
+        if flow5 and "alpha" in flow5:
+            alpha_f5 = np.asarray(flow5["alpha"], dtype=float)
+            if "CL" in flow5:
+                ax_cl.plot(alpha_f5, np.asarray(flow5["CL"], dtype=float), "y.-", label="flow5")
+            if "Cm" in flow5:
+                ax_cm.plot(alpha_f5, np.asarray(flow5["Cm"], dtype=float), "y.-", label="flow5")
         ax_cl.plot([-100, 100], [0, 0], "k", linewidth=0.8)
         ax_cl.plot([0, 0], [-100, 100], "k", linewidth=0.8)
         ax_cm.plot([-100, 100], [0, 0], "k", linewidth=0.8)

@@ -80,6 +80,11 @@ Matlab/fsroot/code/NACA456/naca.gnu
 *.tif
 *.tiff
 
+# --- AID web ---
+web/node_modules/
+web/dist/
+.run/
+
 # --- Python ---
 __pycache__/
 *.py[cod]

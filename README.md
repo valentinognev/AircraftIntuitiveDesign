@@ -33,11 +33,11 @@ Analyze runs one of four methods and overlays coefficients vs angle of attack:
 | **AVL 3.52** | Vortex-lattice (Drela/Youngren) | Shared binary; AID writes `.avl`/`.run` and parses `geometry.st` |
 | **flow5** | Vortex-lattice panel (Deperrois GPL-3) | Vendored `FLOW5/` native helper `flow5_run` subprocess; Python writes a JSON deck only |
 
-MATLAB remains the gold runner. Python `aid` is a headless engine; `aid_gui` is the only widget layer and calls `aid` for load, save, and Analyze.
+MATLAB remains the gold runner. Python `aid` is a headless engine. `aid_gui` (PySide6) stays installable. The CADAC workbench sibling is `api/` + `web/` (`./start-web.sh`: FastAPI :8002, Vite :5175); it wraps the same `aid` for load, Analyze, and handshake.
 
 ## Architecture
 
-Two stacks, one repo. DATCOM, AVL, and flow5 are compiled once and invoked as subprocesses from both languages (flow5 is Python-only today). Tornado is a source port, so coefficient compare uses looser tolerances than the shared Fortran parsers. flow5 is GPL-3: the PySide GUI never links `flow5-lib`; only `FLOW5/run/flow5_run` runs as a subprocess (same pattern as AVL).
+Two solver stacks, one repo, three UIs (MATLAB, PySide, web). DATCOM, AVL, and flow5 are compiled once and invoked as subprocesses from both languages (flow5 is Python-only today). Tornado is a source port, so coefficient compare uses looser tolerances than the shared Fortran parsers. flow5 is GPL-3: the PySide GUI never links `flow5-lib`; only `FLOW5/run/flow5_run` runs as a subprocess (same pattern as AVL). Web Analyze uses the same `aid` runners (no second solver).
 
 ```
 Aircraft (WG/HT/VT/F/A/E/R/BD/AERO)
@@ -46,7 +46,8 @@ Aircraft (WG/HT/VT/F/A/E/R/BD/AERO)
         │
         └─ Python aid    ── datcom_io / tornado_io / avl_io / flow5_io ──► Results/python/
                     │
-                    └─ aid_gui (PySide6 + pyvistaqt 3D)  +  compare.py vs MATLAB gold
+                    ├─ aid_gui (PySide6 + pyvistaqt 3D)  +  compare.py vs MATLAB gold
+                    └─ api/ aid-web FastAPI :8002 + web/ Vite React :5175
 ```
 
 Vendored flow5 source lives under `FLOW5/` (`XFoil-lib/`, `flow5-lib/`, superbuild `CMakeLists.txt`). Build the helper with `cmake -S FLOW5 -B FLOW5/build` then `cmake --build FLOW5/build` (installs executable to `FLOW5/run/flow5_run`, gitignored). System packages (Ubuntu): `libocct-foundation-dev`, `libocct-modeling-algorithms-dev`, `libocct-modeling-data-dev`, `libocct-ocaf-dev`, `libocct-data-exchange-dev`, `libopenblas-dev`. `write_flow5_deck` maps AID JSONC → deck JSON (T1 VLM2, inviscid, thin surfaces, no fuselage). `run_flow5` invokes the native helper from Analyze → flow5; Cessna 172 e2e matches native within atol=1e-6 (`test_e2e_flow5_cessna.py`).
@@ -56,6 +57,8 @@ Vendored flow5 source lives under `FLOW5/` (`XFoil-lib/`, `flow5-lib/`, superbui
 - AVL 3.52 source: `Matlab/fsroot/code/AVL/AVL3.52rel09032025/`. Install executable to `AVL/run/avl` (gitignored).
 - `FLOW5/` — vendored flow5 back-end (`XFoil-lib`, `flow5-lib`, CMake superbuild). Helper `FLOW5/run/flow5_run` (gitignored). Python `flow5_io.write_flow5_deck` + `run_flow5`; no MATLAB gold.
 - `Python/` — package `aid` (engine) + `aid_gui` (PySide6). Models: `Python/models/*.jsonc`.
+- `api/` — FastAPI `aid-web`: `GET /models`, `GET /models/{name}`, `POST /models/validate`, `POST /analyze` (`solver` `datcom`|`tornado`|`avl`|`flow5`; omitted solver is datcom). Optional `mesh` (Tornado default `("10","5")`, AVL/flow5 `("10","10")`). Analyze returns `raw` with mapper lists `{alpha, CL, CD, Cm, MACH}` plus handshake `payload` (`source: "aid"`, `solver` set, tables `cl`/`cd`/`cm`). `POST /stability` body `{aircraft}` returns `aid.stability.aircraft_stability` (CG / static margin). Engine fail (`FileNotFoundError` / `CalledProcessError` / `TimeoutExpired` / `ValueError` / `OSError` / `KeyError`) → HTTP 400 `{ok: false, error}`. Unknown solver → HTTP 400.
+- `web/` — Vite React 18 + Tailwind 3 (`darkMode: ["selector", ".dark"]`) + Zustand on :5175. Proxy `/models` `/analyze` `/stability` → `http://127.0.0.1:8002`. Start: New / Load examples (`GET /models`) / Open file (FileReader JSONC) / Recent (localStorage last-5 names, key `aid-recent`). Theme `aid-theme` + `html.dark`. Non-empty `?cadacSession=` on first load `openNew()` (starter GET is plan 5). Tabs Wing/HT/VT/Control/Body/Aero/Geometry/`+` from PySide `PLANFORM_RP` / Control / Body / Aero keys. Control: Flaps/Ailerons/Elevator/Rudder Inboard|Outboard grids (`F,A,E,R` `CONTROL_BLOCKS`). `+` ExtraTab adds Body 2/3 (`NB` 1×2) and Prop / Wing 2 / HT 2 / VT 2 (`NP` 1×4); Load shows those tabs when slots are filled. Number fields commit on blur (`null` if blank). Save is client download. Analyze header (`DATCOM`/`Tornado`/`AVL`/`flow5`) `POST /analyze`; stores `lastPayload`. If `?cadacSession=` is set, after success `fetch` POSTs the handshake `payload` (`source: "aid"`) to `http://127.0.0.1:8001/handshake/sessions/${id}/complete` (`Content-Type` JSON); `!ok` or thrown fetch sets `handshakeError` and keeps plots. Geometry tab (and a right pane on form tabs) is R3F `AircraftCanvas`. Aero tab right pane is `Results`: SVG CL/CD/Cm vs α overlays (DATCOM default, Tornado red, flow5 yellow, AVL default) plus CG/static-margin text from `POST /stability` (`aid.stability.aircraft_stability`).
 - `Results/` — solver dumps, not versioned (`matlab/`, `python/`, `compare/`).
 - Spec/plan: `Docs/2026-08-26-aid-linux-python-port-spec.md` (binding), atomic tasks, implementation plan.
 
@@ -139,10 +142,34 @@ aid
 
 Headless/offscreen: `QT_QPA_PLATFORM=offscreen aid`. Without the console entry point: `python -m aid_gui.app`.
 
+**AID web (API :8002 + Vite :5175):**
+
+```bash
+./start-web.sh
+```
+
+Kills any previous web instance, then starts FastAPI at `http://127.0.0.1:8002` and Vite at `http://127.0.0.1:5175`. Prefers `api/.venv`. PIDs in `.run/`. Re-run `./start-web.sh` to restart. Stop only: `./kill-web.sh`. Desktop PySide GUI remains `./start.sh`.
+
+Once:
+
+```bash
+(cd api && python -m venv .venv && .venv/bin/pip install -e .)
+(cd web && npm install)
+```
+
+Manual Vite-only: `cd web && npm run dev` (still :5175; API must already be on :8002).
+
 **Python tests (primary compare + full suite except all-23 MATLAB batch):**
 
 ```bash
 cd Python && python -m pytest tests/ -q --ignore=tests/test_matlab_batch_all.py
+```
+
+**AID web tests:**
+
+```bash
+cd api && python -m pytest tests/ -q
+cd web && npm test
 ```
 
 ## Reading order for agents

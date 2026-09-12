@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aid-web"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "aid @ file:../Python",
+    "fastapi",
+    "uvicorn",
+    "httpx",
+]
+
+[tool.setuptools]
+packages = ["aid_web"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

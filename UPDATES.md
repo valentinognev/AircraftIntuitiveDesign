@@ -1,5 +1,84 @@
 # Updates
 
+## 1.26.2 - README: web is CADAC sibling
+- Idea/Architecture: `aid_gui` stays; `./start-web.sh` is the CADAC sibling (API :8002, Vite :5175). Quick start lists `api`/`web` tests.
+
+## 1.26.1 - Analyze 400s, handshake error, cadacSession New
+- `POST /analyze` maps `TimeoutExpired`, `ValueError`, `OSError`, `KeyError` (and prior `FileNotFoundError` / `CalledProcessError`) to HTTP 400 `{ok: false, error}`
+- After Analyze, CADAC complete `!ok` or thrown fetch stores `handshakeError`; `lastPayload` / plots stay
+- Non-empty `?cadacSession=` on first load calls `openNew()` (starter geometry GET still plan 5)
+- Tests: `test_analyze_timeout_expired_is_400`; CADAC complete 500 / network error / success; `openNewIfCadacSession`
+
+## 1.26.0 - AID web start-web.sh / kill-web.sh
+- `./start-web.sh` kills any previous web instance then starts FastAPI :8002 + Vite :5175 (prefer `api/.venv`; PIDs in `.run/`)
+- `./kill-web.sh` stop-only; re-run `./start-web.sh` to restart. Desktop PySide remains `./start.sh`
+- README Running documents `./start-web.sh` and ports
+- Tests: `api/tests/test_start_web_script.py` (ports 8002/5175; kill before start)
+
+## 1.25.2 - analyzing generation token
+- `runAnalyze` owns a generation token; `finally` clears `analyzing` only if this request still owns the in-flight analyze
+- Field edits bump `revision` without stealing ownership, so Analyze re-enables after the request settles
+- `openNew` / `openAircraft` still invalidate the token and clear the flag
+
+## 1.25.1 - Results overlay axes + handshake JSON headers
+- Overlay polylines share one domain per chart (`plotDomain`) so solvers compare on the same α/coeff scales
+- `analyzing` always clears: `finally` on revision match; `openNew` / `openAircraft` reset the flag
+- CADAC complete POST sends `Content-Type` and `Accept: application/json`
+
+## 1.25.0 - AID web Results overlays + handshake
+- Analyze button `POST /analyze` (DATCOM/Tornado/AVL/flow5); store `lastPayload` (overlays keyed by solver)
+- `cadacCallbackUrl()`: `?cadacSession=` → `http://127.0.0.1:8001/handshake/sessions/${id}/complete`; after success `fetch(callback, { method: "POST", body: JSON.stringify(payload) })` with `source: "aid"`
+- `Results.tsx` SVG CL, CD, Cm vs α; strokes DATCOM default, Tornado red, flow5 yellow; AVL uses default
+- `POST /stability` `{aircraft}` → `aid.stability.aircraft_stability` dict; Results shows CG / static-margin text
+- Geometry tab remains 3D; Aero tab right pane is Aerodynamics plots
+- Tests: `web/src/cadacSession.test.ts`, `web/src/payload.test.ts`; `api/tests/test_stability.py` (Cessna live keys)
+
+## 1.24.0 - AID web 3D Geometry view
+- `web/src/geom.ts`: tessellate WG/HT/VT/BD to `{fuselage: polyline[], wings: {le, te}[]}`; `GeometryError`; `sceneFromConfig` `{ok:true, scene}` / `{ok:false, message}`; canvas `keepLastGood`
+- `AircraftCanvas.tsx` R3F/drei: fuselage line segments + wing LE/TE meshes; Geometry tab plus right pane on form tabs
+- Cessna WG `SSPN`/`CHRDR` fixture: geom span > 0; no PyVista numeric match
+- Tests: `cd web && npm test` (`web/src/geom.test.ts`)
+
+## 1.23.0 - AID web Extra + Control grids
+- `+` ExtraTab: New Body / Propeller / New Wing / New HT / New VT fill `NB` 1×2 and `NP` 1×4 (pad `null`); Body 2/3, Prop, Wing 2, HT 2, VT 2 tabs when slots are dicts
+- Load pads short `NP`/`NB`; adding Wing 2 writes `NP[0]` (CHRDR>0)
+- Control: Flaps/Ailerons/Elevator/Rudder Inboard|Outboard from `CONTROL_BLOCKS` (`SPANFI`/`SPANFO`, …); no invented keys
+- Tests: `cd web && npm test` (`web/src/extras.test.ts`)
+
+## 1.22.1 - AID web chrome review fixes
+- NACA blur keeps strings (`0012` not `12`); blank still `null`
+- Recent local names stay listed and do not `GET /models/{name}`
+- Validate failures use `validateError`; `ok: true` clears it (not `parseError`)
+- Tests: `cd web && npm test`
+
+## 1.22.0 - AID web React chrome
+- `web/` Vite React 18 + Tailwind 3 (`darkMode: ["selector", ".dark"]`) + Zustand + Vitest; proxy `/models` `/analyze` → :8002; dev :5175
+- Aircraft dict keys `WG, HT, VT, F, A, E, R, BD, NP, NB, AERO, plot_cmp, unit`; `aircraftFromJson` JSONC round-trip (Cessna `WG.CHRDR`)
+- Field lists copied from PySide `PLANFORM_RP` / Control / Body stations / Aero (+ NACA); number fields commit on blur (`null` if blank)
+- Start: New / Load examples / Open file (FileReader JSONC) / Recent (`aid-recent` last-5 names); theme `aid-theme` + `html.dark`
+- Editor tabs Wing/HT/VT/Control/Body/Aero; Save downloads JSONC; no Extra `+` tab; r3f/three installed, no canvas yet
+- Tests: `cd web && npm test`
+
+## 1.21.0 - Analyze Tornado / AVL / flow5
+- `POST /analyze` body `{aircraft, solver, mesh}`; omitted `solver` is `datcom` (Task 2 path unchanged)
+- Tornado wraps `tornado_io` → `lattice_setup` / `set_boundary` / `solve` / `coeff_create` (default mesh `("10","5")`)
+- AVL `run_avl_full`, flow5 `run_flow5`; default mesh `("10","10")`; AVL `CLtot`/`CDtot`/`Cmtot` map to mapper `CL`/`CD`/`Cm`
+- Handshake `payload.solver` set to the requested solver; unknown solver or missing binary / `CalledProcessError` → HTTP 400 `{ok: false, error}`
+- Tests: `api/tests/test_analyze_solvers.py` (monkeypatched solvers; no live Fortran/AVL/flow5)
+
+## 1.20.0 - Analyze DATCOM mapper-shaped tables
+- `POST /analyze` body `{aircraft}` runs `aid.datcom_run.run_datcom`; solver is datcom (Task 3 adds solver/mesh)
+- Response `{ok, solver: "datcom", raw, payload}`: `raw` keeps the aid dict and adds mapper lists `{alpha, CL, CD, Cm, MACH}`; `payload` is handshake `{source: "aid", solver: "datcom", axes, tables: {cl, cd, cm}, ref: {}}`
+- `to_handshake_payload(raw, mach)` (`payload_from_aid_raw` alias); NaN/Inf in leftover aid fields become JSON `null`
+- `FileNotFoundError` / `CalledProcessError` → HTTP 400 `{ok: false, error}`
+- Tests: `api/tests/test_analyze_datcom.py` (fixture + monkeypatch 400s + live Cessna skipif no wrapper)
+
+## 1.19.0 - AID web API load/validate
+- `api/` FastAPI package `aid-web` (editable `aid` from `../Python`, CORS 5173/5174/5175)
+- `GET /models` lists `Python/models/*.jsonc` stems; `GET /models/{name}` returns `{ok, aircraft}` via `load_jsonc` + `asdict` (drop `cg_data` when None)
+- `POST /models/validate` body `{aircraft}` → `{ok: true}` or `{ok: false, error}`; no bundled-model save
+- Tests: `api/tests/test_load.py`
+
 ## 1.18.0 - run_flow5 Python wrapper
 - `run_flow5_native`: temp deck JSON → `flow5_run --deck` → parsed stdout dict; `FileNotFoundError` if binary missing
 - `run_flow5`: `write_flow5_deck` + `run_flow5_native` (replaces subprocess stub)

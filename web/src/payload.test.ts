@@ -2,6 +2,9 @@ import { afterEach, expect, it, vi } from "vitest";
 import { emptyAircraft } from "./aircraft";
 import { postAnalyze } from "./api";
 import {
+  axisTicks,
+  chartLayout,
+  gridLines,
   overlaySeries,
   plotDomain,
   seriesFromPayload,
@@ -88,6 +91,51 @@ it("maps overlay polylines onto one shared domain per chart", () => {
   const ptsHalf = svgPolyline(series[1].alpha, series[1].cl, 100, 100, 0, domain!);
   expect(ptsWide).toBe("0,100 100,0");
   expect(ptsHalf).toBe("0,100 100,50");
+});
+
+it("lays out a plot rectangle with room for axis ticks", () => {
+  const layout = chartLayout(400, 180);
+  expect(layout.plot.x).toBeGreaterThan(24);
+  expect(layout.plot.y).toBeGreaterThan(0);
+  expect(layout.plot.x + layout.plot.width).toBeLessThan(400);
+  expect(layout.plot.y + layout.plot.height).toBeLessThan(180);
+  expect(layout.plot.width / layout.width).toBeGreaterThan(0.7);
+  expect(layout.plot.height / layout.height).toBeGreaterThan(0.6);
+});
+
+it("places numeric ticks and a grid on the shared domain", () => {
+  const domain = { xmin: -4, xmax: 16, ymin: 0, ymax: 1.5 };
+  const xTicks = axisTicks(domain.xmin, domain.xmax);
+  const yTicks = axisTicks(domain.ymin, domain.ymax);
+  expect(xTicks.map((t) => t.value)).toEqual([-4, 0, 4, 8, 12, 16]);
+  expect(yTicks.map((t) => t.value)).toEqual([0, 0.5, 1, 1.5]);
+  expect(xTicks.every((t) => t.label.length > 0)).toBe(true);
+  const lines = gridLines(domain, chartLayout(400, 180).plot);
+  expect(lines.some((line) => line.y1 === line.y2)).toBe(true);
+  expect(lines.some((line) => line.x1 === line.x2)).toBe(true);
+  expect(lines.length).toBe(xTicks.length + yTicks.length);
+});
+
+it("draws each series across the plot rectangle", () => {
+  const domain = { xmin: -4, xmax: 16, ymin: 0, ymax: 1.2 };
+  const { width, height, plot } = chartLayout(400, 180);
+  const pts = svgPolyline([-4, 16], [0, 1.2], width, height, 0, domain, plot);
+  const [start, end] = pts.split(" ");
+  expect(Number(start.split(",")[0])).toBeCloseTo(plot.x);
+  expect(Number(end.split(",")[0])).toBeCloseTo(plot.x + plot.width);
+});
+
+it("ignores DATCOM no-data sentinels when scaling", () => {
+  const series = overlaySeries([
+    {
+      ...DATCOM_PAYLOAD,
+      axes: { mach: [0.2], alpha: [-2, 0, 4], beta: [0] },
+      tables: { cl: [[0.2, 99999, 0.8]], cd: [[0.02, 0.03, 0.04]], cm: [[0, -0.01, -0.02]] },
+    },
+  ]);
+  expect(plotDomain(series, (s) => s.cl)).toEqual({ xmin: -2, xmax: 4, ymin: 0.2, ymax: 0.8 });
+  const pts = svgPolyline(series[0].alpha, series[0].cl, 100, 100, 0);
+  expect(pts.split(" ")).toHaveLength(2);
 });
 
 it("postAnalyze POSTs handshake payload to CADAC when cadacSession is set", async () => {

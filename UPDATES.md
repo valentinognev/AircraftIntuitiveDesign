@@ -1,5 +1,33 @@
 # Updates
 
+## 1.29.1 - web API can import aid without a venv
+- `./start-web.sh` puts `Python/src` on `PYTHONPATH` before uvicorn, so the fallback interpreter finds `aid` when `api/.venv` is missing
+- Without that path the worker died with `ModuleNotFoundError: No module named 'aid'` and the start screen showed “API unreachable”
+- Tests: `cd api && python -m pytest tests/test_start_web_script.py -q`
+
+## 1.29.0 - web aerodynamics charts use axes and a grid
+- CL, CD, and Cm vs α fill an axes box with numeric ticks and a grid, the same quantities the Qt plots show
+- DATCOM no-data values (99999) are left off the scale so one sentinel cannot flatten the curve
+- Tests: `cd web && npm test` (`payload.test.ts` chart layout, ticks, grid, sentinel scale)
+
+## 1.28.0 - web geometry lofts airfoils, struts, and propeller
+- Planforms use the PySide loft (`DATA` airfoil, quarter-chord, sweep, dihedral, incidence); wing, HT, and VT are sections instead of flat plates
+- `NP` wing 2 is the strut pair; `NP` prop is the nose propeller, same axis map as `aid.viz`
+- Opening a model frames the view on the aircraft (MATLAB `view(3)` direction) so the wing section, struts, and propeller are large enough to read
+- Tests: `cd web && npm test` (`geom.test.ts` thickness, tail section, strut tip, propeller span)
+
+## 1.27.0 - web geometry draws a solid body
+- Body stations loft into closed sections (`R`, `ZU`, `ZL`; superellipse when `P` is not 1) and the Geometry view renders that skin, matching `Plot_Body`
+- Tests: `cd web && npm test` (`web/src/geom.test.ts` elliptical section extents)
+
+## 1.26.4 - start.sh uses PySide6 Qt plugins
+- `./start.sh` sets `QT_PLUGIN_PATH` and `QT_QPA_PLATFORM_PLUGIN_PATH` to pip PySide6's plugins so xcb loads (conda `pigeon/bin/qt6.conf` points at Qt 6.7 plugins, which 6.11 rejects)
+- Tests: `api/tests/test_start_web_script.py` (`test_start_sh_points_qt_plugins_at_pyside6`)
+
+## 1.26.3 - start.sh reinstalls a stale editable aid
+- `./start.sh` reinstalls `pip install -e Python` when `aid_gui` is missing or not this checkout (moved tree left a `pigeon` editable install pointing at `Projects/MDT/...`)
+- Tests: `api/tests/test_start_web_script.py` (stale path reinstalls; matching path skips)
+
 ## 1.26.2 - README: web is CADAC sibling
 - Idea/Architecture: `aid_gui` stays; `./start-web.sh` is the CADAC sibling (API :8002, Vite :5175). Quick start lists `api`/`web` tests.
 

@@ -1,9 +1,17 @@
 import { useStore } from "zustand";
-import { overlaySeries, plotDomain, stabilityText, svgPolyline, type PlotSeries } from "./payload";
+import {
+  axisTicks,
+  chartLayout,
+  gridLines,
+  overlaySeries,
+  plotDomain,
+  stabilityText,
+  svgPolyline,
+  type PlotSeries,
+} from "./payload";
 import store from "./store";
 
-const PLOT_W = 280;
-const PLOT_H = 120;
+const LAYOUT = chartLayout();
 
 function Chart({
   title,
@@ -17,26 +25,84 @@ function Chart({
   pick: (s: PlotSeries) => number[];
 }) {
   const domain = plotDomain(series, pick);
+  const { width, height, plot } = LAYOUT;
+  const xTicks = domain ? axisTicks(domain.xmin, domain.xmax) : [];
+  const yTicks = domain ? axisTicks(domain.ymin, domain.ymax) : [];
+  const dx = domain ? domain.xmax - domain.xmin || 1 : 1;
+  const dy = domain ? domain.ymax - domain.ymin || 1 : 1;
+  const yOf = (value: number) => plot.y + plot.height - ((value - (domain?.ymin ?? 0)) / dy) * plot.height;
+  const xOf = (value: number) => plot.x + ((value - (domain?.xmin ?? 0)) / dx) * plot.width;
   return (
     <figure className="min-w-0">
       <figcaption className="text-xs font-medium text-slate-600 dark:text-slate-300">
         {title}
       </figcaption>
       <svg
-        viewBox={`0 0 ${PLOT_W} ${PLOT_H}`}
-        className="h-28 w-full text-slate-800 dark:text-slate-100"
+        viewBox={`0 0 ${width} ${height}`}
+        preserveAspectRatio="none"
+        className="h-44 w-full text-slate-700 dark:text-slate-200"
         role="img"
-        aria-label={title}
+        aria-label={`${title} (${ylabel})`}
       >
-        <text x="8" y="12" className="fill-current text-[9px]">
-          {ylabel}
-        </text>
-        <text x={PLOT_W - 40} y={PLOT_H - 2} className="fill-current text-[9px]">
-          α
+        {domain
+          ? gridLines(domain, plot).map((line, i) => (
+              <line
+                key={i}
+                x1={line.x1}
+                y1={line.y1}
+                x2={line.x2}
+                y2={line.y2}
+                stroke="currentColor"
+                strokeOpacity={0.22}
+              />
+            ))
+          : null}
+        <rect
+          x={plot.x}
+          y={plot.y}
+          width={plot.width}
+          height={plot.height}
+          fill="none"
+          stroke="currentColor"
+          strokeOpacity={0.7}
+        />
+        {yTicks.map((tick) => (
+          <text
+            key={`y-${tick.label}`}
+            x={plot.x - 6}
+            y={yOf(tick.value)}
+            fill="currentColor"
+            fontSize={12}
+            textAnchor="end"
+            dominantBaseline="middle"
+          >
+            {tick.label}
+          </text>
+        ))}
+        {xTicks.map((tick) => (
+          <text
+            key={`x-${tick.label}`}
+            x={xOf(tick.value)}
+            y={plot.y + plot.height + 18}
+            fill="currentColor"
+            fontSize={12}
+            textAnchor="middle"
+          >
+            {tick.label}
+          </text>
+        ))}
+        <text
+          x={plot.x + plot.width / 2}
+          y={height - 8}
+          fill="currentColor"
+          fontSize={12}
+          textAnchor="middle"
+        >
+          α (deg)
         </text>
         {domain
           ? series.map((s) => {
-              const pts = svgPolyline(s.alpha, pick(s), PLOT_W, PLOT_H, 8, domain);
+              const pts = svgPolyline(s.alpha, pick(s), width, height, 0, domain, plot);
               if (!pts) return null;
               return (
                 <polyline
@@ -44,7 +110,7 @@ function Chart({
                   points={pts}
                   fill="none"
                   stroke={s.stroke}
-                  strokeWidth={1.5}
+                  strokeWidth={1.75}
                 />
               );
             })

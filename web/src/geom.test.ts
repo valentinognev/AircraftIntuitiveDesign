@@ -39,10 +39,66 @@ const CESSNA_SUBSET = {
   unit: "ft",
 };
 
-function wingSpanY(wing: { le: { y: number }[]; te: { y: number }[] }): number {
-  const ys = [...wing.le, ...wing.te].map((p) => p.y);
+function wingSpanY(wing: { rows: { y: number }[][] }): number {
+  const ys = wing.rows.flat().map((p) => p.y);
   return Math.max(...ys) - Math.min(...ys);
 }
+
+const THICK_FOIL = [
+  [1, 0],
+  [0.5, -0.2],
+  [0, 0],
+  [0.5, 0.2],
+  [1, 0],
+];
+
+function zSpan(points: { z: number }[]): number {
+  const zs = points.map((p) => p.z);
+  return Math.max(...zs) - Math.min(...zs);
+}
+
+it("wing root uses DATA airfoil thickness", () => {
+  const ac = aircraftFromJson({
+    ...CESSNA_SUBSET,
+    WG: { ...CESSNA_SUBSET.WG, TC: 0.01, DATA: THICK_FOIL },
+  });
+  const root = tessellate(ac).wings.find((wing) => wing.name === "wing")?.rows[0] ?? [];
+  expect(zSpan(root)).toBeGreaterThan(0.7);
+});
+
+it("horizontal and vertical tails use airfoil thickness", () => {
+  const ac = aircraftFromJson({
+    ...CESSNA_SUBSET,
+    HT: { ...CESSNA_SUBSET.HT, TC: 0.01, DATA: THICK_FOIL },
+    VT: { ...CESSNA_SUBSET.VT, TC: 0.01, DATA: THICK_FOIL },
+  });
+  const tess = tessellate(ac);
+  const ht = tess.wings.find((wing) => wing.name === "ht")?.rows[0] ?? [];
+  const vt = tess.wings.find((wing) => wing.name === "vt")?.rows[0] ?? [];
+  expect(zSpan(ht)).toBeGreaterThan(0.4);
+  const ys = vt.map((p) => p.y);
+  expect(Math.max(...ys) - Math.min(...ys)).toBeGreaterThan(1.5);
+});
+
+it("draws wing struts and a propeller disk from NP", () => {
+  const ac = aircraftFromJson({
+    ...CESSNA_SUBSET,
+    NP: [
+      { CHRDR: 0.3, CHRDTP: 0.3, SSPN: 5, DHDADI: 17, X: 2.5, Y: 0, Z: 0 },
+      null,
+      null,
+      { CHRDR: 0.3125, CHRDTP: 0.15625, SSPN: 1.25, i: 30, TWISTA: 30, X: 0.29, Y: 0, Z: 0 },
+    ],
+  });
+  const tess = tessellate(ac);
+  const strut = tess.wings.find((wing) => wing.name === "wing 2" && wing.rows.some((row) => row.some((p) => p.y > 1)));
+  const tip = strut?.rows[strut.rows.length - 1][0];
+  expect(tip).toBeDefined();
+  expect(tip?.z ?? 0).toBeGreaterThan(1.2);
+  expect(tip?.y ?? 0).toBeGreaterThan(4);
+  const prop = tess.wings.filter((wing) => wing.name === "prop").flatMap((wing) => wing.rows.flat());
+  expect(zSpan(prop)).toBeGreaterThan(0.8);
+});
 
 it("Cessna WG span is greater than 0 in geom", () => {
   const ac = aircraftFromJson(CESSNA_SUBSET);
@@ -54,6 +110,22 @@ it("Cessna WG span is greater than 0 in geom", () => {
 it("tessellate throws GeometryError for negative WG.SSPN", () => {
   const ac = aircraftFromJson({ ...CESSNA_SUBSET, WG: { ...CESSNA_SUBSET.WG, SSPN: -1 } });
   expect(() => tessellate(ac)).toThrow(GeometryError);
+});
+
+it("body stations loft into closed elliptical sections", () => {
+  const ac = aircraftFromJson(CESSNA_SUBSET);
+  const tess = tessellate(ac);
+  expect(tess.fuselage).toHaveLength(CESSNA_SUBSET.BD.X.length);
+  const i = 9;
+  const ring = tess.fuselage[i];
+  expect(ring.length).toBeGreaterThan(4);
+  expect(ring.every((p) => p.x === CESSNA_SUBSET.BD.X[i])).toBe(true);
+  const ys = ring.map((p) => p.y);
+  const zs = ring.map((p) => p.z);
+  expect(Math.max(...ys)).toBeCloseTo(CESSNA_SUBSET.BD.R[i]);
+  expect(Math.min(...ys)).toBeCloseTo(-CESSNA_SUBSET.BD.R[i]);
+  expect(Math.max(...zs)).toBeCloseTo(CESSNA_SUBSET.BD.ZU[i]);
+  expect(Math.min(...zs)).toBeCloseTo(CESSNA_SUBSET.BD.ZL[i]);
 });
 
 it("sceneFromConfig returns ok scene for Cessna subset", () => {

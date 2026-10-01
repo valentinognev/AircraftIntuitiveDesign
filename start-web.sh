@@ -35,7 +35,7 @@ start_api() {
   fi
   (
     cd "${ROOT}/api"
-    export PYTHONPATH="${ROOT}/api${PYTHONPATH:+:${PYTHONPATH}}"
+    export PYTHONPATH="${ROOT}/Python/src:${ROOT}/api${PYTHONPATH:+:${PYTHONPATH}}"
     exec setsid "${py}" -m uvicorn aid_web.app:app \
       --host "${API_HOST}" --port "${API_PORT}" --reload
   ) >"${logfile}" 2>&1 &

@@ -15,10 +15,11 @@ export type PlotSeries = {
   cm: number[];
 };
 
-/** DATCOM default; Tornado red; flow5 yellow (AID README). AVL uses DATCOM default. */
+/** DATCOM default; Tornado red; flow5 yellow; AVL magenta (Qt overlay `m`). */
 export function solverStroke(solver: string): string {
   if (solver === "tornado") return "red";
   if (solver === "flow5") return "yellow";
+  if (solver === "avl") return "magenta";
   return "currentColor";
 }
 

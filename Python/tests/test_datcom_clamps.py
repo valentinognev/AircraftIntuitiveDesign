@@ -224,8 +224,12 @@ def test_t34c_avl_retries_spacing_and_returns_finite_cla(tmp_path):
     if not avl_bin().is_file():
         pytest.skip("avl binary not present")
     ac = load_jsonc(models_dir() / "Beechcraft T-34C.jsonc")
-    got = run_avl_full(ac, ("10", "10"), tmp_path / "t34c_avl")
+    run_dir = tmp_path / "t34c_avl"
+    got = run_avl_full(ac, ("10", "10"), run_dir)
     cla = got.get("CLa")
     assert cla is not None
     assert np.isfinite(float(np.asarray(cla).reshape(-1)[0]))
-    assert (tmp_path / "t34c_avl" / "geometry.st").is_file()
+    n = len(np.asarray(ac.AERO["ALSCHD"], dtype=float).reshape(-1))
+    assert (run_dir / "geometry_ref.st").is_file()
+    for i in range(n):
+        assert (run_dir / f"geometry_{i}.st").is_file()

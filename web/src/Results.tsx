@@ -345,6 +345,17 @@ function LineFigureView({ figure }: { figure: LineFigure }) {
               }
               const pts = svgPolyline(s.x, s.y, width, height, 0, domain, plot);
               if (!pts) return null;
+              if (!pts.includes(" ")) {
+                return (
+                  <circle
+                    key={`${s.solver}-${i}`}
+                    cx={Number(pts.split(",")[0])}
+                    cy={Number(pts.split(",")[1])}
+                    r={3.5}
+                    fill={s.stroke}
+                  />
+                );
+              }
               return (
                 <polyline
                   key={`${s.solver}-${i}`}

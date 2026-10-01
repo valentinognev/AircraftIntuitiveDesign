@@ -225,9 +225,10 @@ export function barLegend(categories: BarCategory[]): { key: string; label: stri
   return out;
 }
 
-/** Tornado red; the second DATCOM bar in a group is blue so the pair stays distinct. */
+/** Tornado red; AVL magenta; the second DATCOM bar in a group is blue so the pair stays distinct. */
 export function barFill(key: string): string {
   if (key === "tornado" || key.endsWith("_d")) return "red";
+  if (key === "avl") return "magenta";
   if (key === "dcm" || key === "chd") return "#1d4ed8";
   if (key === "dclMax") return "#64748b";
   return "currentColor";

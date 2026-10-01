@@ -10,7 +10,6 @@ from aid.stability import stability_lines
 
 _DATCOM_STYLE = "g.-"
 _TORNADO_STYLE = "c-"
-_AVL_STYLE = "m-"
 _FLOW5_STYLE = "y.-"
 _FLOW5_DERIV_STYLE = "y-"
 _ND = 99998.0
@@ -32,7 +31,7 @@ def overlay_vs_alpha(
     *,
     datcom: str | None = None,
     tornado: tuple[str, str | None] | None = None,
-    avl: tuple[str, str | None] | None = None,
+    avl: str | None = None,
     flow5: str | None = None,
 ) -> list[dict]:
     """Same quantity vs α from each solver that has been run."""
@@ -65,17 +64,17 @@ def overlay_vs_alpha(
                 }
             )
     ares = results.get("avl") or {}
-    if avl:
-        val_key, slope_key = avl
-        line = _vlm_line(ares, val_key, slope_key, grid, alpha_is_rad=False)
-        if line is not None:
-            kind = "line" if slope_key and slope_key in ares else "marker"
+    if avl and avl in ares and "alpha" in ares:
+        xs = np.asarray(ares["alpha"], dtype=float).reshape(-1)
+        ys = np.asarray(ares[avl], dtype=float).reshape(-1)
+        if xs.size == ys.size and xs.size > 0:
+            kind = "line" if xs.size > 1 else "marker"
             series.append(
                 {
                     "label": "AVL",
-                    "x": grid if kind == "line" else np.array([_avl_alpha_deg(ares, st)]),
-                    "y": line if kind == "line" else np.array([float(ares[val_key])]),
-                    "style": _AVL_STYLE if kind == "line" else "m.",
+                    "x": xs,
+                    "y": ys,
+                    "style": "m.-" if kind == "line" else "m.",
                     "kind": kind,
                 }
             )
@@ -102,7 +101,7 @@ def overlay_derivative(
     avl: str | None = None,
     flow5: str | None = None,
 ) -> list[dict]:
-    """DATCOM derivative vs α (per deg) with Tornado/AVL as per-deg horizontals."""
+    """DATCOM derivative vs α (per deg). Tornado and flow5 stay horizontal; AVL is solved samples only."""
     grid = alpha_grid(results, st)
     series: list[dict] = []
     dres = results.get("datcom") or {}
@@ -129,16 +128,20 @@ def overlay_derivative(
             }
         )
     ares = results.get("avl") or {}
-    if avl and avl in ares:
-        series.append(
-            {
-                "label": "AVL",
-                "x": grid,
-                "y": float(ares[avl]) * math.pi / 180.0,
-                "style": _AVL_STYLE,
-                "kind": "hline",
-            }
-        )
+    if avl and avl in ares and "alpha" in ares:
+        xs = np.asarray(ares["alpha"], dtype=float).reshape(-1)
+        ys = np.asarray(ares[avl], dtype=float).reshape(-1)
+        if xs.size == ys.size and xs.size > 0:
+            kind = "line" if xs.size > 1 else "marker"
+            series.append(
+                {
+                    "label": "AVL",
+                    "x": xs,
+                    "y": ys * math.pi / 180.0,
+                    "style": "m.-" if kind == "line" else "m.",
+                    "kind": kind,
+                }
+            )
     fres = results.get("flow5") or {}
     if flow5 and flow5 in fres:
         series.append(
@@ -151,12 +154,6 @@ def overlay_derivative(
             }
         )
     return series
-
-
-def _avl_alpha_deg(avl: dict, st: dict) -> float:
-    if "alpha" in avl:
-        return float(avl["alpha"])
-    return float(st["alpha"])
 
 
 def _vlm_line(

@@ -1,5 +1,16 @@
 # Updates
 
+## 1.32.0 - AVL solved at each scheduled angle
+- `run_avl_full` runs one AVL case per `AERO.ALSCHD` angle and returns totals and stability derivatives as arrays parallel to `alpha`
+- Qt and web force, moment, and derivative charts plot those samples; AVL is not extended with `CLa` or any other slope
+- MATLAB gold compare uses `ref`, the unconstrained OPER `x` (no `a a`) stored beside the sweep. For Cessna that printed alpha is about −1.90, not 0°. The plots use the `ALSCHD` samples only
+- Tests: `cd Python && python -m pytest tests/test_avl_stack_cases.py tests/test_avl_write_case_sweep.py tests/test_avl_gold_sample.py tests/test_avl_run_cessna.py tests/test_solver_overlay.py -q` and `cd web && npm test`
+
+## 1.31.1 - web AVL series color
+- AVL coefficient lines and bars use magenta, the same marker color as the Qt overlay, so they no longer match DATCOM's default
+- DATCOM stays the text color; Tornado stays red; flow5 stays yellow
+- Tests: `cd web && npm test`
+
 ## 1.31.0 - control derivatives at a probe angle
 - Handbook, DATCOM, Tornado, AVL, and flow5 return flap, aileron, elevator, and rudder slopes per degree at caller-chosen probes, including when the stored deflection is 0
 - DATCOM has no rudder row (`datcom has no rudder namelist`)

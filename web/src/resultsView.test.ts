@@ -66,6 +66,30 @@ it("replaces those charts with seven tabs when a solver raw exists", () => {
   expect(html).not.toContain("Spanwise lift");
 });
 
+it("draws one AVL sample as a circle and several samples as a polyline", () => {
+  store.setState({
+    raws: { avl: { alpha: 4, CLtot: 0.2 } },
+    handbook: null,
+    lastPayload: null,
+    payloads: {},
+    lastStability: null,
+  });
+  const one = markup("forces");
+  expect(one).toMatch(/<circle[^>]*r="3.5"[^>]*fill="magenta"/);
+  expect(one).not.toMatch(/<polyline[^>]*stroke="magenta"/);
+
+  store.setState({
+    raws: { avl: { alpha: [-4, 0, 4], CLtot: [0.1, 0.4, 0.7] } },
+    handbook: null,
+    lastPayload: null,
+    payloads: {},
+    lastStability: null,
+  });
+  const many = markup("forces");
+  expect(many).toMatch(/<polyline[^>]*points="[^"]* [^"]*"[^>]*stroke="magenta"/);
+  expect(many).not.toMatch(/<circle[^>]*fill="magenta"/);
+});
+
 it("shows only the selected tab, including spanwise names and section table alignment", () => {
   store.setState({
     raws: {

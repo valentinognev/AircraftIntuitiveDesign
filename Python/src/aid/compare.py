@@ -141,7 +141,24 @@ def _compare_avl(python: dict, gold: dict) -> bool:
             if not _values_close(python[key], gold_val, rtol=0.0, atol=_PARSER_ATOL):
                 return False
         elif isinstance(gold_val, (int, float)):
-            if not _values_close(python[key], gold_val, rtol=0.0, atol=_PARSER_ATOL):
+            py_val = python[key]
+            if isinstance(py_val, (list, tuple)):
+                ref = python.get("ref")
+                if isinstance(ref, dict) and key in ref:
+                    if not _values_close(ref[key], gold_val, rtol=0.0, atol=_PARSER_ATOL):
+                        return False
+                    continue
+                alphas = python.get("alpha")
+                if not isinstance(alphas, (list, tuple)) or len(alphas) != len(py_val):
+                    return False
+                sample = next(
+                    (v for a, v in zip(alphas, py_val) if abs(float(a) - 0.0) <= 1e-6),
+                    None,
+                )
+                if sample is None or not _values_close(sample, gold_val, rtol=0.0, atol=_PARSER_ATOL):
+                    return False
+                continue
+            if not _values_close(py_val, gold_val, rtol=0.0, atol=_PARSER_ATOL):
                 return False
     return True
 

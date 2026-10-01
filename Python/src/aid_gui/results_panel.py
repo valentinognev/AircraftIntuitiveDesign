@@ -69,21 +69,17 @@ class ResultsPanel(FigureCanvasQTAgg):
                     "c-",
                     label="Tornado",
                 )
-        avl = results.get("avl")
-        if avl and "CLa" in avl:
-            ax_cl.plot(
-                lines["alpha"],
-                st["CL0"] + avl["CLa"] * lines["alpha"] * np.pi / 180,
-                "m-",
-                label="AVL",
-            )
-            if "Cma" in avl:
-                ax_cm.plot(
-                    lines["alpha"],
-                    st["Cm0"] + avl["Cma"] * lines["alpha"] * np.pi / 180,
-                    "m-",
-                    label="AVL",
-                )
+        avl = results.get("avl") or {}
+        if "alpha" in avl:
+            alpha_avl = np.asarray(avl["alpha"], dtype=float).reshape(-1)
+            if "CLtot" in avl:
+                cl_avl = np.asarray(avl["CLtot"], dtype=float).reshape(-1)
+                if cl_avl.size == alpha_avl.size and alpha_avl.size > 0:
+                    ax_cl.plot(alpha_avl, cl_avl, "m.-", label="AVL")
+            if "Cmtot" in avl:
+                cm_avl = np.asarray(avl["Cmtot"], dtype=float).reshape(-1)
+                if cm_avl.size == alpha_avl.size and alpha_avl.size > 0:
+                    ax_cm.plot(alpha_avl, cm_avl, "m.-", label="AVL")
         flow5 = results.get("flow5")
         if flow5 and "alpha" in flow5:
             alpha_f5 = np.asarray(flow5["alpha"], dtype=float)

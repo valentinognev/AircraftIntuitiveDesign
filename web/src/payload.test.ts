@@ -59,18 +59,18 @@ it("plots CL, CD, Cm vs alpha from handshake payload", () => {
   expect(series.cm).toEqual([0.0, -0.01, -0.03]);
 });
 
-it("uses README overlay colors: DATCOM default, Tornado red, flow5 yellow", () => {
+it("uses README overlay colors: DATCOM default, Tornado red, flow5 yellow, AVL magenta", () => {
   expect(solverStroke("datcom")).toBe("currentColor");
   expect(solverStroke("tornado")).toBe("red");
   expect(solverStroke("flow5")).toBe("yellow");
-  expect(solverStroke("avl")).toBe("currentColor");
-  expect(solverStroke("avl")).toBe(solverStroke("datcom"));
+  expect(solverStroke("avl")).toBe("magenta");
+  expect(solverStroke("avl")).not.toBe(solverStroke("datcom"));
 });
 
 it("overlays multiple solver payloads with those strokes", () => {
   const series = overlaySeries([DATCOM_PAYLOAD, TORNADO_PAYLOAD, FLOW5_PAYLOAD, AVL_PAYLOAD]);
   expect(series.map((s) => s.solver)).toEqual(["datcom", "tornado", "flow5", "avl"]);
-  expect(series.map((s) => s.stroke)).toEqual(["currentColor", "red", "yellow", "currentColor"]);
+  expect(series.map((s) => s.stroke)).toEqual(["currentColor", "red", "yellow", "magenta"]);
 });
 
 it("maps overlay polylines onto one shared domain per chart", () => {

@@ -145,7 +145,6 @@ def test_cessna_stability_overlay_intercepts_match_matlab_formulas():
     assert _line_y_at(ax_cl, "b") == pytest.approx(st["CL0"], abs=0.01)
     assert _line_y_at(ax_cl, "g") == pytest.approx(0.131, abs=0.01)
     assert _line_y_at(ax_cl, "c") == pytest.approx(0.169, abs=0.03)
-    assert _line_y_at(ax_cl, "m") == pytest.approx(st["CL0"], abs=0.01)
     ax_cm = w.results_panel.figure.axes[1]
     assert _line_y_at(ax_cm, "g", 0.0) == pytest.approx(0.0472, abs=1e-4)
     assert _line_y_at(ax_cm, "g", 10.0) == pytest.approx(-0.1115, abs=1e-3)

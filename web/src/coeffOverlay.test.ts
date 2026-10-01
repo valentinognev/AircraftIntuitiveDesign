@@ -103,54 +103,41 @@ it("omits Tornado when the value has no slope key", () => {
   expect(series).toEqual([]);
 });
 
-it("reconstructs AVL CL so y at 1 degree is 1.2", () => {
+it("plots AVL CL at the solved angles and ignores CLa", () => {
   const series = seriesVsAlpha(
     {
       datcom: { alpha: [0, 1] },
-      avl: { alpha: 0, CLtot: 0.2, CLa: PER_RAD },
+      avl: { alpha: [-4, 0, 4], CLtot: [0.1, 0.4, 0.7], CLa: PER_RAD },
     },
     null,
-    { avl: ["CLtot", "CLa"] },
+    { avl: "CLtot" },
   );
   expect(series).toHaveLength(1);
-  expect(series[0].solver).toBe("avl");
-  expect(series[0].stroke).toBe("currentColor");
-  expect(series[0].kind).toBe("line");
-  expect(yAt(series[0], 1)).toBeCloseTo(1.2, 12);
+  expect(series[0]).toMatchObject({
+    solver: "avl",
+    stroke: "magenta",
+    kind: "line",
+    x: [-4, 0, 4],
+    y: [0.1, 0.4, 0.7],
+  });
 });
 
-it("plots AVL without a slope as one point at AVL alpha", () => {
+it("plots a scalar AVL CLtot at its alpha and omits AVL when alpha is missing", () => {
   const series = seriesVsAlpha(
     { avl: { alpha: 4, CLtot: 0.2 } },
     9,
-    { avl: ["CLtot", null] },
+    { avl: "CLtot" },
   );
   expect(series).toEqual([
     {
       solver: "avl",
-      stroke: "currentColor",
+      stroke: "magenta",
       x: [4],
       y: [0.2],
       kind: "line",
     },
   ]);
-});
-
-it("uses stability alpha for an AVL point when AVL alpha is missing", () => {
-  const series = seriesVsAlpha(
-    { avl: { CLtot: 0.2 } },
-    2,
-    { avl: ["CLtot", "CLa"] },
-  );
-  expect(series).toEqual([
-    {
-      solver: "avl",
-      stroke: "currentColor",
-      x: [2],
-      y: [0.2],
-      kind: "line",
-    },
-  ]);
+  expect(seriesVsAlpha({ avl: { CLtot: 0.2 } }, 2, { avl: "CLtot" })).toEqual([]);
 });
 
 it("plots flow5 on its own alpha and keeps no-data values", () => {
@@ -185,22 +172,71 @@ it("draws Tornado derivatives as a per-degree horizontal on the alpha grid", () 
   for (const y of series[0].y) expect(y).toBeCloseTo(1, 12);
 });
 
-it("draws AVL and flow5 derivatives as per-degree horizontals", () => {
+it("plots AVL CLa only at solved angles, in per degree", () => {
+  const series = seriesDerivative(
+    { avl: { alpha: [-4, 0, 4], CLa: [PER_RAD, PER_RAD, PER_RAD] } },
+    null,
+    { avl: "CLa" },
+  );
+  expect(series[0].x).toEqual([-4, 0, 4]);
+  expect(series[0].y.every((value) => Math.abs(value - 1) < 1e-12)).toBe(true);
+  expect(series[0].kind).toBe("line");
+});
+
+it("treats a one-element AVL alpha as one solved angle for a scalar derivative", () => {
+  const series = seriesDerivative(
+    { avl: { alpha: [4], CLa: PER_RAD } },
+    null,
+    { avl: "CLa" },
+  );
+  expect(series).toHaveLength(1);
+  expect(series[0].kind).toBe("line");
+  expect(series[0].x).toEqual([4]);
+  expect(Math.abs(series[0].y[0] - 1) < 1e-12).toBe(true);
+  expect(
+    seriesDerivative(
+      { avl: { alpha: [-4, 0, 4], CLa: PER_RAD } },
+      null,
+      { avl: "CLa" },
+    ),
+  ).toEqual([]);
+});
+
+it("plots a scalar AVL derivative as one per-degree point at its alpha", () => {
+  const series = seriesDerivative(
+    { avl: { alpha: 4, CLa: PER_RAD } },
+    null,
+    { avl: "CLa" },
+  );
+  expect(series).toHaveLength(1);
+  expect(series[0].kind).toBe("line");
+  expect(series[0].x).toEqual([4]);
+  expect(Math.abs(series[0].y[0] - 1) < 1e-12).toBe(true);
+});
+
+it("omits an AVL derivative when alpha and the value differ in length", () => {
+  expect(
+    seriesDerivative(
+      { avl: { alpha: [-4, 0, 4], CLa: [PER_RAD, PER_RAD] } },
+      null,
+      { avl: "CLa" },
+    ),
+  ).toEqual([]);
+});
+
+it("draws flow5 derivatives as a per-degree horizontal and does not spread AVL without alpha", () => {
   const raws = {
     datcom: { alpha: [0, 10] },
     avl: { CLa: PER_RAD },
     flow5: { CLa: PER_RAD },
   };
   const series = seriesDerivative(raws, null, { avl: "CLa", flow5: "CLa" });
-  expect(series.map((item) => item.solver)).toEqual(["avl", "flow5"]);
-  expect(series[0].stroke).toBe("currentColor");
-  expect(series[1].stroke).toBe("yellow");
-  for (const item of series) {
-    expect(item.kind).toBe("hline");
-    expect(item.x).toEqual(alphaGrid(raws, null));
-    expect(item.y).toHaveLength(80);
-    for (const y of item.y) expect(y).toBeCloseTo(1, 12);
-  }
+  expect(series.map((item) => item.solver)).toEqual(["flow5"]);
+  expect(series[0].stroke).toBe("yellow");
+  expect(series[0].kind).toBe("hline");
+  expect(series[0].x).toEqual(alphaGrid(raws, null));
+  expect(series[0].y).toHaveLength(80);
+  for (const y of series[0].y) expect(y).toBeCloseTo(1, 12);
 });
 
 it("plots DATCOM derivatives on DATCOM alpha, not the 80-point grid", () => {

@@ -44,7 +44,7 @@ export type AeroTab = { id: string; label: string; figures: AeroFigure[] };
 type VsSpec = {
   datcom?: string;
   tornado?: [string, string | null];
-  avl?: [string, string | null];
+  avl?: string;
   flow5?: string;
 };
 
@@ -262,18 +262,25 @@ function forceExtras(raws: SolverRaws): BarGroup[] {
     ["NP", "Xnp"],
   ] as const) {
     if (!has(avl, key)) continue;
-    const value = finiteScalar(avl?.[key]);
+    const raw = avl?.[key];
+    if (Array.isArray(raw) && raw.length !== 1) continue;
+    const value = finiteScalar(raw);
     if (value == null) continue;
     groups.push({ label, tornado: null, avl: value });
   }
   return groups;
 }
 
+function rateAvl(value: unknown): number | null {
+  if (Array.isArray(value) && value.length !== 1) return null;
+  return finiteScalar(value);
+}
+
 function rateBars(raws: SolverRaws): BarGroup[] {
   return RATE_GROUPS.map((group) => ({
     label: group.label,
     tornado: finiteScalar(raws.tornado?.[group.tornado]),
-    avl: finiteScalar(raws.avl?.[group.avl]),
+    avl: rateAvl(raws.avl?.[group.avl]),
   }));
 }
 
@@ -524,29 +531,32 @@ export function aeroTabs(
         alphaLines("CL", raws, stabilityAlpha, {
           datcom: "cl",
           tornado: ["CL", "CL_a"],
-          avl: ["CLtot", "CLa"],
+          avl: "CLtot",
           flow5: "CL",
         }),
         alphaLines("CD", raws, stabilityAlpha, {
           datcom: "cd",
           tornado: ["CD", "CD_a"],
-          avl: ["CDtot", null],
+          avl: "CDtot",
           flow5: "CD",
         }),
         alphaLines("CY", raws, stabilityAlpha, {
           tornado: ["CY", "CY_a"],
-          avl: ["CYtot", "CYa"],
+          avl: "CYtot",
         }),
         alphaLines("CN", raws, stabilityAlpha, {
           datcom: "cn",
           tornado: ["CZ", "CZ_a"],
-          avl: ["CZtot", null],
+          avl: "CZtot",
         }),
         alphaLines("CA", raws, stabilityAlpha, {
           datcom: "ca",
           tornado: ["CX", "CX_a"],
-          avl: ["CXtot", null],
+          avl: "CXtot",
         }),
+        alphaLines("CDind", raws, stabilityAlpha, { avl: "CDind" }),
+        alphaLines("CDvis", raws, stabilityAlpha, { avl: "CDvis" }),
+        alphaLines("e", raws, stabilityAlpha, { avl: "e" }),
         { kind: "bars", title: "Per-wing / AVL extras", groups: forceExtras(raws) },
       ],
     },
@@ -557,18 +567,19 @@ export function aeroTabs(
         alphaLines("Cm", raws, stabilityAlpha, {
           datcom: "cm",
           tornado: ["Cm", "Cm_a"],
-          avl: ["Cmtot", "Cma"],
+          avl: "Cmtot",
           flow5: "Cm",
         }),
         alphaLines("Cl", raws, stabilityAlpha, {
           tornado: ["Cl", "Cl_a"],
-          avl: ["Cltot", "Cla"],
+          avl: "Cltot",
         }),
         alphaLines("Cn", raws, stabilityAlpha, {
           tornado: ["Cn", "Cn_a"],
-          avl: ["Cntot", "Cna"],
+          avl: "Cntot",
         }),
         alphaLines("Xcp", raws, stabilityAlpha, { datcom: "xcp" }),
+        alphaLines("NP", raws, stabilityAlpha, { avl: "NP" }),
       ],
     },
     {
@@ -580,6 +591,12 @@ export function aeroTabs(
         derivLines("CYβ", raws, stabilityAlpha, { datcom: "cyb", tornado: "CY_b", avl: "CYb" }),
         derivLines("Cnβ", raws, stabilityAlpha, { datcom: "cnb", tornado: "Cn_b", avl: "Cnb" }),
         derivLines("Clβ", raws, stabilityAlpha, { datcom: "clb", tornado: "Cl_b", avl: "Clb" }),
+        ...RATE_GROUPS.map((group) =>
+          derivLines(group.label, raws, stabilityAlpha, {
+            tornado: group.tornado,
+            avl: group.avl,
+          }),
+        ),
         { kind: "bars", title: "p, q, r (per rad)", groups: rateBars(raws) },
       ],
     },

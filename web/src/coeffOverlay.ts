@@ -26,6 +26,12 @@ function finiteNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
+/** A scalar, or the only entry of a one-element list. Longer lists are not one sample. */
+function oneSample(value: unknown): number | null {
+  if (Array.isArray(value)) return value.length === 1 ? finiteNumber(value[0]) : null;
+  return finiteNumber(value);
+}
+
 /** Scalar coeff, or the first finite entry when Analyze stored a one-element list. */
 function firstFinite(value: unknown): number | null {
   if (Array.isArray(value)) {
@@ -126,7 +132,7 @@ export function seriesVsAlpha(
   spec: {
     datcom?: string;
     tornado?: [string, string | null];
-    avl?: [string, string | null];
+    avl?: string;
     flow5?: string;
   },
 ): OverlayPointSeries[] {
@@ -156,24 +162,9 @@ export function seriesVsAlpha(
   }
 
   const avl = raws.avl;
-  if (spec.avl && avl) {
-    const [valKey, slopeKey] = spec.avl;
-    const value = firstFinite(avl[valKey]);
-    if (value != null) {
-      const slope = slopeKey ? firstFinite(avl[slopeKey]) : null;
-      if (slope != null) {
-        const a0 = firstFinite(avl.alpha) ?? 0;
-        out.push(series("avl", grid, slopeLine(value, slope, a0, grid), "line"));
-      } else {
-        const own = firstFinite(avl.alpha);
-        const a0 =
-          own ??
-          (typeof stabilityAlpha === "number" && Number.isFinite(stabilityAlpha)
-            ? stabilityAlpha
-            : null);
-        if (a0 != null) out.push(series("avl", [a0], [value], "line"));
-      }
-    }
+  if (spec.avl && avl && has(avl, spec.avl) && has(avl, "alpha")) {
+    const samples = pairedSamples(avl.alpha, avl[spec.avl], false);
+    if (samples.x.length > 0) out.push(series("avl", samples.x, samples.y, "line"));
   }
 
   const flow5 = raws.flow5;
@@ -205,7 +196,7 @@ export function seriesDerivative(
   }
 
   const horizontal = (
-    solver: "tornado" | "avl" | "flow5",
+    solver: "tornado" | "flow5",
     key: string | undefined,
     raw: SolverRaw | undefined,
   ) => {
@@ -217,7 +208,34 @@ export function seriesDerivative(
   };
 
   horizontal("tornado", spec.tornado, raws.tornado);
-  horizontal("avl", spec.avl, raws.avl);
+
+  const avl = raws.avl;
+  if (spec.avl && avl && has(avl, spec.avl) && has(avl, "alpha")) {
+    const alpha = avl.alpha;
+    const value = avl[spec.avl];
+    if (Array.isArray(alpha) && Array.isArray(value)) {
+      if (alpha.length === value.length) {
+        const samples = pairedSamples(alpha, value, false);
+        if (samples.x.length > 0) {
+          out.push(
+            series(
+              "avl",
+              samples.x,
+              samples.y.map((item) => (item * Math.PI) / 180),
+              "line",
+            ),
+          );
+        }
+      }
+    } else {
+      const a0 = oneSample(alpha);
+      const v = oneSample(value);
+      if (a0 != null && v != null) {
+        out.push(series("avl", [a0], [(v * Math.PI) / 180], "line"));
+      }
+    }
+  }
+
   horizontal("flow5", spec.flow5, raws.flow5);
   return out;
 }

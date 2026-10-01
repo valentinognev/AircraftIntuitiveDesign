@@ -83,9 +83,12 @@ it("returns the seven tabs in order when every figure is empty", () => {
     "CY",
     "CN",
     "CA",
+    "CDind",
+    "CDvis",
+    "e",
     "Per-wing / AVL extras",
   ]);
-  for (const title of ["CL", "CD", "CY", "CN", "CA"]) {
+  for (const title of ["CL", "CD", "CY", "CN", "CA", "CDind", "CDvis", "e"]) {
     const fig = lines(forces, title);
     expect(fig.series).toEqual([]);
     expect(fig.xlabel).toBe("α (deg)");
@@ -94,8 +97,8 @@ it("returns the seven tabs in order when every figure is empty", () => {
   expect(bars(forces, "Per-wing / AVL extras").groups).toEqual([]);
 
   const moments = tab(tabs, "Moments");
-  expect(moments.figures.map((item) => item.title)).toEqual(["Cm", "Cl", "Cn", "Xcp"]);
-  for (const title of ["Cm", "Cl", "Cn", "Xcp"]) {
+  expect(moments.figures.map((item) => item.title)).toEqual(["Cm", "Cl", "Cn", "Xcp", "NP"]);
+  for (const title of ["Cm", "Cl", "Cn", "Xcp", "NP"]) {
     expect(lines(moments, title).series).toEqual([]);
   }
 
@@ -106,8 +109,17 @@ it("returns the seven tabs in order when every figure is empty", () => {
     "CYβ",
     "Cnβ",
     "Clβ",
+    "Clp",
+    "Cmq",
+    "Cnr",
+    "CLp",
+    "CLq",
+    "CLr",
     "p, q, r (per rad)",
   ]);
+  for (const title of ["Clp", "Cmq", "Cnr", "CLp", "CLq", "CLr"]) {
+    expect(lines(derivatives, title).series).toEqual([]);
+  }
   expect(bars(derivatives, "p, q, r (per rad)").groups).toEqual([
     { label: "Clp", tornado: null, avl: null },
     { label: "Cmq", tornado: null, avl: null },
@@ -201,7 +213,7 @@ it("maps force and moment coefficient keys onto the named line figures", () => {
       Cn: 0.5,
       Cn_a: PER_RAD,
     },
-    avl: { alpha: 4, CDtot: 0.3, CYtot: 0.1, CYa: PER_RAD },
+    avl: { alpha: [-4, 0, 4], CDtot: [0.01, 0.02, 0.04], CZtot: [-0.2, -0.5, -0.7], CXtot: [0.02, 0.03, 0.05], CYtot: [0, 0, 0] },
     flow5: { alpha: [0, 2], CL: [0.7, 99999], CD: [0.15, 0.16], Cm: [0.01, 0.02] },
   };
   const tabs = aeroTabs(raws, null, null);
@@ -214,9 +226,19 @@ it("maps force and moment coefficient keys onto the named line figures", () => {
     expect(yAt(series as OverlayPointSeries, 1)).toBeCloseTo(1.5, 12);
   }
   const cdAvl = lines(forces, "CD").series.find((item) => item.solver === "avl");
-  expect(cdAvl).toMatchObject({ x: [4], y: [0.3], kind: "line", stroke: "currentColor" });
+  expect(cdAvl).toMatchObject({
+    solver: "avl",
+    x: [-4, 0, 4],
+    y: [0.01, 0.02, 0.04],
+    kind: "line",
+    stroke: "magenta",
+  });
+  const cnAvl = lines(forces, "CN").series.find((item) => item.solver === "avl");
+  expect(cnAvl).toMatchObject({ x: [-4, 0, 4], y: [-0.2, -0.5, -0.7] });
+  const caAvl = lines(forces, "CA").series.find((item) => item.solver === "avl");
+  expect(caAvl).toMatchObject({ x: [-4, 0, 4], y: [0.02, 0.03, 0.05] });
   const cyAvl = lines(forces, "CY").series.find((item) => item.solver === "avl");
-  expect(yAt(cyAvl as OverlayPointSeries, 1)).toBeCloseTo(-2.9, 12);
+  expect(cyAvl).toMatchObject({ x: [-4, 0, 4], y: [0, 0, 0] });
 
   const flowCl = lines(forces, "CL").series.find((item) => item.solver === "flow5");
   expect(flowCl).toMatchObject({
@@ -274,6 +296,50 @@ it("expands per-wing Tornado bars and AVL extra scalars", () => {
   ]);
 });
 
+it("bars a one-element AVL extra and plots a sweep as a line", () => {
+  const one = aeroTabs({ avl: { alpha: [2], CDind: [0.02], NP: [1.5] } }, null, null);
+  expect(bars(tab(one, "Forces"), "Per-wing / AVL extras").groups).toEqual([
+    { label: "CDind", tornado: null, avl: 0.02 },
+    { label: "Xnp", tornado: null, avl: 1.5 },
+  ]);
+  expect(lines(tab(one, "Forces"), "CDind").series[0]).toMatchObject({
+    solver: "avl",
+    x: [2],
+    y: [0.02],
+    kind: "line",
+  });
+
+  const sweep = aeroTabs(
+    {
+      avl: {
+        alpha: [-4, 0, 4],
+        CDind: [0.01, 0.02, 0.03],
+        CDvis: [0.001, 0.002, 0.003],
+        e: [0.8, 0.81, 0.82],
+        NP: [1.1, 1.2, 1.3],
+      },
+    },
+    null,
+    null,
+  );
+  expect(bars(tab(sweep, "Forces"), "Per-wing / AVL extras").groups).toEqual([]);
+  expect(lines(tab(sweep, "Forces"), "CDind").series[0]).toMatchObject({
+    solver: "avl",
+    stroke: "magenta",
+    kind: "line",
+    x: [-4, 0, 4],
+    y: [0.01, 0.02, 0.03],
+  });
+  expect(lines(tab(sweep, "Forces"), "CDvis").series[0].y).toEqual([0.001, 0.002, 0.003]);
+  expect(lines(tab(sweep, "Forces"), "e").series[0].y).toEqual([0.8, 0.81, 0.82]);
+  expect(lines(tab(sweep, "Moments"), "NP").series[0]).toMatchObject({
+    solver: "avl",
+    x: [-4, 0, 4],
+    y: [1.1, 1.2, 1.3],
+    kind: "line",
+  });
+});
+
 it("reads derivative bar Clp from Tornado Cl_P and keeps every rate group", () => {
   const tabs = aeroTabs(
     {
@@ -291,6 +357,32 @@ it("reads derivative bar Clp from Tornado Cl_P and keeps every rate group", () =
     { label: "CLq", tornado: null, avl: null },
     { label: "CLr", tornado: null, avl: null },
   ]);
+});
+
+it("drops a multi-angle AVL rate from the bar and plots it per degree", () => {
+  const tabs = aeroTabs(
+    {
+      datcom: { alpha: [0, 1] },
+      tornado: { Cl_P: PER_RAD },
+      avl: { alpha: [-4, 0, 4], Clp: [PER_RAD, PER_RAD, PER_RAD] },
+    },
+    null,
+    null,
+  );
+  const derivatives = tab(tabs, "Derivatives");
+  expect(bars(derivatives, "p, q, r (per rad)").groups[0]).toEqual({
+    label: "Clp",
+    tornado: PER_RAD,
+    avl: null,
+  });
+  const fig = lines(derivatives, "Clp");
+  const avl = fig.series.find((item) => item.solver === "avl");
+  expect(avl?.kind).toBe("line");
+  expect(avl?.x).toEqual([-4, 0, 4]);
+  expect(avl?.y.every((value) => Math.abs(value - 1) < 1e-12)).toBe(true);
+  const tornado = fig.series.find((item) => item.solver === "tornado");
+  expect(tornado?.kind).toBe("hline");
+  expect(tornado && yAt(tornado, 0)).toBeCloseTo(1, 12);
 });
 
 it("plots derivative lines with seriesDerivative scaling", () => {
@@ -424,7 +516,7 @@ it("plots AVL control deflection instead of hinge bars when surface is present",
   expect(deflection.series).toEqual([
     {
       solver: "avl",
-      stroke: "currentColor",
+      stroke: "magenta",
       kind: "line",
       x: [0, 1],
       y: [5, -2],

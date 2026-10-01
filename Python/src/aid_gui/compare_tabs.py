@@ -139,11 +139,11 @@ class CompareTabs(QTabWidget):
     def _plot_forces(self, st: dict, results: dict) -> None:
         fig = self._clear("Forces")
         specs = (
-            (r"$C_L$", "cl", ("CL", "CL_a"), ("CLtot", "CLa"), "CL"),
-            (r"$C_D$", "cd", ("CD", "CD_a"), ("CDtot", None), "CD"),
-            (r"$C_Y$", None, ("CY", "CY_a"), ("CYtot", "CYa"), None),
-            (r"$C_N$", "cn", ("CZ", "CZ_a"), ("CZtot", None), None),
-            (r"$C_A$", "ca", ("CX", "CX_a"), ("CXtot", None), None),
+            (r"$C_L$", "cl", ("CL", "CL_a"), "CLtot", "CL"),
+            (r"$C_D$", "cd", ("CD", "CD_a"), "CDtot", "CD"),
+            (r"$C_Y$", None, ("CY", "CY_a"), "CYtot", None),
+            (r"$C_N$", "cn", ("CZ", "CZ_a"), "CZtot", None),
+            (r"$C_A$", "ca", ("CX", "CX_a"), "CXtot", None),
         )
         for i, (ylabel, dkey, torn, avl, flow5) in enumerate(specs, start=1):
             ax = fig.add_subplot(2, 3, i)
@@ -161,9 +161,9 @@ class CompareTabs(QTabWidget):
     def _plot_moments(self, st: dict, results: dict) -> None:
         fig = self._clear("Moments")
         specs = (
-            (r"$C_m$", "cm", ("Cm", "Cm_a"), ("Cmtot", "Cma"), "Cm"),
-            (r"$C_\ell$", None, ("Cl", "Cl_a"), ("Cltot", "Cla"), None),
-            (r"$C_n$", None, ("Cn", "Cn_a"), ("Cntot", "Cna"), None),
+            (r"$C_m$", "cm", ("Cm", "Cm_a"), "Cmtot", "Cm"),
+            (r"$C_\ell$", None, ("Cl", "Cl_a"), "Cltot", None),
+            (r"$C_n$", None, ("Cn", "Cn_a"), "Cntot", None),
         )
         for i, (ylabel, dkey, torn, avl, flow5) in enumerate(specs, start=1):
             ax = fig.add_subplot(2, 2, i)
@@ -494,10 +494,14 @@ def _plot_force_extras(ax, results: dict) -> None:
             torn_v.append(float(val))
             avl_v.append(np.nan)
     for key, lab in (("CDind", r"$C_{Dind}$"), ("CDvis", r"$C_{Dvis}$"), ("e", r"$e$"), ("NP", r"$X_{np}$")):
-        if key in ares:
-            labels.append(lab)
-            torn_v.append(np.nan)
-            avl_v.append(float(ares[key]))
+        if key not in ares:
+            continue
+        arr = np.asarray(ares[key], dtype=float).reshape(-1)
+        if arr.size != 1:
+            continue
+        labels.append(lab)
+        torn_v.append(np.nan)
+        avl_v.append(float(arr[0]))
     x = np.arange(len(labels))
     width = 0.35
     if any(np.isfinite(torn_v)):
@@ -761,6 +765,13 @@ def _fill_leftover(table: QTableWidget, groups: list[tuple[str, list[tuple[str, 
     _resize_table_columns(table)
 
 
+def _finite_scalar(val) -> float:
+    arr = np.asarray(val, dtype=float).reshape(-1)
+    if arr.size != 1 or not np.isfinite(arr[0]):
+        return np.nan
+    return float(arr[0])
+
+
 def _plot_rate_bars(ax, results: dict) -> None:
     groups = (
         (r"$C_{\ell p}$", "Cl_P", "Clp"),
@@ -773,8 +784,8 @@ def _plot_rate_bars(ax, results: dict) -> None:
     tres = results.get("tornado") or {}
     ares = results.get("avl") or {}
     x = np.arange(len(groups))
-    tvals = [float(tres[tk]) if tk in tres else np.nan for _, tk, _ in groups]
-    avals = [float(ares[ak]) if ak in ares else np.nan for _, _, ak in groups]
+    tvals = [_finite_scalar(tres[tk]) if tk in tres else np.nan for _, tk, _ in groups]
+    avals = [_finite_scalar(ares[ak]) if ak in ares else np.nan for _, _, ak in groups]
     width = 0.35
     if any(np.isfinite(tvals)):
         ax.bar(x - width / 2, tvals, width, color="c", label="Tornado")

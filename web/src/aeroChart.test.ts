@@ -1,6 +1,7 @@
 import { expect, it } from "vitest";
 import type { ControlBars, HingeBars } from "./aeroFigures";
 import {
+  barFill,
   controlBarCategories,
   groupedBarCategories,
   hingeBarCategories,
@@ -121,4 +122,10 @@ it("turns control and hinge figures into labeled slots, skipping nulls at layout
   const laid = layoutBars(hingeBarCategories(hinge), plot);
   expect(laid.labels.map((label) => label.label)).toEqual(["flap"]);
   expect(laid.bars.map((bar) => bar.key)).toEqual(["chd"]);
+});
+
+it("paints AVL bars magenta so they are not the DATCOM default", () => {
+  expect(barFill("avl")).toBe("magenta");
+  expect(barFill("avl")).not.toBe(barFill("dcl"));
+  expect(barFill("tornado")).toBe("red");
 });

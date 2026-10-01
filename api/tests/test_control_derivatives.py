@@ -74,6 +74,43 @@ def test_control_report_passes_deltas_deg_to_heavy_solvers(monkeypatch):
         assert seen[name][2] == (mesh,)
 
 
+def test_control_report_omitted_mesh_matches_api_default(monkeypatch):
+    """The Controls menu calls control_report with no mesh. Panel solvers must
+    receive the same tuples POST /control-derivatives applies from DEFAULT_MESH.
+    Handbook and DATCOM stay mesh-free.
+    """
+    from aid.control_report import control_report
+    from aid_web.analyze import DEFAULT_MESH
+
+    seen = {}
+
+    def capture(name):
+        def fake(ac, deltas_deg=None, *args, **kwargs):
+            seen[name] = (args, kwargs)
+            return []
+
+        return fake
+
+    for name in (
+        "handbook_controls",
+        "datcom_controls",
+        "tornado_controls",
+        "avl_controls",
+        "flow5_controls",
+    ):
+        monkeypatch.setattr(f"aid.control_report.{name}", capture(name))
+
+    ac = object()
+    for solver in ("tornado", "avl", "flow5"):
+        control_report(ac, solver)
+        assert seen[f"{solver}_controls"] == ((DEFAULT_MESH[solver],), {})
+
+    control_report(ac, "handbook")
+    assert seen["handbook_controls"] == ((), {})
+    control_report(ac, "datcom")
+    assert seen["datcom_controls"] == ((), {})
+
+
 def test_control_report_unknown_solver_raises():
     from aid.control_report import control_report
 

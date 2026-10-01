@@ -229,30 +229,34 @@ def write_avl_geometry(
             )
 
 
-def write_case(case_id: str, state: dict, run_dir: Path) -> None:
-    """Write AVL run-case file (port of ``AVL_IO.m`` ``Write_Case``)."""
+def write_case(case_id: str, state: dict, run_dir: Path, alphas: list[float]) -> None:
+    """One AVL process, one solved angle per ``alphas`` entry (degrees)."""
+    if not alphas:
+        raise ValueError("AERO.ALSCHD is empty")
     run_dir = Path(run_dir)
     run_path = run_dir / f"{case_id}.run"
     as_val = float(state["AS"])
+    sb_at = next((i for i, angle in enumerate(alphas) if float(angle) == 0.0), 0)
 
     with run_path.open("w", encoding="ascii") as fid:
         fid.write(f"LOAD {case_id}.avl\n")
-
         mass_path = run_dir / f"{case_id}.mass"
         if mass_path.is_file():
             fid.write(f"MASS {case_id}.mass\n")
             fid.write("MSET 1\n")
-
         fid.write("0\n")
         fid.write("PLOP\ng\n\n")
         fid.write("OPER\n")
         fid.write("c1\n")
         fid.write(f"v {as_val:6.4f}\n\n")
-        fid.write("x\n")
-        fid.write("st\n")
-        fid.write(f"{case_id}.st\n")
-        fid.write("sb\n")
-        fid.write(f"{case_id}.sb\n")
+        for i, angle in enumerate(alphas):
+            fid.write(f"a a {float(angle):.4f}\n")
+            fid.write("x\n")
+            fid.write("st\n")
+            fid.write(f"{case_id}_{i}.st\n")
+            if i == sb_at:
+                fid.write("sb\n")
+                fid.write(f"{case_id}.sb\n")
         fid.write("\n")
         fid.write("Quit\n")
 
@@ -273,6 +277,7 @@ _AVL_RUN_KEYS = (
     "CDind",
     "CDff",
     "CLff",
+    "CYff",
     "e",
     "surface",
 )
@@ -288,6 +293,34 @@ def merge_avl_st(path: Path) -> dict:
         if key not in st or st[key] in ([], None):
             st[key] = rc[key]
     return st
+
+
+_SWEEP_TOTALS = (
+    "CXtot", "CYtot", "CZtot", "Cltot", "Cmtot", "Cntot",
+    "CLtot", "CDtot", "CDvis", "CDind", "CDff", "CLff", "CYff", "e",
+)
+_SWEEP_DERIVS = (
+    "CLa", "CYa", "Cla", "Cma", "Cna",
+    "CLb", "CYb", "Clb", "Cmb", "Cnb",
+    "CLp", "CYp", "Clp", "Cmp", "Cnp",
+    "CLq", "CYq", "Clq", "Cmq", "Cnq",
+    "CLr", "CYr", "Clr", "Cmr", "Cnr",
+    "NP",
+)
+
+
+def stack_avl_cases(paths: list[Path]) -> dict:
+    """One merged ``.st`` per angle, in path order. No interpolation."""
+    if not paths:
+        raise ValueError("AVL sweep is empty")
+    cases = [merge_avl_st(path) for path in paths]
+    out: dict = {
+        "alpha": [float(case["alpha"]) for case in cases],
+        "surface": list(cases[0].get("surface") or []),
+    }
+    for key in (*_SWEEP_TOTALS, *_SWEEP_DERIVS):
+        out[key] = [float(case[key]) for case in cases]
+    return out
 
 
 def run_avl(run_dir: Path, *, timeout: float = 120) -> None:
@@ -307,7 +340,7 @@ def run_avl(run_dir: Path, *, timeout: float = 120) -> None:
 
 
 def _avl_spacing_attempts(ni: int, nj: int) -> list[tuple[int, int, float | None, float | None]]:
-    """Primary mesh, then documented fallbacks used only when geometry.st is missing.
+    """Primary mesh, then documented fallbacks used only when a geometry_{i}.st is missing.
 
     Each tuple is (ni, nj, cspace, sspace). None spacing keeps the writer default
     (cosine -2 when nelem>=4, else weighted outboard -1.1).
@@ -324,15 +357,31 @@ def _avl_spacing_attempts(ni: int, nj: int) -> list[tuple[int, int, float | None
     ]
 
 
-def run_avl_full(ac: Aircraft, mesh: tuple[str, str], run_dir: Path) -> dict:
-    """Tornado geo → AVL geometry/case → run → parse stability derivatives.
+def _insert_ref_solve(run_path: Path) -> None:
+    """Unconstrained OPER ``x`` before the first commanded ``a a``."""
+    text = run_path.read_text(encoding="ascii")
+    marker = "\na a "
+    idx = text.find(marker)
+    if idx < 0:
+        raise ValueError("geometry.run has no alpha command")
+    text = text[: idx + 1] + "x\nst\ngeometry_ref.st\n" + text[idx + 1 :]
+    run_path.write_text(text, encoding="ascii")
 
-    If AVL rejects the primary cosine mesh (no ``geometry.st``), retry with
-    weighted-outboard / equal spanwise spacing and slightly finer or coarser
-    nj from the same dialog values. Coefficients are never invented.
+
+def run_avl_full(ac: Aircraft, mesh: tuple[str, str], run_dir: Path) -> dict:
+    """Tornado geo → AVL geometry/case → run → stack one case per scheduled angle.
+
+    An unconstrained solve is inserted before the first ``a a`` and returned as
+    ``ref``. If AVL rejects the primary cosine mesh (a ``geometry_{i}.st`` or
+    ``geometry_ref.st`` is missing), retry with weighted-outboard / equal
+    spanwise spacing and slightly finer or coarser nj from the same dialog
+    values. Coefficients are never invented.
     """
     run_dir = Path(run_dir)
     geo, state = tornado_io(ac, mesh)
+    alphas = [float(a) for a in np.asarray(ac.AERO["ALSCHD"], dtype=float).reshape(-1)]
+    if not alphas:
+        raise ValueError("AERO.ALSCHD is empty")
     nj = int(mesh[0])
     ni = int(mesh[1])
     last_exc: Exception | None = None
@@ -340,22 +389,36 @@ def run_avl_full(ac: Aircraft, mesh: tuple[str, str], run_dir: Path) -> dict:
         write_avl_geometry(
             ac, geo, state, run_dir, try_ni, try_nj, cspace=cspace, sspace=sspace
         )
-        write_case("geometry", state, run_dir)
-        for stale in ("geometry.st", "geometry.sb"):
-            path = run_dir / stale
-            if path.is_file():
-                path.unlink()
+        write_case("geometry", state, run_dir, alphas)
+        _insert_ref_solve(run_dir / "geometry.run")
+        for path in run_dir.glob("geometry_*.st"):
+            path.unlink()
+        sb_path = run_dir / "geometry.sb"
+        if sb_path.is_file():
+            sb_path.unlink()
+        st_paths = [run_dir / f"geometry_{i}.st" for i in range(len(alphas))]
+        ref_path = run_dir / "geometry_ref.st"
+        if ref_path.is_file():
+            ref_path.unlink()
+
+        def _ready() -> bool:
+            return ref_path.is_file() and all(path.is_file() for path in st_paths)
+
         try:
-            run_avl(run_dir)
+            run_avl(run_dir, timeout=120 * len(alphas))
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
             last_exc = exc
-            if not (run_dir / "geometry.st").is_file():
+            if not _ready():
                 continue
             raise
-        st_path = run_dir / "geometry.st"
-        if st_path.is_file():
-            return merge_avl_st(st_path)
-        last_exc = FileNotFoundError(f"AVL produced no {st_path}")
+        if _ready():
+            out = stack_avl_cases(st_paths)
+            out["ref"] = merge_avl_st(ref_path)
+            return out
+        missing = ref_path if not ref_path.is_file() else next(
+            path for path in st_paths if not path.is_file()
+        )
+        last_exc = FileNotFoundError(f"AVL produced no {missing}")
     if last_exc is not None:
         raise last_exc
     raise FileNotFoundError(f"AVL produced no geometry.st in {run_dir}")

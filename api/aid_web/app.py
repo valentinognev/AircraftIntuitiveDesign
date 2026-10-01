@@ -11,7 +11,12 @@ from pydantic import BaseModel
 from aid.aircraft import Aircraft, load_jsonc
 from aid.stability import aircraft_stability
 
-from aid_web.analyze import SOLVERS, _jsonable, analyze as run_analyze
+from aid_web.analyze import (
+    SOLVERS,
+    _jsonable,
+    analyze as run_analyze,
+    control_derivatives as run_control_derivatives,
+)
 from aid_web.paths import MODELS_DIR, ModelPathError, resolve_model
 
 CORS_ORIGINS = [
@@ -37,6 +42,13 @@ class AircraftBody(BaseModel):
 class AnalyzeBody(BaseModel):
     aircraft: dict
     solver: str = "datcom"
+    mesh: list[str] | None = None
+
+
+class ControlDerivativesBody(BaseModel):
+    aircraft: dict
+    solver: str
+    deltas_deg: list[float] | None = None
     mesh: list[str] | None = None
 
 
@@ -115,6 +127,30 @@ def analyze(body: AnalyzeBody):
         ac = aircraft_from_json(body.aircraft)
         mesh = tuple(str(x) for x in body.mesh) if body.mesh else None
         return run_analyze(ac, solver=solver, mesh=mesh)
+    except (
+        FileNotFoundError,
+        CalledProcessError,
+        TimeoutExpired,
+        ValueError,
+        OSError,
+        KeyError,
+    ) as exc:
+        return JSONResponse(status_code=400, content={"ok": False, "error": str(exc)})
+
+
+@app.post("/control-derivatives")
+def control_derivatives(body: ControlDerivativesBody):
+    try:
+        ac = aircraft_from_json(body.aircraft)
+        mesh = tuple(str(x) for x in body.mesh) if body.mesh else None
+        return _jsonable(
+            run_control_derivatives(
+                ac,
+                solver=body.solver,
+                deltas_deg=body.deltas_deg,
+                mesh=mesh,
+            )
+        )
     except (
         FileNotFoundError,
         CalledProcessError,

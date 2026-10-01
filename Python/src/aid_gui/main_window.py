@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 )
 
 from aid.aircraft import Aircraft
+from aid.control_report import control_report
 from aid.avl_io import run_avl_full
 from aid.datcom_io import DatcomInputWarning, with_aid_exposed_spans, write_for005
 from aid.datcom_parse import datcom_user_warning, parse_for006
@@ -68,6 +69,7 @@ class MainWindow(QMainWindow):
         self.aircraft = None
         self._aircraft_stem: str | None = None
         self.last_results: dict = {}
+        self.last_analyze_solver: str | None = None
         self.settings = SettingsState()
         build_menus(self)
         self.settings.bind_window(self)
@@ -467,6 +469,7 @@ class MainWindow(QMainWindow):
         if coeffs is None:
             return
         self.last_results["datcom"] = coeffs
+        self.last_analyze_solver = "datcom"
         self._refresh_plots()
 
     def run_tornado(
@@ -524,6 +527,7 @@ class MainWindow(QMainWindow):
         if self.settings.check_io:
             coeffs["vlm_mode"] = mode
         self.last_results["tornado"] = coeffs
+        self.last_analyze_solver = "tornado"
         self._refresh_plots()
 
     def run_avl(
@@ -565,6 +569,7 @@ class MainWindow(QMainWindow):
             )
             return
         self.last_results["avl"] = coeffs
+        self.last_analyze_solver = "avl"
         self._refresh_plots()
 
     def run_flow5(
@@ -601,4 +606,25 @@ class MainWindow(QMainWindow):
             )
             return
         self.last_results["flow5"] = coeffs
+        self.last_analyze_solver = "flow5"
+        self._refresh_plots()
+
+    def run_control_derivatives(self) -> None:
+        if not self._require_aircraft():
+            return
+        sync_fields_to_aircraft(self)
+        solver = self.last_analyze_solver or "handbook"
+        try:
+            report = control_report(self.aircraft, solver, [0.0, 5.0])
+        except (
+            FileNotFoundError,
+            OSError,
+            subprocess.CalledProcessError,
+            subprocess.TimeoutExpired,
+            ValueError,
+            KeyError,
+        ) as exc:
+            QMessageBox.critical(self, "Control derivatives", str(exc))
+            return
+        self.last_results["control_derivatives"] = report
         self._refresh_plots()

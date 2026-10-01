@@ -1,5 +1,16 @@
 # Updates
 
+## 1.31.0 - control derivatives at a probe angle
+- Handbook, DATCOM, Tornado, AVL, and flow5 return flap, aileron, elevator, and rudder slopes per degree at caller-chosen probes, including when the stored deflection is 0
+- DATCOM has no rudder row (`datcom has no rudder namelist`)
+- `POST /control-derivatives`; PySide Controls tab and the web results chart plot the probes
+- Ordinary Analyze coefficients are unchanged
+
+## 1.30.0 - web Aero coefficient tabs
+- Web Aero tab plots the Qt coefficient categories from analysis raw on Forces, Moments, Derivatives, Downwash, Controls, Spanwise, and Sections
+- Tornado spanwise and the Prandtl curve are included; handshake payload tables stay cl/cd/cm
+- Tests: `cd web && npm test` and `cd web && npx tsc --noEmit`
+
 ## 1.29.1 - web API can import aid without a venv
 - `./start-web.sh` puts `Python/src` on `PYTHONPATH` before uvicorn, so the fallback interpreter finds `aid` when `api/.venv` is missing
 - Without that path the worker died with `ModuleNotFoundError: No module named 'aid'` and the start screen showed “API unreachable”

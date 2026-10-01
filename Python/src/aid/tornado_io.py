@@ -31,6 +31,31 @@ def _has_deflection(obj: dict, key: str) -> bool:
     return bool(val)
 
 
+def _span_legal(obj: dict) -> bool:
+    """True when SPANFO > SPANFI and both chord stations are present."""
+    if not isinstance(obj, dict):
+        return False
+    for key in ("SPANFI", "SPANFO", "CHRDFI", "CHRDFO"):
+        if key not in obj or obj[key] is None:
+            return False
+    try:
+        spanfi = float(np.asarray(obj["SPANFI"], dtype=float).reshape(-1)[0])
+        spanfo = float(np.asarray(obj["SPANFO"], dtype=float).reshape(-1)[0])
+        chrdfi = float(np.asarray(obj["CHRDFI"], dtype=float).reshape(-1)[0])
+        chrdfo = float(np.asarray(obj["CHRDFO"], dtype=float).reshape(-1)[0])
+    except (TypeError, ValueError, IndexError):
+        return False
+    if not all(math.isfinite(v) for v in (spanfi, spanfo, chrdfi, chrdfo)):
+        return False
+    return spanfo > spanfi
+
+
+def _include_control(obj: dict, keys: tuple[str, ...], force_controls: bool) -> bool:
+    if force_controls:
+        return _span_legal(obj)
+    return any(_has_deflection(obj, key) for key in keys)
+
+
 def _swp_val(pt: dict, row: int = 1, col: int = 0) -> float:
     swp = np.asarray(pt["swp"], dtype=float)
     if swp.ndim == 1:
@@ -375,7 +400,11 @@ def _cmp_enabled(plot_cmp: list, index: int) -> bool:
     return bool(plot_cmp[index])
 
 
-def tornado_io(ac: Aircraft, mesh: tuple[str, ...]) -> tuple[dict, dict]:
+def tornado_io(
+    ac: Aircraft,
+    mesh: tuple[str, ...],
+    force_controls: bool = False,
+) -> tuple[dict, dict]:
     nj = int(mesh[0])
     ni = int(mesh[1])
     m = [1, 1]
@@ -393,9 +422,9 @@ def tornado_io(ac: Aircraft, mesh: tuple[str, ...]) -> tuple[dict, dict]:
 
     if _cmp_enabled(cmp, 0):
         cs: list = []
-        if _has_deflection(ac.F, "DELTA"):
+        if _include_control(ac.F, ("DELTA",), force_controls):
             cs.append(ac.F)
-        if _has_deflection(ac.A, "DELTAL") or _has_deflection(ac.A, "DELTAR"):
+        if _include_control(ac.A, ("DELTAL", "DELTAR"), force_controls):
             cs.append(ac.A)
         if geo is None:
             geo = _init_geo(ac.AERO)
@@ -403,7 +432,7 @@ def tornado_io(ac: Aircraft, mesh: tuple[str, ...]) -> tuple[dict, dict]:
 
     if _cmp_enabled(cmp, 1):
         cs = []
-        if _has_deflection(ac.E, "DELTA"):
+        if _include_control(ac.E, ("DELTA",), force_controls):
             cs.append(ac.E)
         if geo is None:
             geo = _init_geo(ac.AERO)
@@ -419,7 +448,7 @@ def tornado_io(ac: Aircraft, mesh: tuple[str, ...]) -> tuple[dict, dict]:
 
     if _cmp_enabled(cmp, 2):
         cs = []
-        if _has_deflection(ac.R, "DELTA"):
+        if _include_control(ac.R, ("DELTA",), force_controls):
             cs.append(ac.R)
         if geo is None:
             geo = _init_geo(ac.AERO)

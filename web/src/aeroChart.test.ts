@@ -1,0 +1,124 @@
+import { expect, it } from "vitest";
+import type { ControlBars, HingeBars } from "./aeroFigures";
+import {
+  controlBarCategories,
+  groupedBarCategories,
+  hingeBarCategories,
+  hlineSegment,
+  knownSolverRaws,
+  layoutBars,
+  lineSeriesDomain,
+  seriesLegend,
+  stabilityAlphaOf,
+} from "./aeroChart";
+import { chartLayout } from "./payload";
+
+it("keeps datcom, tornado, avl, and flow5 raws and drops other keys", () => {
+  const datcom = { cl: [0.2] };
+  const flow5 = { CL: [0.1] };
+  expect(
+    knownSolverRaws({
+      datcom,
+      flow5,
+      panel: { CL: [1] },
+      tornado: null,
+      avl: [1, 2],
+    }),
+  ).toEqual({ datcom, flow5 });
+});
+
+it("reads a finite stability alpha and ignores anything else", () => {
+  expect(stabilityAlphaOf(null)).toBeNull();
+  expect(stabilityAlphaOf(undefined)).toBeNull();
+  expect(stabilityAlphaOf({})).toBeNull();
+  expect(stabilityAlphaOf({ alpha: Number.NaN })).toBeNull();
+  expect(stabilityAlphaOf({ alpha: Number.POSITIVE_INFINITY })).toBeNull();
+  expect(stabilityAlphaOf({ alpha: "2" })).toBeNull();
+  expect(stabilityAlphaOf({ alpha: 2.5 })).toBe(2.5);
+});
+
+it("labels a line series with its name, otherwise the solver", () => {
+  expect(seriesLegend({ solver: "tornado", name: "Prandtl" })).toBe("Prandtl");
+  expect(seriesLegend({ solver: "datcom" })).toBe("datcom");
+  expect(seriesLegend({ solver: "avl", name: "" })).toBe("avl");
+});
+
+it("includes an hline's first y in the domain and draws it across the plot", () => {
+  const domain = lineSeriesDomain([
+    { solver: "datcom", stroke: "currentColor", kind: "line", x: [0, 2], y: [0, 1] },
+    { solver: "tornado", stroke: "red", kind: "hline", x: [0, 2], y: [4, 9] },
+  ]);
+  expect(domain).toEqual({ xmin: 0, xmax: 2, ymin: 0, ymax: 4 });
+
+  const plot = chartLayout().plot;
+  const seg = hlineSegment(4, domain!, plot);
+  expect(seg).toEqual({
+    x1: plot.x,
+    y1: plot.y,
+    x2: plot.x + plot.width,
+    y2: plot.y,
+  });
+  expect(hlineSegment(Number.NaN, domain!, plot)).toBeNull();
+});
+
+it("leaves a no-data hline off the scale", () => {
+  const domain = lineSeriesDomain([
+    { solver: "datcom", stroke: "currentColor", kind: "line", x: [0, 2], y: [0, 1] },
+    { solver: "tornado", stroke: "red", kind: "hline", x: [0, 2], y: [99999] },
+  ]);
+  expect(domain).toEqual({ xmin: 0, xmax: 2, ymin: 0, ymax: 1 });
+  expect(hlineSegment(99999, domain!, chartLayout().plot)).toBeNull();
+});
+
+it("skips null bar slots and keeps every category label", () => {
+  const plot = chartLayout().plot;
+  const laid = layoutBars(
+    groupedBarCategories([
+      { label: "Clp", tornado: 1, avl: null },
+      { label: "Cmq", tornado: null, avl: -2 },
+    ]),
+    plot,
+  );
+  expect(laid.labels.map((label) => label.label)).toEqual(["Clp", "Cmq"]);
+  expect(laid.bars.map((bar) => ({ key: bar.key, label: bar.label }))).toEqual([
+    { key: "tornado", label: "Clp" },
+    { key: "avl", label: "Cmq" },
+  ]);
+  expect(laid.domain).toEqual({ xmin: -0.5, xmax: 1.5, ymin: -2, ymax: 1 });
+  expect(laid.bars[0].height).toBeGreaterThan(0);
+  expect(laid.bars[1].height).toBeGreaterThan(0);
+  expect(laid.bars[0].x).toBeLessThan(laid.bars[1].x);
+  expect(laid.labels[0].x).toBeCloseTo(plot.x + plot.width / 4);
+});
+
+it("places tornado left of avl in one category and anchors bars at zero", () => {
+  const plot = chartLayout().plot;
+  const laid = layoutBars(groupedBarCategories([{ label: "Clp", tornado: 1, avl: 2 }]), plot);
+  expect(laid.bars.map((bar) => bar.key)).toEqual(["tornado", "avl"]);
+  expect(laid.bars[0].x).toBeLessThan(laid.bars[1].x);
+  expect(laid.domain?.ymin).toBe(0);
+  expect(laid.domain?.ymax).toBe(2);
+  const dy = 2;
+  const yOf = (value: number) => plot.y + plot.height - ((value - 0) / dy) * plot.height;
+  expect(laid.bars[0].y).toBeCloseTo(yOf(1));
+  expect(laid.bars[0].y + laid.bars[0].height).toBeCloseTo(yOf(0));
+});
+
+it("turns control and hinge figures into labeled slots, skipping nulls at layout", () => {
+  const controls: ControlBars = {
+    kind: "control-bars",
+    title: "Control increments",
+    groups: [{ label: "flap", dcl: 0.1, dcm: null }],
+    tornado: [{ key: "CL_d", values: [0.2, 0.3] }],
+  };
+  expect(controlBarCategories(controls).map((cat) => cat.label)).toEqual(["flap", "CL_d", "CL_d"]);
+  const hinge: HingeBars = {
+    kind: "hinge-bars",
+    title: "DATCOM hinge / max-lift",
+    groups: [{ label: "flap", cha: null, chd: 1, dclMax: null }],
+  };
+  const plot = chartLayout().plot;
+  const laid = layoutBars(hingeBarCategories(hinge), plot);
+  expect(laid.labels.map((label) => label.label)).toEqual(["flap"]);
+  expect(laid.bars.map((bar) => bar.key)).toEqual(["chd"]);
+});

@@ -304,6 +304,196 @@ it("CADAC complete network error sets handshake error and keeps lastPayload", as
   expect(store.getState().analyzeError).toBeNull();
 });
 
+const DATCOM_RAW = { cl: [0.2], alpha: [0] };
+const TORNADO_RAW = { CL: [0.4], alpha: [1] };
+const HANDBOOK = { y: [0, 1], Cl: [0.1, 0.2] };
+
+function stubAnalyze(jsonFor: (solver: string) => unknown) {
+  vi.stubGlobal("location", { search: "" });
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (!String(input).includes("/analyze")) {
+        return { ok: true, status: 200, json: async () => ({}) };
+      }
+      const req = JSON.parse(String(init?.body ?? "{}")) as { solver?: string };
+      return {
+        ok: true,
+        status: 200,
+        json: async () => jsonFor(req.solver ?? "datcom"),
+      };
+    }),
+  );
+}
+
+it("postAnalyze includes an object handbook, otherwise null", async () => {
+  vi.stubGlobal("location", { search: "" });
+  const fetchMock = vi.fn(async () => ({
+    ok: true,
+    status: 200,
+    json: async () => ({
+      ok: true,
+      solver: "datcom",
+      raw: DATCOM_RAW,
+      payload: DATCOM_PAYLOAD,
+      handbook: HANDBOOK,
+    }),
+  }));
+  vi.stubGlobal("fetch", fetchMock);
+  const withBook = await postAnalyze(emptyAircraft(), "datcom");
+  expect(withBook.ok).toBe(true);
+  if (withBook.ok) expect(withBook.handbook).toEqual(HANDBOOK);
+
+  fetchMock.mockImplementation(async () => ({
+    ok: true,
+    status: 200,
+    json: async () => ({ ok: true, solver: "datcom", raw: DATCOM_RAW, payload: DATCOM_PAYLOAD }),
+  }));
+  const omitted = await postAnalyze(emptyAircraft(), "datcom");
+  expect(omitted.ok).toBe(true);
+  if (omitted.ok) expect(omitted.handbook).toBeNull();
+
+  fetchMock.mockImplementation(async () => ({
+    ok: true,
+    status: 200,
+    json: async () => ({
+      ok: true,
+      solver: "datcom",
+      raw: DATCOM_RAW,
+      payload: DATCOM_PAYLOAD,
+      handbook: [0.1, 0.2],
+    }),
+  }));
+  const notObject = await postAnalyze(emptyAircraft(), "datcom");
+  expect(notObject.ok).toBe(true);
+  if (notObject.ok) expect(notObject.handbook).toBeNull();
+});
+
+it("stores analyze raw at raws.datcom and keeps lastPayload", async () => {
+  stubAnalyze(() => ({ ok: true, solver: "datcom", raw: DATCOM_RAW, payload: DATCOM_PAYLOAD }));
+  const store = createStore();
+  store.getState().openNew();
+  await store.getState().runAnalyze("datcom");
+  expect(store.getState().raws.datcom).toEqual(DATCOM_RAW);
+  expect(store.getState().lastPayload).toEqual(DATCOM_PAYLOAD);
+});
+
+it("keeps datcom raw when a tornado analyze is stored", async () => {
+  stubAnalyze((solver) =>
+    solver === "tornado"
+      ? { ok: true, solver: "tornado", raw: TORNADO_RAW, payload: TORNADO_PAYLOAD }
+      : { ok: true, solver: "datcom", raw: DATCOM_RAW, payload: DATCOM_PAYLOAD },
+  );
+  const store = createStore();
+  store.getState().openNew();
+  await store.getState().runAnalyze("datcom");
+  await store.getState().runAnalyze("tornado");
+  expect(store.getState().raws.datcom).toEqual(DATCOM_RAW);
+  expect(store.getState().raws.tornado).toEqual(TORNADO_RAW);
+});
+
+it("openNew clears raws and handbook", async () => {
+  stubAnalyze(() => ({
+    ok: true,
+    solver: "datcom",
+    raw: DATCOM_RAW,
+    payload: DATCOM_PAYLOAD,
+    handbook: HANDBOOK,
+  }));
+  const store = createStore();
+  store.getState().openNew();
+  await store.getState().runAnalyze("datcom");
+  expect(store.getState().raws.datcom).toEqual(DATCOM_RAW);
+  expect(store.getState().handbook).toEqual(HANDBOOK);
+  store.getState().openNew();
+  expect(store.getState().raws).toEqual({});
+  expect(store.getState().handbook).toBeNull();
+});
+
+it("openAircraft clears raws and handbook", async () => {
+  stubAnalyze(() => ({
+    ok: true,
+    solver: "datcom",
+    raw: DATCOM_RAW,
+    payload: DATCOM_PAYLOAD,
+    handbook: HANDBOOK,
+  }));
+  const store = createStore();
+  store.getState().openNew();
+  await store.getState().runAnalyze("datcom");
+  store.getState().openAircraft(emptyAircraft(), "cessna");
+  expect(store.getState().raws).toEqual({});
+  expect(store.getState().handbook).toBeNull();
+});
+
+it("stores handbook y and Cl from analyze JSON", async () => {
+  stubAnalyze(() => ({
+    ok: true,
+    solver: "datcom",
+    raw: DATCOM_RAW,
+    payload: DATCOM_PAYLOAD,
+    handbook: { y: [0, 1], Cl: [0.1, 0.2] },
+  }));
+  const store = createStore();
+  store.getState().openNew();
+  await store.getState().runAnalyze("datcom");
+  expect(store.getState().handbook).toEqual({ y: [0, 1], Cl: [0.1, 0.2] });
+});
+
+it("leaves the previous handbook when a later analyze omits it or sends invalid y/Cl", async () => {
+  const responses: unknown[] = [
+    {
+      ok: true,
+      solver: "datcom",
+      raw: DATCOM_RAW,
+      payload: DATCOM_PAYLOAD,
+      handbook: HANDBOOK,
+    },
+    { ok: true, solver: "datcom", raw: { cl: [0.3], alpha: [1] }, payload: DATCOM_PAYLOAD },
+    {
+      ok: true,
+      solver: "datcom",
+      raw: DATCOM_RAW,
+      payload: DATCOM_PAYLOAD,
+      handbook: { y: [0, 1], Cl: [0.1] },
+    },
+    {
+      ok: true,
+      solver: "datcom",
+      raw: DATCOM_RAW,
+      payload: DATCOM_PAYLOAD,
+      handbook: { y: [0, Number.NaN], Cl: [0.1, 0.2] },
+    },
+    {
+      ok: true,
+      solver: "datcom",
+      raw: DATCOM_RAW,
+      payload: DATCOM_PAYLOAD,
+      handbook: { Cl: [0.1, 0.2] },
+    },
+    {
+      ok: true,
+      solver: "datcom",
+      raw: DATCOM_RAW,
+      payload: DATCOM_PAYLOAD,
+      handbook: { y: [0, Number.POSITIVE_INFINITY], Cl: [0.1, 0.2] },
+    },
+  ];
+  let i = 0;
+  stubAnalyze(() => responses[i++]);
+  const store = createStore();
+  store.getState().openNew();
+  await store.getState().runAnalyze("datcom");
+  expect(store.getState().handbook).toEqual(HANDBOOK);
+  await store.getState().runAnalyze("datcom");
+  expect(store.getState().handbook).toEqual(HANDBOOK);
+  expect(store.getState().raws.datcom).toEqual({ cl: [0.3], alpha: [1] });
+  for (let n = 2; n < responses.length; n += 1) {
+    await store.getState().runAnalyze("datcom");
+    expect(store.getState().handbook).toEqual(HANDBOOK);
+  }
+});
+
 it("successful CADAC complete does not set handshake error", async () => {
   vi.stubGlobal("location", { search: "?cadacSession=sess-1" });
   vi.stubGlobal(

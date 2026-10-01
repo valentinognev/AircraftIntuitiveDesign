@@ -6,13 +6,17 @@ from tempfile import TemporaryDirectory
 
 from aid.aircraft import Aircraft
 from aid.avl_io import run_avl_full
+from aid.control_report import control_report
 from aid.datcom_run import run_datcom
 from aid.flow5_io import run_flow5
+from aid.lifting_line import lifting_line
 from aid.tornado.boundary import set_boundary
 from aid.tornado.coeff import coeff_create
 from aid.tornado.lattice import lattice_setup
 from aid.tornado.solver import solve
+from aid.tornado.spanwise import tornado_spanwise
 from aid.tornado_io import tornado_io
+from aid.viz import planform_stations
 
 SOLVERS = frozenset({"datcom", "tornado", "avl", "flow5"})
 DEFAULT_MESH = {
@@ -91,14 +95,48 @@ def _mach_float(raw: dict) -> float:
     return machs[0] if machs else 0.3
 
 
-def _analyze_result(solver: str, aid_raw: dict) -> dict:
+def _finite_floats(value) -> list[float] | None:
+    if hasattr(value, "tolist"):
+        value = value.tolist()
+    if not isinstance(value, (list, tuple)):
+        return None
+    out: list[float] = []
+    for item in value:
+        try:
+            number = float(item)
+        except (TypeError, ValueError):
+            return None
+        if not math.isfinite(number):
+            return None
+        out.append(number)
+    return out
+
+
+def handbook_spanwise(ac: Aircraft) -> dict | None:
+    try:
+        y, c, _, _, theta = planform_stations(ac.WG, 12, True, "wing")
+        dist = lifting_line(ac, y, c, theta)
+        ys = _finite_floats(dist["y"])
+        cls = _finite_floats(dist["Cl"])
+        if ys is None or cls is None or len(ys) != len(cls):
+            return None
+        return {"y": ys, "Cl": cls}
+    except Exception:
+        return None
+
+
+def _analyze_result(solver: str, aid_raw: dict, ac: Aircraft) -> dict:
     raw = mapper_shaped_raw(aid_raw)
-    return {
+    result = {
         "ok": True,
         "solver": solver,
         "raw": raw,
         "payload": to_handshake_payload(raw, _mach_float(raw), solver=solver),
     }
+    handbook = handbook_spanwise(ac)
+    if isinstance(handbook, dict):
+        result["handbook"] = handbook
+    return result
 
 
 def _mesh_tuple(solver: str, mesh: tuple[str, ...] | None) -> tuple[str, ...]:
@@ -116,27 +154,31 @@ def run_tornado(ac: Aircraft, mesh: tuple[str, ...]) -> dict:
     coeffs["alpha"] = float(state["alpha"]) * 180.0 / math.pi
     if "MACH" not in coeffs and "mach" not in coeffs:
         coeffs["MACH"] = ac.AERO.get("MACH")
+    try:
+        coeffs["spanwise"] = tornado_spanwise(coeffs, lattice, geo, state, ac)
+    except Exception:
+        pass
     return coeffs
 
 
 def analyze_datcom(ac: Aircraft) -> dict:
     with TemporaryDirectory() as td:
         aid_raw = run_datcom(ac, Path(td))
-    return _analyze_result("datcom", aid_raw)
+    return _analyze_result("datcom", aid_raw, ac)
 
 
 def analyze_tornado(ac: Aircraft, mesh: tuple[str, ...]) -> dict:
-    return _analyze_result("tornado", run_tornado(ac, mesh))
+    return _analyze_result("tornado", run_tornado(ac, mesh), ac)
 
 
 def analyze_avl(ac: Aircraft, mesh: tuple[str, ...]) -> dict:
     with TemporaryDirectory() as td:
         aid_raw = run_avl_full(ac, mesh, Path(td))
-    return _analyze_result("avl", aid_raw)
+    return _analyze_result("avl", aid_raw, ac)
 
 
 def analyze_flow5(ac: Aircraft, mesh: tuple[str, ...]) -> dict:
-    return _analyze_result("flow5", run_flow5(ac, mesh))
+    return _analyze_result("flow5", run_flow5(ac, mesh), ac)
 
 
 def analyze(
@@ -155,3 +197,14 @@ def analyze(
     if solver == "avl":
         return analyze_avl(ac, mesh)
     return analyze_flow5(ac, mesh)
+
+
+def control_derivatives(
+    ac: Aircraft,
+    solver: str,
+    deltas_deg=None,
+    mesh: tuple[str, ...] | None = None,
+) -> dict:
+    if solver in DEFAULT_MESH:
+        mesh = _mesh_tuple(solver, mesh)
+    return control_report(ac, solver, deltas_deg=deltas_deg, mesh=mesh)

@@ -35,6 +35,7 @@ TAB_NAMES = (
 )
 
 _STYLE_COLOR = {"g": "g", "c": "c", "m": "m", "b": "b", "y": "y"}
+_PROBE_COEFFS = ("CL", "Cm", "Cl", "Cn", "CY")
 _TORNADO_SPANWISE_LS = ("-", "--", "-.", ":")
 _TORNADO_SPANWISE_LW = (2.2, 1.7, 1.4, 1.1)
 _HEADER_BG = QColor("#3d444c")
@@ -235,9 +236,18 @@ class CompareTabs(QTabWidget):
 
     def _plot_controls(self, results: dict) -> None:
         fig = self._clear("Controls")
-        ax_inc = fig.add_subplot(1, 3, 1)
-        ax_dcdi = fig.add_subplot(1, 3, 2)
-        ax_extra = fig.add_subplot(1, 3, 3)
+        curves = _control_probe_curves(results.get("control_derivatives"))
+        n_extra = sum(1 for coeff in _PROBE_COEFFS if curves.get(coeff))
+        if n_extra:
+            cols = max(3, n_extra)
+            ax_inc = fig.add_subplot(2, cols, 1)
+            ax_dcdi = fig.add_subplot(2, cols, 2)
+            ax_extra = fig.add_subplot(2, cols, 3)
+        else:
+            cols = 0
+            ax_inc = fig.add_subplot(1, 3, 1)
+            ax_dcdi = fig.add_subplot(1, 3, 2)
+            ax_extra = fig.add_subplot(1, 3, 3)
         dres = results.get("datcom") or {}
         blocks = dres.get("high_lift") or []
         if blocks:
@@ -290,6 +300,20 @@ class CompareTabs(QTabWidget):
         else:
             ax_extra.text(0.5, 0.5, "No control-surface output", ha="center", va="center", transform=ax_extra.transAxes)
             ax_extra.set_title("Control extras")
+        if n_extra:
+            slot = cols + 1
+            for coeff in _PROBE_COEFFS:
+                items = curves.get(coeff) or []
+                if not items:
+                    continue
+                ax = fig.add_subplot(2, cols, slot)
+                slot += 1
+                for label, xs, ys in items:
+                    ax.plot(xs, ys, ".-", label=label)
+                ax.set_xlabel(r"$\delta$ (deg)")
+                ax.set_ylabel(coeff)
+                ax.legend(fontsize=7, loc="best", framealpha=0.75)
+                _style_ax(ax)
         ax_inc.set_ylabel("increment")
         ax_inc.set_title("Control increments")
         if ax_inc.get_legend_handles_labels()[0]:
@@ -396,6 +420,35 @@ def _alpha_xlim(results: dict, st: dict | None = None) -> tuple[float, float] | 
         if grid.size:
             return float(grid[0]), float(grid[-1])
     return None
+
+
+def _control_probe_curves(payload) -> dict[str, list[tuple[str, list[float], list[float]]]]:
+    curves: dict[str, list[tuple[str, list[float], list[float]]]] = {coeff: [] for coeff in _PROBE_COEFFS}
+    if not isinstance(payload, dict):
+        return curves
+    solver = str(payload.get("solver") or "")
+    grouped: dict[str, list] = {}
+    for row in payload.get("rows") or []:
+        if not isinstance(row, dict) or not row.get("available"):
+            continue
+        surface = row.get("surface")
+        if surface is None or row.get("delta_deg") is None:
+            continue
+        grouped.setdefault(str(surface), []).append(row)
+    for surface, rows in grouped.items():
+        ordered = sorted(rows, key=lambda row: float(row["delta_deg"]))
+        for coeff in _PROBE_COEFFS:
+            xs: list[float] = []
+            ys: list[float] = []
+            for row in ordered:
+                val = row.get(coeff)
+                if val is None:
+                    continue
+                xs.append(float(row["delta_deg"]))
+                ys.append(float(val))
+            if xs:
+                curves[coeff].append((f"{solver} {surface} {coeff}", xs, ys))
+    return curves
 
 
 def _style_ax(ax) -> None:

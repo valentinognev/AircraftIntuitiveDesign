@@ -11,4 +11,4 @@ def test_analyze_submenu():
     w = MainWindow()
     analyze = [a for a in w.menuBar().actions() if a.text() == "Analyze"][0].menu()
     labels = [a.text() for a in analyze.actions() if not a.isSeparator()]
-    assert labels == ["DATCOM", "Tornado", "AVL", "flow5"]
+    assert labels == ["DATCOM", "Tornado", "AVL", "flow5", "Control derivatives"]

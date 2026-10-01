@@ -53,6 +53,8 @@ export type AidState = {
   revision: number;
   lastPayload: HandshakePayload | null;
   payloads: Record<string, HandshakePayload>;
+  raws: Record<string, unknown>;
+  handbook: { y: number[]; Cl: number[] } | null;
   lastStability: Record<string, unknown> | null;
   analyzeError: ParseErrorInfo | null;
   handshakeError: string | null;
@@ -85,6 +87,17 @@ export type AidState = {
   runAnalyze: (solver: string) => Promise<void>;
   loadStability: () => Promise<void>;
 };
+
+function finiteNumbers(value: unknown): value is number[] {
+  return Array.isArray(value) && value.every((n) => typeof n === "number" && Number.isFinite(n));
+}
+
+function finiteHandbook(value: unknown): { y: number[]; Cl: number[] } | null {
+  if (value == null || typeof value !== "object") return null;
+  const rec = value as { y?: unknown; Cl?: unknown };
+  if (!finiteNumbers(rec.y) || !finiteNumbers(rec.Cl) || rec.y.length !== rec.Cl.length) return null;
+  return { y: rec.y, Cl: rec.Cl };
+}
 
 function initialTheme(): Theme {
   if (typeof window === "undefined") return "light";
@@ -125,6 +138,8 @@ export function createStore() {
     revision: 0,
     lastPayload: null,
     payloads: {},
+    raws: {},
+    handbook: null,
     lastStability: null,
     analyzeError: null,
     handshakeError: null,
@@ -150,6 +165,8 @@ export function createStore() {
           tab: "wing",
           lastPayload: null,
           payloads: {},
+          raws: {},
+          handbook: null,
           lastStability: null,
           analyzeError: null,
           handshakeError: null,
@@ -172,6 +189,8 @@ export function createStore() {
             recent: recordRecent(stem),
             lastPayload: null,
             payloads: {},
+            raws: {},
+            handbook: null,
             lastStability: null,
             analyzeError: null,
             handshakeError: null,
@@ -279,13 +298,18 @@ export function createStore() {
         if (analyzeGen !== gen) return;
         if (result.ok) {
           if (get().revision !== revision) return;
-          set((s) => ({
-            lastPayload: result.payload,
-            payloads: { ...s.payloads, [result.payload.solver]: result.payload },
-            analyzeError: null,
-            handshakeError: result.handshakeError,
-            tab: "aero",
-          }));
+          set((s) => {
+            const handbook = finiteHandbook(result.handbook);
+            return {
+              lastPayload: result.payload,
+              payloads: { ...s.payloads, [result.payload.solver]: result.payload },
+              raws: { ...s.raws, [result.payload.solver]: result.raw },
+              ...(handbook ? { handbook } : {}),
+              analyzeError: null,
+              handshakeError: result.handshakeError,
+              tab: "aero",
+            };
+          });
         } else {
           set({ analyzeError: { message: result.error } });
         }

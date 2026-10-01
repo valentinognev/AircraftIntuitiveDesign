@@ -158,6 +158,10 @@ def _build_analyze_menu(window: QMainWindow) -> None:
     flow5_action.triggered.connect(lambda: window.run_flow5())
     analyze_menu.addAction(flow5_action)
 
+    control_action = QAction("Control derivatives", window)
+    control_action.triggered.connect(window.run_control_derivatives)
+    analyze_menu.addAction(control_action)
+
 
 def _build_settings_menu(window: QMainWindow) -> None:
     settings = window.settings

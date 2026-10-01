@@ -132,6 +132,43 @@ bool configure_wing(WingXfl& wing, const json& wing_json, std::string& err)
                 sec.setYDistType(xfl::UNIFORM);
             }
         }
+
+        if (!sec_json.contains("te_flap_x")) {
+            continue;
+        }
+
+        Foil* base = Objects2d::foil(foil_name);
+        if (!base) {
+            err = "te flap foil missing: " + foil_name;
+            return false;
+        }
+
+        const double xhinge = json_number(sec_json["te_flap_x"]);
+        const double angle = sec_json.contains("te_flap_deg")
+            ? json_number(sec_json["te_flap_deg"])
+            : 0.0;
+        const bool antisym = sec_json.contains("te_flap_antisym")
+            && sec_json["te_flap_antisym"].is_boolean()
+            && sec_json["te_flap_antisym"].get<bool>();
+
+        const std::string tag = wing.name() + "_s" + std::to_string(isec);
+        const std::string right_name = tag + "_r";
+        auto* right = new Foil(base);
+        right->setName(right_name);
+        right->setTEFlapData(true, xhinge, 0.0, angle);
+        right->setFlaps();
+        Objects2d::insertThisFoil(right);
+
+        std::string left_name = right_name;
+        if (antisym) {
+            left_name = tag + "_l";
+            auto* left = new Foil(base);
+            left->setName(left_name);
+            left->setTEFlapData(true, xhinge, 0.0, -angle);
+            left->setFlaps();
+            Objects2d::insertThisFoil(left);
+        }
+        sec.setFoilNames(left_name, right_name);
     }
 
     return true;

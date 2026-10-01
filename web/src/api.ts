@@ -40,6 +40,7 @@ export type AnalyzeOk = {
   solver: string;
   raw: unknown;
   payload: HandshakePayload;
+  handbook: unknown | null;
   handshakeError: string | null;
 };
 
@@ -47,11 +48,23 @@ export type AnalyzeFail = { ok: false; error: string };
 
 export type AnalyzeResult = AnalyzeOk | AnalyzeFail;
 
+function objectHandbook(value: unknown): unknown | null {
+  if (value != null && typeof value === "object" && !Array.isArray(value)) return value;
+  return null;
+}
+
 export async function postAnalyze(
   aircraft: AircraftDict,
   solver: string,
 ): Promise<AnalyzeResult> {
-  let data: { ok?: boolean; error?: unknown; solver?: unknown; raw?: unknown; payload?: unknown };
+  let data: {
+    ok?: boolean;
+    error?: unknown;
+    solver?: unknown;
+    raw?: unknown;
+    payload?: unknown;
+    handbook?: unknown;
+  };
   try {
     const res = await fetch("/analyze", {
       method: "POST",
@@ -85,6 +98,7 @@ export async function postAnalyze(
       solver: typeof data.solver === "string" ? data.solver : solver,
       raw: data.raw,
       payload,
+      handbook: objectHandbook(data.handbook),
       handshakeError,
     };
   }

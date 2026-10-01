@@ -9,6 +9,7 @@ export default defineConfig({
       "/models": "http://127.0.0.1:8002",
       "/analyze": "http://127.0.0.1:8002",
       "/stability": "http://127.0.0.1:8002",
+      "/control-derivatives": "http://127.0.0.1:8002",
     },
   },
   test: {

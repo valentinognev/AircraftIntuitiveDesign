@@ -1,5 +1,12 @@
 # Updates
 
+## 1.34.0 - Saved files carry analysis results
+- Optional top-level `results` block in JSONC, `{solver, payload, raw}` per solver that ran; web Save omits it entirely when nothing ran
+- Loading a file with `results` seeds `payloads`/`raws`, so the Aero overlays redraw without re-running a solver
+- `aircraftForRequest` strips `results` from `/analyze`, `/models/validate`, `/stability`, and `/control-derivatives`
+- `aid.Aircraft.results` and `aid/jsonc.py` carry it through load and save as an opaque dict, emitted without per-key doc comments; `GET /models/{name}` omits it when empty
+- MATLAB is unchanged: `AID.m`'s save list still omits `Results`
+
 ## 1.33.2 - Handbook finish edge cases
 - A zero-slope neutral-point error no longer aborts Tornado finish; CL and CD stay and plots refresh
 - Trim mode 2 writes `HT.l` from X, x_ac, cbar, xmac, and XCG before the incidence solve

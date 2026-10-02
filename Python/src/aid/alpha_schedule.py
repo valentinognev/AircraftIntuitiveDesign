@@ -64,5 +64,7 @@ def alpha_schedule(ac, target: int = ALPHA_POINTS) -> list[float]:
 
 def apply_alpha_default(ac, target: int = ALPHA_POINTS):
     """Store the expanded schedule in ``AERO.ALSCHD`` and return the aircraft."""
+    if "ALSCHD" not in ac.AERO:
+        return ac
     ac.AERO["ALSCHD"] = alpha_schedule(ac, target)
     return ac

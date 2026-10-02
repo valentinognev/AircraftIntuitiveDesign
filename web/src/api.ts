@@ -1,8 +1,14 @@
-import { aircraftToJson, type AircraftDict } from "./aircraft";
+import { aircraftToJson, type AircraftDict, type SavedSolverResult } from "./aircraft";
 import { cadacCallbackUrl } from "./cadacSession";
 import type { HandshakePayload } from "./payload";
 
 export type ValidateResult = { ok: true } | { ok: false; error: string };
+
+function withoutResults(aircraft: AircraftDict): AircraftDict {
+  const geometry = aircraftToJson(aircraft);
+  delete geometry.results;
+  return geometry;
+}
 
 export async function fetchModels(): Promise<string[]> {
   const res = await fetch("/models");
@@ -25,7 +31,7 @@ export async function validateAircraft(aircraft: AircraftDict): Promise<Validate
     const res = await fetch("/models/validate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ aircraft: aircraftToJson(aircraft) }),
+      body: JSON.stringify({ aircraft: withoutResults(aircraft) }),
     });
     const data = (await res.json()) as { ok?: boolean; error?: unknown };
     if (data.ok === true) return { ok: true };
@@ -69,7 +75,7 @@ export async function postAnalyze(
     const res = await fetch("/analyze", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ aircraft: aircraftToJson(aircraft), solver }),
+      body: JSON.stringify({ aircraft: withoutResults(aircraft), solver }),
     });
     data = (await res.json()) as typeof data;
   } catch (err) {
@@ -112,7 +118,7 @@ export async function fetchStability(
     const res = await fetch("/stability", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ aircraft: aircraftToJson(aircraft) }),
+      body: JSON.stringify({ aircraft: withoutResults(aircraft) }),
     });
     if (!res.ok) return null;
     const data = (await res.json()) as Record<string, unknown>;
@@ -122,11 +128,18 @@ export async function fetchStability(
   }
 }
 
-export function downloadAircraft(aircraft: AircraftDict, stem: string): void {
+export function downloadAircraft(
+  aircraft: AircraftDict,
+  stem: string,
+  results?: Record<string, SavedSolverResult>,
+): void {
   const name = stem.toLowerCase().endsWith(".jsonc") || stem.toLowerCase().endsWith(".json")
     ? stem
     : `${stem || "aircraft"}.jsonc`;
-  const blob = new Blob([JSON.stringify(aircraftToJson(aircraft), null, 4)], {
+  const geometry = withoutResults(aircraft);
+  const saved: AircraftDict =
+    results != null && Object.keys(results).length > 0 ? { ...geometry, results } : geometry;
+  const blob = new Blob([JSON.stringify(saved, null, 4)], {
     type: "application/json",
   });
   const url = URL.createObjectURL(blob);

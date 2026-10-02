@@ -171,7 +171,7 @@ export function Editor() {
           disabled={aircraft == null}
           onClick={() => {
             if (aircraft == null) return;
-            downloadAircraft(aircraft, stem ?? "aircraft");
+            downloadAircraft(aircraft, stem ?? "aircraft", store.getState().resultsForSave());
           }}
         >
           Save

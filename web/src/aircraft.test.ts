@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { aircraftFromJson, aircraftToJson, parseJsonc } from "./aircraft";
+import { aircraftFromJson, aircraftToJson, emptyAircraft, parseJsonc } from "./aircraft";
 import { commitString } from "./Field";
 import {
   AERO_FIELDS,
@@ -39,6 +39,62 @@ it("aircraftFromJson round-trips Cessna WG.CHRDR", () => {
   const ac = aircraftFromJson(parseJsonc(CESSNA_SUBSET_JSONC));
   expect(ac.WG.CHRDR).toBe(2);
   expect(aircraftToJson(ac).WG.CHRDR).toBe(2);
+});
+
+it("a valid results block survives aircraftFromJson to aircraftToJson", () => {
+  const results = { datcom: solverResult("datcom"), tornado: solverResult("tornado") };
+  const out = aircraftToJson(aircraftFromJson(withResults(results)));
+  expect(out.results).toEqual(results);
+});
+
+it("absent results in gives absent results out", () => {
+  const ac = aircraftFromJson(baseAircraftJson());
+  expect("results" in ac).toBe(false);
+  expect("results" in aircraftToJson(ac)).toBe(false);
+  expect("results" in emptyAircraft()).toBe(false);
+});
+
+it("empty results block is omitted", () => {
+  const ac = aircraftFromJson(withResults({}));
+  expect("results" in ac).toBe(false);
+  expect("results" in aircraftToJson(ac)).toBe(false);
+});
+
+it("non-object results block is omitted without throwing", () => {
+  for (const bad of [null, "x", [], 7]) {
+    const ac = aircraftFromJson(withResults(bad));
+    expect("results" in ac).toBe(false);
+    expect("results" in aircraftToJson(ac)).toBe(false);
+  }
+});
+
+it("an entry missing payload is dropped and siblings survive", () => {
+  const datcom = solverResult("datcom");
+  const flow5 = solverResult("flow5");
+  const ac = aircraftFromJson(
+    withResults({ datcom, avl: { solver: "avl", raw: { notes: "no payload" } }, flow5 }),
+  );
+  expect(ac.results).toEqual({ datcom, flow5 });
+  expect(aircraftToJson(ac).results).toEqual({ datcom, flow5 });
+});
+
+it("an entry whose payload is an array is dropped", () => {
+  const ac = aircraftFromJson(
+    withResults({ tornado: { solver: "tornado", payload: [1, 2, 3], raw: { ok: true } } }),
+  );
+  expect("results" in aircraftToJson(ac)).toBe(false);
+});
+
+it("an entry missing solver or with a non-object raw is dropped", () => {
+  const datcom = solverResult("datcom");
+  const ac = aircraftFromJson(
+    withResults({
+      datcom,
+      avl: { payload: { ref: {} }, raw: { ok: true } },
+      flow5: { solver: "flow5", payload: { ref: {} }, raw: "not an object" },
+    }),
+  );
+  expect(ac.results).toEqual({ datcom });
 });
 
 it("PLANFORM_RP copies PySide label/key pairs", () => {
@@ -119,6 +175,36 @@ it("rememberRecent keeps last 5 JSONC names", () => {
     "b.jsonc",
   ]);
 });
+
+function baseAircraftJson(): Record<string, unknown> {
+  return {
+    WG: { CHRDR: 2 },
+    HT: {},
+    VT: {},
+    F: {},
+    A: {},
+    E: {},
+    R: {},
+    BD: {},
+    NP: [null, null, null, null],
+    NB: [null, null],
+    AERO: {},
+    plot_cmp: [1, 1, 1, 1],
+    unit: "ft",
+  };
+}
+
+function withResults(value: unknown): Record<string, unknown> {
+  return { ...baseAircraftJson(), results: value };
+}
+
+function solverResult(solver: string): Record<string, unknown> {
+  return {
+    solver,
+    payload: { source: "api", solver, axes: { alpha: [0, 5] }, tables: { CL: [0.4, 0.5] }, ref: { mac: 1.3 } },
+    raw: { solver, lattice: { nodes: [[0, 0, 0], [1, 1, 1]], fields: ["cp"] }, note: "verbatim" },
+  };
+}
 
 function memoryStorage(): Storage {
   const map = new Map<string, string>();

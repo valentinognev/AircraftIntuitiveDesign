@@ -16,6 +16,12 @@ export const AIRCRAFT_KEYS = [
 
 export type AircraftGroup = "WG" | "HT" | "VT" | "F" | "A" | "E" | "R" | "BD" | "AERO";
 
+export type SavedSolverResult = {
+  solver: string;
+  payload: Record<string, unknown>;
+  raw: Record<string, unknown>;
+};
+
 export type AircraftDict = {
   WG: Record<string, unknown>;
   HT: Record<string, unknown>;
@@ -31,6 +37,7 @@ export type AircraftDict = {
   plot_cmp: unknown[];
   unit: string;
   cg_data?: unknown;
+  results?: Record<string, SavedSolverResult>;
 };
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -47,6 +54,21 @@ function asDict(value: unknown, key: string): Record<string, unknown> {
 function asArray(value: unknown, key: string): unknown[] {
   if (!Array.isArray(value)) throw new Error(`missing ${key}`);
   return [...value];
+}
+
+function asSolverResults(value: unknown): Record<string, SavedSolverResult> | null {
+  const rec = asRecord(value);
+  if (rec == null) return null;
+  const out: Record<string, SavedSolverResult> = {};
+  for (const [name, entry] of Object.entries(rec)) {
+    const item = asRecord(entry);
+    if (item == null) continue;
+    const payload = asRecord(item.payload);
+    const raw = asRecord(item.raw);
+    if (typeof item.solver !== "string" || payload == null || raw == null) continue;
+    out[name] = { solver: item.solver, payload: { ...payload }, raw: { ...raw } };
+  }
+  return Object.keys(out).length > 0 ? out : null;
 }
 
 function padNull(list: unknown[], n: number): unknown[] {
@@ -118,6 +140,8 @@ export function aircraftFromJson(raw: unknown): AircraftDict {
     unit: typeof rec.unit === "string" ? rec.unit : String(rec.unit),
   };
   if ("cg_data" in rec) ac.cg_data = rec.cg_data;
+  const results = asSolverResults(rec.results);
+  if (results != null) ac.results = results;
   return ac;
 }
 
@@ -138,6 +162,7 @@ export function aircraftToJson(ac: AircraftDict): AircraftDict {
     unit: ac.unit,
   };
   if ("cg_data" in ac) out.cg_data = ac.cg_data;
+  if (ac.results != null && Object.keys(ac.results).length > 0) out.results = { ...ac.results };
   return out;
 }
 

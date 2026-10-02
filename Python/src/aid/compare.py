@@ -102,13 +102,75 @@ def _values_close(a, b, *, rtol: float, atol: float) -> bool:
     return bool(np.allclose(np.asarray(a, dtype=float), np.asarray(b, dtype=float), rtol=rtol, atol=atol))
 
 
+# Alpha values are written out in full decimal, so match them only to this much.
+_ALPHA_MATCH_ATOL = 1e-6
+
+
+def _sample_at_alphas(alphas, values, wanted) -> list | None:
+    """``values`` sampled at each alpha in ``wanted``, or None if any is absent."""
+    sampled = []
+    for want in wanted:
+        hit = next(
+            (
+                v
+                for a, v in zip(alphas, values)
+                if abs(float(a) - float(want)) <= _ALPHA_MATCH_ATOL
+            ),
+            None,
+        )
+        if hit is None:
+            return None
+        sampled.append(hit)
+    return sampled
+
+
 def _compare_datcom(python: dict, gold: dict) -> bool:
+    """Compare a DATCOM run against gold, sampling the Python sweep where needed.
+
+    ``compare_to_matlab`` flies the gold's own sweep, but this predicate must
+    stay correct for any caller: if the two sweeps differ, a per-alpha series is
+    sampled at the gold's ``alpha`` values rather than zipped element-wise. Every
+    gold alpha must be present in the Python sweep, and an empty gold series is a
+    failure -- sampling must never reduce a comparison to zero values and pass
+    vacuously.
+    """
+    gold_alphas = gold.get("alpha")
+    py_alphas = python.get("alpha")
+    aligned = (
+        isinstance(gold_alphas, list)
+        and isinstance(py_alphas, list)
+        and bool(gold_alphas)
+    )
+
     for key, gold_val in gold.items():
         if key not in python:
             return False
         py_val = python[key]
+
+        if aligned and key == "alpha":
+            # The gold's alphas are the conditions to confirm, not a series to zip.
+            if _sample_at_alphas(py_alphas, py_alphas, gold_alphas) is None:
+                return False
+            continue
+
         if isinstance(gold_val, list):
-            if not _values_close(py_val, gold_val, rtol=0.0, atol=_PARSER_ATOL):
+            if not gold_val:
+                return False
+            sampled = None
+            if (
+                aligned
+                and isinstance(py_val, (list, tuple))
+                and len(py_val) == len(py_alphas)
+            ):
+                sampled = _sample_at_alphas(py_alphas, py_val, gold_alphas)
+                if sampled is None:
+                    return False
+            if not _values_close(
+                py_val if sampled is None else sampled,
+                gold_val,
+                rtol=0.0,
+                atol=_PARSER_ATOL,
+            ):
                 return False
         elif isinstance(gold_val, (int, float)):
             if not _values_close(py_val, gold_val, rtol=0.0, atol=_PARSER_ATOL):
@@ -208,12 +270,30 @@ def _solver_pass(
     return entry
 
 
+def _gold_alpha(matlab_dir: Path) -> list | None:
+    """The alpha sweep the DATCOM gold was flown on, if it records one."""
+    gold_path = matlab_dir / "datcom.json"
+    if not gold_path.is_file():
+        return None
+    alpha = json.loads(gold_path.read_text()).get("alpha")
+    return alpha if isinstance(alpha, list) and alpha else None
+
+
 def compare_to_matlab(name: str) -> dict:
-    """Run Python solvers, compare to MATLAB gold, write ``Results/compare/<name>.json``."""
+    """Run Python solvers, compare to MATLAB gold, write ``Results/compare/<name>.json``.
+
+    The gold is a fixture with its own inputs, and solver output depends on the
+    alpha grid it was asked for -- DATCOM's ``cla``/``cma`` are finite differences
+    along it -- so the comparison flies the gold's own sweep when it records one,
+    rather than whatever schedule the model happens to store today.
+    """
     matlab_dir = results_dir() / "matlab" / name
     status = json.loads((matlab_dir / "status.json").read_text())
 
     ac = load_jsonc(models_dir() / f"{name}.jsonc")
+    gold_alpha = _gold_alpha(matlab_dir)
+    if gold_alpha is not None:
+        ac.AERO["ALSCHD"] = list(gold_alpha)
     work = results_dir() / "python" / name
     python = run_python(ac, work)
 

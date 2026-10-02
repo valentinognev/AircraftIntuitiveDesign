@@ -11,4 +11,6 @@ def test_e2e_cessna_aid_matches_native_flow5():
     aid = run_flow5(ac, mesh)
     for key in ("alpha", "CL", "CD", "Cm"):
         assert np.allclose(native[key], aid[key], rtol=0.0, atol=1e-6), key
-    assert len(aid["CL"]) == 5
+    swept = [float(a) for a in ac.AERO["ALSCHD"]]
+    assert [float(a) for a in aid["alpha"]] == swept
+    assert len(aid["CL"]) == len(swept)

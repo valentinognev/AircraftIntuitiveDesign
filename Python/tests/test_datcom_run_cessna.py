@@ -9,6 +9,10 @@ from aid.paths import models_dir, results_dir
 def test_run_datcom_matches_matlab_gold(tmp_path):
     gold = json.loads((results_dir() / "matlab" / "Cessna 172" / "datcom.json").read_text())
     ac = load_jsonc(models_dir() / "Cessna 172.jsonc")
+    # DATCOM's output depends on the alpha grid it was asked for -- cla and cma
+    # are finite differences along it -- so the gold is reproducible only on the
+    # sweep it was flown on, not on the model's current default.
+    ac.AERO["ALSCHD"] = list(gold["alpha"])
     got = run_datcom(ac, tmp_path / "work")
     assert np.allclose(got["cl"], gold["cl"], atol=1e-6)
 

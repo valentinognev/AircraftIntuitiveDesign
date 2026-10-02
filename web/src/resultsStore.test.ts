@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from "vitest";
 import type { SavedSolverResult } from "./aircraft";
-import type { HandshakePayload } from "./payload";
+import { seriesFromPayload, type HandshakePayload } from "./payload";
 import { createStore } from "./store";
 
 const SOLVERS = ["datcom", "tornado", "avl", "flow5"];
@@ -127,6 +127,84 @@ it("resultsForSave omits an entry whose raw is not an object", () => {
   store.setState({ payloads: { datcom: handshake("datcom", 1) }, raws: { datcom: "not an object" } });
   expect(store.getState().resultsForSave()).toBeUndefined();
 });
+
+it("a well-formed four-solver block restores and saves back in full", () => {
+  stubFetch();
+  const store = createStore();
+  const saved = fourSolverBlock();
+  store.getState().openAircraft(withResults(saved), "a.jsonc");
+  expect(Object.keys(store.getState().payloads)).toEqual(SOLVERS);
+  expect(store.getState().payloads.flow5).toEqual(saved.flow5.payload);
+  expect(store.getState().raws.flow5).toEqual(saved.flow5.raw);
+  expect(store.getState().lastPayload).toEqual(saved.flow5.payload);
+  expect(store.getState().resultsForSave()).toEqual(saved);
+});
+
+it("a block with an unplottable payload drops that entry and leaves the rest intact", () => {
+  stubFetch();
+  const store = createStore();
+  const good = savedResult("datcom", 1);
+  const bad: SavedSolverResult = { solver: "tornado", payload: {}, raw: solverRaw("tornado", 1) };
+  store.getState().openAircraft(withResults({ datcom: good, tornado: bad }), "a.jsonc");
+  expect(store.getState().payloads).toEqual({ datcom: good.payload });
+  expect(store.getState().raws).toEqual({ datcom: good.raw });
+  expect(store.getState().lastPayload).toEqual(good.payload);
+  expect(store.getState().resultsForSave()).toEqual({ datcom: good });
+  for (const payload of Object.values(store.getState().payloads)) {
+    expect(() => seriesFromPayload(payload)).not.toThrow();
+  }
+});
+
+it("a block whose payload cannot be plotted never reaches payloads or lastPayload", () => {
+  const unusable = [
+    {},
+    { axes: {} },
+    { axes: { alpha: "0 4" } },
+    { axes: { alpha: [-2, 0, 4] } },
+    { axes: { alpha: [-2, 0, 4] }, tables: null },
+  ];
+  for (const payload of unusable) {
+    stubFetch();
+    const store = createStore();
+    const entry: SavedSolverResult = {
+      solver: "tornado",
+      payload,
+      raw: solverRaw("tornado", 1),
+    };
+    store.getState().openAircraft(withResults({ tornado: entry }), "a.jsonc");
+    expect(store.getState().aircraft!.results).toEqual({ tornado: entry });
+    expect(store.getState().payloads).toEqual({});
+    expect(store.getState().raws).toEqual({});
+    expect(store.getState().lastPayload).toBeNull();
+    expect(store.getState().resultsForSave()).toBeUndefined();
+  }
+});
+
+it("resultsForSave omits an entry whose payload cannot be plotted", () => {
+  const store = createStore();
+  store.setState({
+    payloads: { datcom: { solver: "datcom" } },
+    raws: { datcom: { alpha: [0, 2], cl: [0.1, 0.2] } },
+  });
+  expect(store.getState().resultsForSave()).toBeUndefined();
+});
+
+it("geometry edits leave resultsForSave intact", () => {
+  stubFetch();
+  const store = createStore();
+  const saved = fourSolverBlock();
+  store.getState().openAircraft(withResults(saved), "a.jsonc");
+  store.getState().setGroupField("WG", "CHRDR", 2.75);
+  store.getState().setArrayField("BD", "BDFX", 0, 12);
+  store.getState().setUnit("m");
+  store.getState().setPlotCmp(0, 0);
+  expect(store.getState().resultsForSave()).toEqual(saved);
+  expect(store.getState().aircraft!.WG.CHRDR).toBe(2.75);
+});
+
+function fourSolverBlock(): Record<string, SavedSolverResult> {
+  return Object.fromEntries(SOLVERS.map((solver) => [solver, savedResult(solver, 1)]));
+}
 
 function baseAircraftJson(): Record<string, unknown> {
   return {

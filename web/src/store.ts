@@ -107,22 +107,29 @@ type SeededResults = {
   lastPayload: HandshakePayload | null;
 };
 
+function savedRecord(value: unknown): Record<string, unknown> | null {
+  if (value == null || typeof value !== "object" || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+function usablePayload(value: unknown): value is HandshakePayload {
+  const payload = savedRecord(value);
+  if (payload == null) return false;
+  const axes = savedRecord(payload.axes);
+  return axes != null && Array.isArray(axes.alpha) && savedRecord(payload.tables) != null;
+}
+
 function seededResults(results: Record<string, SavedSolverResult> | undefined): SeededResults {
   const payloads: Record<string, HandshakePayload> = {};
   const raws: Record<string, unknown> = {};
   let lastPayload: HandshakePayload | null = null;
   for (const [name, entry] of Object.entries(results ?? {})) {
-    const payload = entry.payload as HandshakePayload;
-    payloads[name] = payload;
+    if (!usablePayload(entry.payload)) continue;
+    payloads[name] = entry.payload;
     raws[name] = entry.raw;
-    lastPayload = payload;
+    lastPayload = entry.payload;
   }
   return { payloads, raws, lastPayload };
-}
-
-function savedRecord(value: unknown): Record<string, unknown> | null {
-  if (value == null || typeof value !== "object" || Array.isArray(value)) return null;
-  return value as Record<string, unknown>;
 }
 
 function initialTheme(): Theme {
@@ -362,7 +369,7 @@ export function createStore() {
       const out: Record<string, SavedSolverResult> = {};
       for (const [name, payload] of Object.entries(payloads)) {
         const raw = savedRecord(raws[name]);
-        if (raw == null) continue;
+        if (raw == null || !usablePayload(payload)) continue;
         out[name] = {
           solver: typeof payload.solver === "string" ? payload.solver : name,
           payload: { ...payload },

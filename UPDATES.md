@@ -1,5 +1,29 @@
 # Updates
 
+## 1.33.2 - Handbook finish edge cases
+- A zero-slope neutral-point error no longer aborts Tornado finish; CL and CD stay and plots refresh
+- Trim mode 2 writes `HT.l` from X, x_ac, cbar, xmac, and XCG before the incidence solve
+- Fuselage sketch Apply sets body area to `pi * ZU**2` at the new station count
+
+## 1.33.1 - Tornado hooks after the inviscid save
+- `MainWindow._finish_tornado` stores the inviscid Tornado dict before viscous strip, Cp paint, and neutral-point iteration
+- A strip failure or `StaticMarginError` leaves `CL` and `CD` published
+
+## 1.33.0 - handbook airfoil lateral dynamic tornado extras
+- R1: `aid.naca456.ordinates` matches the Fortran `naca.gnu` ordinates
+- R2: 4- and 5-digit NACA ordinates, vortex panel `a0`/`alpha0`/`Cm_ac`, and `section_slopes`
+- R3: `aid.aero.aero` ports Aero.m through `x_ac` and `a *= pi/180`
+- R4: `aircraft_cd0` is the handbook CD0, including the 1.25 interference factor once
+- R5: trim mode 2 solves wing incidence, HT incidence, and angle of attack
+- R6: `stamp_control_geometry` writes flap/elevator/rudder `tau`, flap `x_ac`/`l`, and aileron `Kb`
+- R7: lateral-directional corrections, static derivatives, and dynamic derivatives
+- R8: longitudinal dynamic `A`/`B` and short-period / phugoid roots
+- R9: after Tornado, ask "Estimate Neutral Point?" offscreen never asks; Yes stores `results["N0"]`
+- R10: Tornado Cp is painted on the 3D view; a geometry redraw clears it
+- R11: Body tab Sketch opens the side/top fuselage editor; Adjust stays the station table
+- R12: Calculations → Viscous Strip is off by default and stores `results["viscous"]` without replacing CL or CD
+- R13: `apply_handbook` runs that sequence; Calculations uses it with `trim_fix='both'`
+
 ## 1.32.0 - AVL solved at each scheduled angle
 - `run_avl_full` runs one AVL case per `AERO.ALSCHD` angle and returns totals and stability derivatives as arrays parallel to `alpha`
 - Qt and web force, moment, and derivative charts plot those samples; AVL is not extended with `CLa` or any other slope

@@ -13,6 +13,7 @@ from aid.aircraft import Aircraft
 from aid.atmosphere import atmosphere
 from aid.body_stability import body_stability
 from aid.downwash import downwash
+from aid.drag import aircraft_cd0
 
 
 def _last(val) -> float:
@@ -250,22 +251,7 @@ def aircraft_stability(
     cm0 = lm["Cm0"]
     summary = lm["summary"]
 
-    cd0 = 0.0
-    if flags[0]:
-        cd0 += float(wg.get("CD0", 0) or 0)
-    if htail:
-        cd0 += float(ht.get("CD0", 0) or 0)
-    if flags[2]:
-        cd0 += float(ac.VT.get("CD0", 0) or 0)
-    if body:
-        cd0 += float(bd.get("CD0", 0) or 0)
-    for pt in ac.NP:
-        if pt and "CD0" in pt:
-            extra = float(pt["CD0"])
-            if pt.get("Y"):
-                extra *= 2
-            cd0 += extra
-    cd0 *= 1.25
+    cd0 = aircraft_cd0(ac) if ac.WG and ac.HT and ac.VT and ac.BD else 0.0
 
     result = {
         "x_cg": x_cg,

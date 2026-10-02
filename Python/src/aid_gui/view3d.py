@@ -249,6 +249,7 @@ class View3D(QWidget):
         keep_camera: bool = False,
     ) -> None:
         self._aircraft = ac
+        self.clear_cp()
         if res is not None:
             self._res = tuple(res)
         if angle is not None:
@@ -494,6 +495,41 @@ class View3D(QWidget):
                 tornado_line, color="red", line_width=2, name="lift_tornado"
             )
             self._overlay_actor_names.append(actor_tornado)
+
+    def paint_cp(self, xyz: np.ndarray, cp: np.ndarray) -> None:
+        """xyz (npan, 4, 3) corner points, cp (npan,). Adds mesh name 'tornado_cp'
+        with cell scalars, clim (min(cp), max(cp)), scalar bar title 'Cp'.
+        Replaces a previous tornado_cp mesh. Does not clear the aircraft mesh."""
+        xyz = np.asarray(xyz, dtype=float)
+        cp = np.asarray(cp, dtype=float).reshape(-1)
+        npan = int(xyz.shape[0])
+        points = xyz.reshape(-1, 3)
+        faces = np.empty((npan, 5), dtype=np.int64)
+        faces[:, 0] = 4
+        faces[:, 1:] = np.arange(npan * 4, dtype=np.int64).reshape(npan, 4)
+        mesh = pv.PolyData(points, faces.ravel())
+        mesh.cell_data["Cp"] = cp
+        self.clear_cp()
+        lo = float(np.min(cp))
+        hi = float(np.max(cp))
+        self._plotter.add_mesh(
+            mesh,
+            scalars="Cp",
+            preference="cell",
+            clim=(lo, hi),
+            scalar_bar_args={"title": "Cp"},
+            name="tornado_cp",
+        )
+
+    def clear_cp(self) -> None:
+        """Remove tornado_cp if present."""
+        actors = getattr(self._plotter, "actors", {}) or {}
+        if "tornado_cp" in actors:
+            self._plotter.remove_actor("tornado_cp")
+
+    def cp_painted(self) -> bool:
+        actors = getattr(self._plotter, "actors", {}) or {}
+        return "tornado_cp" in actors
 
     def apply_matlab_view(self) -> None:
         """MATLAB view(3): az=-37.5°, el=30°."""

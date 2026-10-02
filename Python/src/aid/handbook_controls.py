@@ -177,3 +177,43 @@ def handbook_controls(ac: Aircraft, deltas_deg=None) -> list[dict]:
                 row["Cn"] = cn_dr
         rows.append(row)
     return rows
+
+
+def _stamp_x_cg(ac: Aircraft) -> float:
+    """Flap lever CG: (XCG - X - xmac) / cbar, else WG x_cg, else 0.25."""
+    wg = ac.WG
+    aero = ac.AERO
+    if all(
+        block.get(key) is not None
+        for block, key in ((aero, "XCG"), (wg, "X"), (wg, "xmac"), (wg, "cbar"))
+    ):
+        return (_last(aero["XCG"]) - _last(wg["X"]) - _last(wg["xmac"])) / _last(wg["cbar"])
+    if wg.get("x_cg") is not None:
+        return _last(wg["x_cg"])
+    return 0.25
+
+
+def stamp_control_geometry(ac: Aircraft) -> None:
+    """Write the Controls.m fields the trim equations read.
+
+    F['tau'], F['x_ac'], F['l'] with l = x_ac_flap - x_cg and
+    x_ac_flap = cbar - 0.5*(CHRDFI+CHRDFO).
+    E['tau'] from elevator area / HT.S.
+    R['tau'] from rudder area / VT.S (keep the existing fix; do not use elevator area).
+    A['Kb'] from _aileron_kb.
+    x_cg is (AERO.XCG - WG.X - xmac) / cbar when those keys exist, else WG['x_cg'] if present, else 0.25.
+    Skip a surface whose span is illegal; leave its fields unchanged.
+    """
+    wg = ac.WG
+    if _span_legal(ac.F):
+        flap = ac.F
+        x_ac = _last(wg["cbar"]) - 0.5 * (float(flap["CHRDFI"]) + float(flap["CHRDFO"]))
+        flap["tau"] = _tau(_control_area(flap), _last(wg["S"]))
+        flap["x_ac"] = x_ac
+        flap["l"] = x_ac - _stamp_x_cg(ac)
+    if _span_legal(ac.A):
+        ac.A["Kb"] = _aileron_kb(ac.A, wg)
+    if _span_legal(ac.E):
+        ac.E["tau"] = _tau(_control_area(ac.E), _last(ac.HT["S"]))
+    if _span_legal(ac.R):
+        ac.R["tau"] = _tau(_control_area(ac.R), _last(ac.VT["S"]))

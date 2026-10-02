@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
 
 from aid.aircraft import Aircraft
 from aid.geometry import geometry
+from aid_gui.profile_sketch_dialog import ProfileSketchDialog
 
 _INDEXED_KEY = re.compile(r"^([A-Za-z]+)\.([A-Za-z]+)\[(\d+)\]$")
 _LIST_KEY = re.compile(r"^([A-Za-z]+)\[(\d+)\]\.(.+)$")
@@ -562,7 +563,11 @@ def _body_tab(
     adjust = QPushButton("Adjust")
     adjust.setMinimumHeight(28)
     adjust.clicked.connect(lambda *_: _open_body_sketcher(window, prefix))
-    layout.addWidget(adjust, 1, 0, 1, 3)
+    layout.addWidget(adjust, 1, 0, 1, 2)
+    sketch = QPushButton("Sketch")
+    sketch.setMinimumHeight(28)
+    sketch.clicked.connect(lambda *_: _open_profile_sketch(window, prefix))
+    layout.addWidget(sketch, 1, 2)
     layout.addWidget(QLabel("Station"), 2, 0, Qt.AlignmentFlag.AlignCenter)
     pos_hdr = QLabel()
     pos_hdr.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -678,6 +683,26 @@ def _body_section(ac: Aircraft, prefix: str):
     if listed:
         return _section_dict(ac, listed.group(1), int(listed.group(2)))
     return None
+
+
+def _open_profile_sketch(window, prefix: str) -> None:
+    ac = getattr(window, "aircraft", None)
+    if ac is None:
+        return
+    section = _body_section(ac, prefix)
+    if not isinstance(section, dict):
+        return
+    ProfileSketchDialog(section, window).exec()
+    populate_from_aircraft(window, ac)
+    view = getattr(window, "view3d", None)
+    settings = getattr(window, "settings", None)
+    if view is not None and settings is not None:
+        view.plot_aircraft(
+            ac,
+            res=tuple(settings.plot_res),
+            angle=settings.angle,
+            keep_camera=True,
+        )
 
 
 def _open_body_sketcher(window, prefix: str) -> None:

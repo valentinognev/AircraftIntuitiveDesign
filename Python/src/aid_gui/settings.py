@@ -106,6 +106,7 @@ class SettingsState:
         self.slipstream = False
         self.slipstream_data = [0.5, 0.9]
         self.multhopp = True
+        self.viscous_strip = False
         self.units_in = False
         self.units_kts = True
         self.check_io = False
@@ -225,6 +226,7 @@ class SettingsState:
             self.trim_mode = self.action(("Calculations", "Trim Mode")).isChecked()
             self.slipstream = self.action(("Calculations", "Estimate Slipstream")).isChecked()
             self.multhopp = self.action(("Calculations", "Multhopp's Method")).isChecked()
+            self.viscous_strip = self.action(("Calculations", "Viscous Strip")).isChecked()
         except KeyError:
             pass
 
@@ -243,6 +245,10 @@ class SettingsState:
     def on_multhopp(self, action: QAction) -> None:
         self.multhopp = action.isChecked()
         self._apply_calculations()
+
+    def on_viscous_strip(self, action: QAction) -> None:
+        """Tornado-only. Default off so gold compares stay inviscid."""
+        self.viscous_strip = action.isChecked()
 
     def _apply_calculations(self) -> None:
         if self._window is not None:

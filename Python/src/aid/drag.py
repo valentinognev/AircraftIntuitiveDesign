@@ -2,6 +2,9 @@ import math
 
 import numpy as np
 
+from aid.aircraft import Aircraft
+from aid.atmosphere import atmosphere
+
 
 def _last(val) -> float:
     return float(np.asarray(val).reshape(-1)[-1])
@@ -54,3 +57,46 @@ def drag(pt: dict, unit: str, atm: dict, wg_sref: float) -> dict:
         pt["CD0"] = cf * (1 + 60 / l_d**3 + 0.0025 * l_d) * s_wet / wg_sref
 
     return pt
+
+
+def _on(val) -> bool:
+    return bool(val)
+
+
+def _extra_parts(parts, n: int):
+    if not isinstance(parts, list):
+        return
+    for pt in parts[:n]:
+        if isinstance(pt, dict) and pt:
+            yield pt
+
+
+def aircraft_cd0(ac: Aircraft) -> float:
+    """AID.m lines 882-902. Sum Drag() over wing, HT, VT, body, NP, NB when plot_cmp (and extra slots) are on.
+    Twin if NP.Y or NB.Y0 is truthy. Return 1.25 * sum. Writes each part['CD0']."""
+    alt = float(np.asarray(ac.AERO["ALT"]).reshape(-1)[0])
+    mach = float(np.asarray(ac.AERO["MACH"]).reshape(-1)[0])
+    atm = atmosphere(alt)
+    atm["Q"] = 0.5 * atm["D"] * (mach * atm["a"]) ** 2
+    if ac.unit == "in":
+        atm["Q"] /= 144.0
+    atm["Re"] = atm["D"] * mach * atm["a"] / atm["V"]
+    sref = float(np.asarray(ac.WG["S"]).reshape(-1)[-1])
+
+    total = 0.0
+    primaries = (ac.WG, ac.HT, ac.VT, ac.BD)
+    for i, pt in enumerate(primaries):
+        if i < len(ac.plot_cmp) and _on(ac.plot_cmp[i]):
+            drag(pt, ac.unit, atm, sref)
+            total += float(pt["CD0"])
+    for pt in _extra_parts(ac.NP, 4):
+        drag(pt, ac.unit, atm, sref)
+        if _on(pt.get("Y")):
+            pt["CD0"] = float(pt["CD0"]) * 2
+        total += float(pt["CD0"])
+    for pt in _extra_parts(ac.NB, 2):
+        drag(pt, ac.unit, atm, sref)
+        if _on(pt.get("Y0")):
+            pt["CD0"] = float(pt["CD0"]) * 2
+        total += float(pt["CD0"])
+    return 1.25 * total

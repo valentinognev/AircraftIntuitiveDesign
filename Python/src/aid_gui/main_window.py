@@ -1,4 +1,5 @@
 import math
+import os
 import subprocess
 import warnings
 from pathlib import Path
@@ -25,8 +26,11 @@ from aid.datcom_parse import datcom_user_warning, parse_for006
 from aid.flow5_io import run_flow5
 from aid.paths import avl_bin, datcom_wrapper, flow5_bin, results_dir
 from aid.geometry import geometry
+from aid.handbook_pass import apply_handbook
 from aid.scale_geom import scale_aircraft, scale_lengths
 from aid.stability import aircraft_stability
+from aid.tornado.static_margin import find_static_margin
+from aid.tornado.viscous import viscous_correction
 from aid.lifting_line import lifting_line
 from aid.tornado.boundary import set_boundary
 from aid.tornado.coeff import coeff_create
@@ -190,7 +194,17 @@ class MainWindow(QMainWindow):
         if self.aircraft is None:
             return
         self.settings.sync_calculation_actions()
-        st = self.stability_for_display()
+        s = self.settings
+        trim = int(s.trim_mode_data[0]) if s.trim_mode else 0
+        st = apply_handbook(
+            self.aircraft,
+            angl=s.angle,
+            slipstream=s.slipstream,
+            slipstream_data=tuple(s.slipstream_data),
+            multhopp=s.multhopp,
+            trim_mode=trim,
+            trim_fix="both",
+        )
         populate_from_aircraft(self, self.aircraft)
         self.results_bar.set_summary(st["summary"])
         if self.plot_mode() in ("Aerodynamics", "Stability"):
@@ -472,6 +486,36 @@ class MainWindow(QMainWindow):
         self.last_analyze_solver = "datcom"
         self._refresh_plots()
 
+    def _paint_tornado_cp(self, lattice: dict, coeffs: dict) -> None:
+        xyz = lattice.get("XYZ")
+        cp = coeffs.get("cp")
+        view = getattr(self, "view3d", None)
+        if xyz is None or cp is None or view is None:
+            return
+        xyz = np.asarray(xyz, dtype=float)
+        cp = np.asarray(cp, dtype=float).reshape(-1)
+        if xyz.ndim != 3 or xyz.shape[0] == 0 or xyz.shape[0] != cp.size:
+            return
+        if xyz.shape[1] > 4:
+            xyz = xyz[:, :4, :]
+        view.paint_cp(xyz, cp)
+
+    def _maybe_estimate_neutral_point(self, geo: dict, state: dict, coeffs: dict) -> None:
+        """Not a persistent toggle. Offscreen and tests never ask."""
+        if os.environ.get("QT_QPA_PLATFORM") == "offscreen":
+            return
+        answer = QMessageBox.question(
+            self,
+            "Estimate Neutral Point?",
+            "Estimate Neutral Point?",
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            coeffs["N0"] = find_static_margin(geo, state)
+        except Exception:
+            return
+
     def run_tornado(
         self,
         mesh: tuple[str, ...] | None = None,
@@ -524,10 +568,36 @@ class MainWindow(QMainWindow):
         coeffs["CL0"] = float(coeffs["CL"]) - float(coeffs["CL_a"]) * alpha
         coeffs["Cm0"] = float(coeffs["Cm"]) - float(coeffs["Cm_a"]) * alpha
         coeffs["spanwise"] = tornado_spanwise(coeffs, lattice, geo, state, self.aircraft)
+        self._finish_tornado(coeffs, geo, state, lattice, ref, mode)
+
+    def _finish_tornado(
+        self,
+        coeffs: dict,
+        geo: dict,
+        state: dict,
+        lattice: dict,
+        ref: dict,
+        mode: int,
+    ) -> None:
+        """Save the inviscid Tornado dict, then run the optional hooks.
+
+        A viscous-strip failure or a neutral-point failure does not drop CL or CD.
+        Plots still refresh.
+        """
         if self.settings.check_io:
             coeffs["vlm_mode"] = mode
         self.last_results["tornado"] = coeffs
         self.last_analyze_solver = "tornado"
+        if self.settings.viscous_strip:
+            try:
+                coeffs["viscous"] = viscous_correction(geo, state, lattice, coeffs, ref)
+            except Exception:
+                pass
+        try:
+            self._paint_tornado_cp(lattice, coeffs)
+        except Exception:
+            pass
+        self._maybe_estimate_neutral_point(geo, state, coeffs)
         self._refresh_plots()
 
     def run_avl(

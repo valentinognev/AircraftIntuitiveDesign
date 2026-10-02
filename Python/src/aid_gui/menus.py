@@ -256,6 +256,15 @@ def _build_settings_menu(window: QMainWindow) -> None:
     multhopp_action.triggered.connect(lambda: settings.on_multhopp(multhopp_action))
     calculations_menu.addAction(multhopp_action)
 
+    viscous_action = QAction("Viscous Strip", window)
+    settings.add_checkable(
+        ("Calculations", "Viscous Strip"),
+        viscous_action,
+        checked=settings.viscous_strip,
+    )
+    viscous_action.triggered.connect(lambda: settings.on_viscous_strip(viscous_action))
+    calculations_menu.addAction(viscous_action)
+
     units_menu = settings_menu.addMenu("Units")
     units_in_action = QAction("in-oz-ft/s", window)
     settings.add_checkable(

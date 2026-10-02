@@ -221,3 +221,68 @@ def test_analyze_entry_point_does_not_introduce_alschd(monkeypatch):
     with pytest.raises(_SolverReached):
         w.run_flow5(mesh=("6", "3"))
     assert "ALSCHD" not in w.aircraft.AERO
+
+
+# (low, high) of every shipped model as it was before the resample. The resample
+# refines the schedule but must not move the envelope it sweeps.
+SHIPPED_ALSCHD_RANGES = {
+    "ASW-20 Sailplane.jsonc": (-9.0, 10.0),
+    "B-1 Lancer.jsonc": (-4.0, 16.0),
+    "Beechcraft T-34C.jsonc": (-16.0, 24.0),
+    "Boeing 727.jsonc": (-4.0, 16.0),
+    "Boeing 737Max.jsonc": (-4.0, 16.0),
+    "Boeing 747-400.jsonc": (-4.0, 16.0),
+    "Box.jsonc": (-4.0, 16.0),
+    "Cessna 172.jsonc": (-4.0, 12.0),
+    "DA20-C1.jsonc": (-4.0, 16.0),
+    "ERAU DBF Plane.jsonc": (-2.0, 16.0),
+    "Enterprise.jsonc": (-4.0, 16.0),
+    "F-16.jsonc": (-4.0, 16.0),
+    "HK36.jsonc": (2.0, 8.0),
+    "Learjet 23.jsonc": (-4.0, 16.0),
+    "Navion.jsonc": (-4.0, 24.0),
+    "Orbiter.jsonc": (-4.0, 16.0),
+    "Rocket Prop.jsonc": (-4.0, 16.0),
+    "SR-71.jsonc": (-4.0, 16.0),
+    "Ski Plane.jsonc": (-4.0, 16.0),
+    "Sphere.jsonc": (-4.0, 16.0),
+    "X-Wing.jsonc": (-4.0, 16.0),
+    "XB-70 Valkyrie.jsonc": (-4.0, 16.0),
+}
+# Scalar ALSCHD, no schedule to expand; deliberately left alone.
+SCALAR_ALSCHD_MODEL = "T-38.jsonc"
+MIN_SHIPPED_POINTS = 11
+SHIPPED_NAMES = sorted(SHIPPED_ALSCHD_RANGES)
+
+
+def _shipped_alschd(name: str) -> list[float]:
+    stored = load_jsonc(models_dir() / name).AERO["ALSCHD"]
+    return [float(a) for a in stored]
+
+
+def test_range_table_covers_every_shipped_model():
+    shipped = {p.name for p in models_dir().glob("*.jsonc")}
+    assert shipped == set(SHIPPED_ALSCHD_RANGES) | {SCALAR_ALSCHD_MODEL}
+
+
+@pytest.mark.parametrize("name", SHIPPED_NAMES)
+def test_shipped_alschd_is_fine_enough(name):
+    """A shipped model must already carry a plot-grade schedule on disk."""
+    assert len(_shipped_alschd(name)) >= MIN_SHIPPED_POINTS
+
+
+@pytest.mark.parametrize(("name", "expected"), SHIPPED_ALSCHD_RANGES.items())
+def test_shipped_alschd_range_did_not_move(name, expected):
+    sched = _shipped_alschd(name)
+    assert (min(sched), max(sched)) == pytest.approx(expected)
+
+
+@pytest.mark.parametrize("name", SHIPPED_NAMES)
+def test_shipped_alschd_equals_the_runtime_default(name):
+    """The files are already the default schedule, so a run changes nothing."""
+    ac = load_jsonc(models_dir() / name)
+    assert [float(a) for a in ac.AERO["ALSCHD"]] == alpha_schedule(ac)
+
+
+def test_scalar_alschd_model_left_alone():
+    assert load_jsonc(models_dir() / SCALAR_ALSCHD_MODEL).AERO["ALSCHD"] == 0

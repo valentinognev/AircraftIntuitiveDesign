@@ -527,7 +527,7 @@
         []
     ],
     "AERO": { // flight conditions and reference data
-        "ALSCHD": [-4, 0, 4, 8, 12, 16], // Angle(s) of Attack, deg
+        "ALSCHD": [-4.0, -2.0, 0.0, 2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0], // Angle(s) of Attack, deg
         "ALT": 0, // Altitude, ft
         "MACH": 0.09, // Mach Number
         "WT": 218.3673, // Weight, lb

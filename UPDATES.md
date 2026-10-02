@@ -1,5 +1,9 @@
 # Updates
 
+## 1.34.1 - Saved results block hardening
+- A `__proto__` solver name in a file's `results` block no longer replaces the parsed aircraft's prototype
+- Tests guard the `results`-after-`unit` emit order and cross-check `api/aid_web/app.py`'s hand-written `Aircraft` constructor against `dataclasses.fields`
+
 ## 1.34.0 - Saved files carry analysis results
 - Optional top-level `results` block in JSONC, `{solver, payload, raw}` per solver that ran; web Save omits it entirely when nothing ran
 - Loading a file with `results` seeds `payloads`/`raws`, so the Aero overlays redraw without re-running a solver

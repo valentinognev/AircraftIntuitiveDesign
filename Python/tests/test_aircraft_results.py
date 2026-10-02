@@ -174,6 +174,14 @@ def test_results_is_the_last_optional_dataclass_field():
     assert Aircraft.__dataclass_fields__["results"].default is None
 
 
+def test_results_key_is_emitted_after_unit(tmp_path):
+    ac = load_jsonc(fixture_with_results(tmp_path, RESULTS))
+    out = tmp_path / "order.jsonc"
+    save_jsonc(ac, out)
+    text = out.read_text()
+    assert text.index('"results":') > text.index('"unit":')
+
+
 def test_load_mat_has_no_results():
     assert load_mat(CESSNA_MAT).results is None
 

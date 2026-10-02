@@ -61,6 +61,7 @@ function asSolverResults(value: unknown): Record<string, SavedSolverResult> | nu
   if (rec == null) return null;
   const out: Record<string, SavedSolverResult> = {};
   for (const [name, entry] of Object.entries(rec)) {
+    if (name === "__proto__") continue;
     const item = asRecord(entry);
     if (item == null) continue;
     const payload = asRecord(item.payload);

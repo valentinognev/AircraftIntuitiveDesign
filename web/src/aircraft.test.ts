@@ -97,6 +97,18 @@ it("an entry missing solver or with a non-object raw is dropped", () => {
   expect(ac.results).toEqual({ datcom });
 });
 
+it("a __proto__ key in the results block is skipped, not adopted as the prototype", () => {
+  const hostile = JSON.parse(
+    `{"__proto__": ${JSON.stringify(solverResult("evil"))}, "datcom": ${JSON.stringify(solverResult("datcom"))}}`,
+  ) as Record<string, unknown>;
+  expect(Object.getOwnPropertyNames(hostile)).toContain("__proto__");
+  const results = aircraftFromJson(withResults(hostile)).results;
+  expect(results?.datcom?.solver).toBe("datcom");
+  expect(Object.getPrototypeOf(results)).toBe(Object.prototype);
+  expect("payload" in (results as Record<string, unknown>)).toBe(false);
+  expect(Object.keys(aircraftToJson(aircraftFromJson(withResults(hostile))).results ?? {})).toEqual(["datcom"]);
+});
+
 it("PLANFORM_RP copies PySide label/key pairs", () => {
   expect(PLANFORM_RP).toEqual([
     ["CHRDR", "Root Chord", "len"],

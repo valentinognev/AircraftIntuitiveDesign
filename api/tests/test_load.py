@@ -1,7 +1,10 @@
-from dataclasses import replace
+import ast
+import inspect
+from dataclasses import fields, replace
+from textwrap import dedent
 
 from fastapi.testclient import TestClient
-from aid.aircraft import load_jsonc
+from aid.aircraft import Aircraft, load_jsonc
 from aid_web.app import aircraft_from_json, aircraft_to_json, app
 from aid_web.paths import resolve_model
 
@@ -99,3 +102,9 @@ def test_validate_accepts_aircraft_with_results():
     ac["results"] = RESULTS
     r = TestClient(app).post("/models/validate", json={"aircraft": ac})
     assert r.json()["ok"] is True
+
+
+def test_aircraft_from_json_supplies_every_dataclass_field():
+    tree = ast.parse(dedent(inspect.getsource(aircraft_from_json)))
+    call = next(n for n in ast.walk(tree) if isinstance(n, ast.Call) and getattr(n.func, "id", None) == "Aircraft")
+    assert {kw.arg for kw in call.keywords} == {f.name for f in fields(Aircraft)}

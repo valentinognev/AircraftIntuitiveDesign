@@ -79,6 +79,7 @@ MATLAB save variables (and JSONC top-level keys):
 | `AERO` | Flight: `ALSCHD`, `ALT`, `MACH`, `WT`, `XCG`, reference lengths, component positions (`XW`…`ZV`) |
 | `unit` | `'ft'` or `'in'` (`DIM IN` only for inches) |
 | `plot_cmp` | Component flags `[wing, HT, VT, body]`; DATCOM writes HT/VT/body only when set (wing always) |
+| `results` | JSONC only (`AID.m` never saves it): `{solver, payload, raw}` per solver run, written by web Save and preserved opaquely by Python |
 
 JSONC is JSON plus `//` comments on every key. MATLAB field `i` (incidence) is the JSON key `"i"`. Converter: `Python/scripts/mat_to_jsonc.py`. Python GUI Open/Save is JSONC only.
 

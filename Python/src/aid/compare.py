@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -88,11 +89,18 @@ def _run_avl(ac: Aircraft, workdir: Path) -> dict:
         return {"status": "failed", "coeffs": None, "error": str(exc)}
 
 
-def run_python(ac: Aircraft, work: Path) -> dict:
-    """Run DATCOM, Tornado, and AVL for *ac* under *work*."""
+def run_python(ac: Aircraft, work: Path, datcom_ac: Aircraft | None = None) -> dict:
+    """Run DATCOM, Tornado, and AVL for *ac* under *work*.
+
+    DATCOM alone may be flown on a different aircraft: ``compare_to_matlab``
+    reproduces a gold fixture on its own sweep, and only DATCOM's output depends
+    on the alpha grid in that way. Tornado and AVL always get *ac*.
+    """
     work = Path(work)
     return {
-        "datcom": _run_datcom_safe(ac, work / "datcom"),
+        "datcom": _run_datcom_safe(
+            ac if datcom_ac is None else datcom_ac, work / "datcom"
+        ),
         "tornado": _run_tornado(ac),
         "avl": _run_avl(ac, work / "avl"),
     }
@@ -242,12 +250,22 @@ def _solver_pass(
     matlab_status: str,
     python_result: dict,
     gold_path: Path,
+    *,
+    alpha: list[float],
+    alpha_source: str,
 ) -> dict:
+    """Grade one solver against its gold, recording the sweep that was flown.
+
+    ``alpha`` and ``alpha_source`` are required, not defaulted: a report that
+    says ``pass`` without saying which sweep earned it is not self-describing.
+    """
     py_status = python_result["status"]
     entry: dict[str, Any] = {
         "pass": False,
         "matlab_status": matlab_status,
         "python_status": py_status,
+        "alpha": alpha,
+        "alpha_source": alpha_source,
     }
     if python_result.get("error"):
         entry["error"] = python_result["error"]
@@ -279,30 +297,49 @@ def _gold_alpha(matlab_dir: Path) -> list | None:
     return alpha if isinstance(alpha, list) and alpha else None
 
 
+def _flown_alpha(ac: Aircraft) -> list[float]:
+    """The ``AERO.ALSCHD`` sweep a solver leg would fly for *ac*."""
+    alschd = ac.AERO.get("ALSCHD") or []
+    return [float(a) for a in np.asarray(alschd, dtype=float).reshape(-1)]
+
+
 def compare_to_matlab(name: str) -> dict:
     """Run Python solvers, compare to MATLAB gold, write ``Results/compare/<name>.json``.
 
-    The gold is a fixture with its own inputs, and solver output depends on the
-    alpha grid it was asked for -- DATCOM's ``cla``/``cma`` are finite differences
-    along it -- so the comparison flies the gold's own sweep when it records one,
-    rather than whatever schedule the model happens to store today.
+    The gold is a fixture with its own inputs, and DATCOM's output depends on the
+    alpha grid it is asked for -- its ``cla``/``cma`` are finite differences along
+    it -- so only the DATCOM leg flies the gold's own sweep. Tornado and AVL have
+    no gold alpha axis and run on the model's schedule; what each leg actually
+    flew, and where that sweep came from, is recorded in the report.
     """
     matlab_dir = results_dir() / "matlab" / name
     status = json.loads((matlab_dir / "status.json").read_text())
 
     ac = load_jsonc(models_dir() / f"{name}.jsonc")
     gold_alpha = _gold_alpha(matlab_dir)
+    datcom_ac = ac
+    datcom_source = "model"
     if gold_alpha is not None:
-        ac.AERO["ALSCHD"] = list(gold_alpha)
-    work = results_dir() / "python" / name
-    python = run_python(ac, work)
+        # A separate object, so the loaded model is never edited in place.
+        datcom_ac = replace(ac, AERO={**ac.AERO, "ALSCHD": list(gold_alpha)})
+        datcom_source = "gold"
 
+    work = results_dir() / "python" / name
+    python = run_python(ac, work, datcom_ac=datcom_ac)
+
+    flown = {
+        "datcom": (_flown_alpha(datcom_ac), datcom_source),
+        "tornado": (_flown_alpha(ac), "model"),
+        "avl": (_flown_alpha(ac), "model"),
+    }
     report = {
         solver: _solver_pass(
             solver,
             status[solver],
             python[solver],
             matlab_dir / f"{solver}.json",
+            alpha=flown[solver][0],
+            alpha_source=flown[solver][1],
         )
         for solver in ("datcom", "tornado", "avl")
     }

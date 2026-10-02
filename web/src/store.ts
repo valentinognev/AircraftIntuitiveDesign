@@ -7,6 +7,7 @@ import {
   patchGroup,
   type AircraftDict,
   type AircraftGroup,
+  type SavedSolverResult,
 } from "./aircraft";
 import { fetchModel, fetchStability, postAnalyze, type ValidateResult } from "./api";
 import type { HandshakePayload } from "./payload";
@@ -86,6 +87,7 @@ export type AidState = {
   setUnit: (unit: string) => void;
   runAnalyze: (solver: string) => Promise<void>;
   loadStability: () => Promise<void>;
+  resultsForSave: () => Record<string, SavedSolverResult> | undefined;
 };
 
 function finiteNumbers(value: unknown): value is number[] {
@@ -97,6 +99,30 @@ function finiteHandbook(value: unknown): { y: number[]; Cl: number[] } | null {
   const rec = value as { y?: unknown; Cl?: unknown };
   if (!finiteNumbers(rec.y) || !finiteNumbers(rec.Cl) || rec.y.length !== rec.Cl.length) return null;
   return { y: rec.y, Cl: rec.Cl };
+}
+
+type SeededResults = {
+  payloads: Record<string, HandshakePayload>;
+  raws: Record<string, unknown>;
+  lastPayload: HandshakePayload | null;
+};
+
+function seededResults(results: Record<string, SavedSolverResult> | undefined): SeededResults {
+  const payloads: Record<string, HandshakePayload> = {};
+  const raws: Record<string, unknown> = {};
+  let lastPayload: HandshakePayload | null = null;
+  for (const [name, entry] of Object.entries(results ?? {})) {
+    const payload = entry.payload as HandshakePayload;
+    payloads[name] = payload;
+    raws[name] = entry.raw;
+    lastPayload = payload;
+  }
+  return { payloads, raws, lastPayload };
+}
+
+function savedRecord(value: unknown): Record<string, unknown> | null {
+  if (value == null || typeof value !== "object" || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
 }
 
 function initialTheme(): Theme {
@@ -177,6 +203,7 @@ export function createStore() {
     openAircraft: (raw, stem) => {
       try {
         const aircraft = aircraftFromJson(raw);
+        const seeded = seededResults(aircraft.results);
         set((s) => {
           analyzeGen += 1;
           return {
@@ -187,9 +214,9 @@ export function createStore() {
             validateError: null,
             tab: "wing",
             recent: recordRecent(stem),
-            lastPayload: null,
-            payloads: {},
-            raws: {},
+            lastPayload: seeded.lastPayload,
+            payloads: seeded.payloads,
+            raws: seeded.raws,
             handbook: null,
             lastStability: null,
             analyzeError: null,
@@ -329,6 +356,20 @@ export function createStore() {
       const st = await fetchStability(ac);
       if (get().revision !== revision) return;
       set({ lastStability: st });
+    },
+    resultsForSave: () => {
+      const { payloads, raws } = get();
+      const out: Record<string, SavedSolverResult> = {};
+      for (const [name, payload] of Object.entries(payloads)) {
+        const raw = savedRecord(raws[name]);
+        if (raw == null) continue;
+        out[name] = {
+          solver: typeof payload.solver === "string" ? payload.solver : name,
+          payload: { ...payload },
+          raw: { ...raw },
+        };
+      }
+      return Object.keys(out).length > 0 ? out : undefined;
     },
   }));
 }

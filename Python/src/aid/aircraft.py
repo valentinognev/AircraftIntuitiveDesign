@@ -25,6 +25,7 @@ class Aircraft:
     plot_cmp: list
     unit: str
     cg_data: list | None = None
+    results: dict | None = None
 
 
 def _convert_cell_element(obj):
@@ -63,6 +64,13 @@ def _convert_mat(obj):
     return obj
 
 
+def _results_from_dict(d: dict) -> dict | None:
+    results = d.get("results")
+    if not isinstance(results, dict) or not results:
+        return None
+    return results
+
+
 def _aircraft_from_dict(d: dict) -> Aircraft:
     return Aircraft(
         WG=d["WG"],
@@ -79,6 +87,7 @@ def _aircraft_from_dict(d: dict) -> Aircraft:
         plot_cmp=d["plot_cmp"],
         unit=d["unit"],
         cg_data=d.get("cg_data"),
+        results=_results_from_dict(d),
     )
 
 
@@ -90,6 +99,9 @@ def save_jsonc(ac: Aircraft, path: Path) -> None:
     data = asdict(ac)
     if data.get("cg_data") is None:
         data.pop("cg_data", None)
+    results = data.get("results")
+    if not isinstance(results, dict) or not results:
+        data.pop("results", None)
     path.write_text(dumps_jsonc(data, field_docs.DOCS))
 
 
@@ -112,4 +124,5 @@ def load_mat(path: Path) -> Aircraft:
         plot_cmp=_convert_mat(raw["plot_cmp"]),
         unit=_convert_mat(raw["unit"]) if "unit" in raw else "ft",
         cg_data=cg_data,
+        results=None,
     )

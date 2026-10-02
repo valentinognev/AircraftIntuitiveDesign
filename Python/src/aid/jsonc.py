@@ -91,14 +91,28 @@ def _emit_list_contents(lst: list, path_parts: list[str], docs: dict, lines: lis
             raise TypeError(type(item))
 
 
+RESULTS_DOC = "Analysis results, keyed by solver"
+
+
+def _emit_opaque(key: str, value: dict, pad: str, comma: str, lines: list[str]) -> None:
+    body = json.dumps(value, indent=4)[1:-1].strip("\n")
+    lines.append(f'{pad}"{key}": {{ // {RESULTS_DOC}')
+    if body:
+        lines.append(pad + body.replace("\n", "\n" + pad))
+    lines.append(pad + "}" + comma)
+
+
 def _emit_dict_contents(d: dict, path_parts: list[str], docs: dict, lines: list[str], indent: int) -> None:
     pad = " " * indent
     items = list(d.items())
     for i, (key, value) in enumerate(items):
         key_path = path_parts + [key]
-        doc = _lookup_doc(key_path, docs)
         is_last = i == len(items) - 1
         comma = "" if is_last else ","
+        if key_path == ["results"] and isinstance(value, dict):
+            _emit_opaque(key, value, pad, comma, lines)
+            continue
+        doc = _lookup_doc(key_path, docs)
         comment = f" // {doc}"
         if _is_inline(value):
             lines.append(f'{pad}"{key}": {_json_scalar(value)}{comma}{comment}')

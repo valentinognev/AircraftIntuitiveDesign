@@ -1,6 +1,7 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { emptyAircraft, type AircraftDict, type SavedSolverResult } from "./aircraft";
 import { downloadAircraft, fetchStability, postAnalyze, validateAircraft } from "./api";
+import * as api from "./api";
 import { createStore } from "./store";
 
 type CapturedBlob = { text: string; options: unknown };
@@ -168,7 +169,7 @@ it("an aircraft carrying a results block still validates and analyzes as geometr
   for (const aircraft of sent) expect(aircraft).toEqual(populatedJson());
 });
 
-it("the Save path writes resultsForSave, so a gated-out entry never reaches the file", () => {
+it("saveAircraftFromStore writes the usablePayload-gated block into the download", () => {
   const captured = stubBrowser();
   stubFetch();
   const store = createStore();
@@ -179,13 +180,51 @@ it("the Save path writes resultsForSave, so a gated-out entry never reaches the 
     raw: { note: "unplottable" },
   };
   const loaded = { ...populatedJson(), results: { datcom: good, tornado: gated } };
-  store.getState().openAircraft(loaded, "a.jsonc");
-  const state = store.getState();
-  downloadAircraft(state.aircraft!, "Cessna172", state.resultsForSave());
+  store.getState().openAircraft(loaded, "Cessna172");
+  api.saveAircraftFromStore(store.getState());
   const written = JSON.parse(captured.blobs[0].text) as {
     results?: Record<string, SavedSolverResult>;
   };
   expect(written.results).toEqual({ datcom: good });
+  expect("tornado" in (written.results ?? {})).toBe(false);
+  expect(captured.names).toEqual(["Cessna172.jsonc"]);
+});
+
+it("saveAircraftFromStore writes a geometry-only file when resultsForSave is undefined", () => {
+  const captured = stubBrowser();
+  stubFetch();
+  const store = createStore();
+  store.getState().openAircraft(populatedJson(), "Cessna172");
+  api.saveAircraftFromStore(store.getState());
+  expect(captured.blobs[0].text).toBe(JSON.stringify(populatedJson(), null, 4));
+});
+
+it("saveAircraftFromStore downloads nothing without an aircraft", () => {
+  const captured = stubBrowser();
+  stubFetch();
+  const store = createStore();
+  expect(api.saveAircraftFromStore(store.getState())).toBeUndefined();
+  expect(captured.blobs).toHaveLength(0);
+});
+
+it("saveAircraftFromStore falls back to aircraft.jsonc when the stem is missing", () => {
+  const captured = stubBrowser();
+  stubFetch();
+  const store = createStore();
+  store.getState().openAircraft(populatedJson(), "Cessna172");
+  store.setState({ stem: null });
+  api.saveAircraftFromStore(store.getState());
+  expect(captured.names).toEqual(["aircraft.jsonc"]);
+});
+
+it("downloadAircraft ignores results carried by the aircraft it is handed", () => {
+  const captured = stubBrowser();
+  const ac: AircraftDict = {
+    ...populatedAircraft(),
+    results: { datcom: solverResult("datcom") },
+  };
+  downloadAircraft(ac, "Cessna172");
+  expect("results" in (JSON.parse(captured.blobs[0].text) as Record<string, unknown>)).toBe(false);
 });
 
 function bodyAircraft(body: string): Record<string, unknown> {

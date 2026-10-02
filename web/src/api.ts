@@ -4,7 +4,7 @@ import type { HandshakePayload } from "./payload";
 
 export type ValidateResult = { ok: true } | { ok: false; error: string };
 
-function withoutResults(aircraft: AircraftDict): AircraftDict {
+export function aircraftForRequest(aircraft: AircraftDict): AircraftDict {
   const geometry = aircraftToJson(aircraft);
   delete geometry.results;
   return geometry;
@@ -31,7 +31,7 @@ export async function validateAircraft(aircraft: AircraftDict): Promise<Validate
     const res = await fetch("/models/validate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ aircraft: withoutResults(aircraft) }),
+      body: JSON.stringify({ aircraft: aircraftForRequest(aircraft) }),
     });
     const data = (await res.json()) as { ok?: boolean; error?: unknown };
     if (data.ok === true) return { ok: true };
@@ -75,7 +75,7 @@ export async function postAnalyze(
     const res = await fetch("/analyze", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ aircraft: withoutResults(aircraft), solver }),
+      body: JSON.stringify({ aircraft: aircraftForRequest(aircraft), solver }),
     });
     data = (await res.json()) as typeof data;
   } catch (err) {
@@ -118,7 +118,7 @@ export async function fetchStability(
     const res = await fetch("/stability", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ aircraft: withoutResults(aircraft) }),
+      body: JSON.stringify({ aircraft: aircraftForRequest(aircraft) }),
     });
     if (!res.ok) return null;
     const data = (await res.json()) as Record<string, unknown>;
@@ -136,7 +136,7 @@ export function downloadAircraft(
   const name = stem.toLowerCase().endsWith(".jsonc") || stem.toLowerCase().endsWith(".json")
     ? stem
     : `${stem || "aircraft"}.jsonc`;
-  const geometry = withoutResults(aircraft);
+  const geometry = aircraftForRequest(aircraft);
   const saved: AircraftDict =
     results != null && Object.keys(results).length > 0 ? { ...geometry, results } : geometry;
   const blob = new Blob([JSON.stringify(saved, null, 4)], {
@@ -148,4 +148,16 @@ export function downloadAircraft(
   a.download = name;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+export type AircraftSaveSource = {
+  aircraft: AircraftDict | null;
+  stem: string | null;
+  resultsForSave: () => Record<string, SavedSolverResult> | undefined;
+};
+
+export function saveAircraftFromStore(source: AircraftSaveSource): void {
+  const { aircraft } = source;
+  if (aircraft == null) return;
+  downloadAircraft(aircraft, source.stem ?? "aircraft", source.resultsForSave());
 }

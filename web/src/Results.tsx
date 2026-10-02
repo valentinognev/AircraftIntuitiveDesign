@@ -1,5 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { aircraftToJson } from "./aircraft";
+import { aircraftForRequest } from "./api";
 import { chartRows, type ControlChartSeries, type ControlDerivPayload } from "./controlDeriv";
 import {
   barFill,
@@ -525,7 +525,7 @@ export function Results({ initialTab = "forces" }: { initialTab?: string }) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            aircraft: aircraftToJson(aircraft),
+            aircraft: aircraftForRequest(aircraft),
             solver: "handbook",
             deltas_deg: [0, 5],
           }),

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useStore } from "zustand";
-import { downloadAircraft, validateAircraft } from "./api";
+import { saveAircraftFromStore, validateAircraft } from "./api";
 import { VALIDATE_MS, debounce } from "./debounce";
 import { AircraftCanvas } from "./AircraftCanvas";
 import { extraTabs } from "./extras";
@@ -169,10 +169,7 @@ export function Editor() {
           type="button"
           className="rounded border border-slate-300 bg-white px-3 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
           disabled={aircraft == null}
-          onClick={() => {
-            if (aircraft == null) return;
-            downloadAircraft(aircraft, stem ?? "aircraft", store.getState().resultsForSave());
-          }}
+          onClick={() => saveAircraftFromStore(store.getState())}
         >
           Save
         </button>

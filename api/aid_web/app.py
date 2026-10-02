@@ -56,6 +56,8 @@ def aircraft_to_json(ac: Aircraft) -> dict:
     data = asdict(ac)
     if data.get("cg_data") is None:
         data.pop("cg_data", None)
+    if not data.get("results"):
+        data.pop("results", None)
     return data
 
 
@@ -75,6 +77,7 @@ def aircraft_from_json(data: dict) -> Aircraft:
         plot_cmp=data["plot_cmp"],
         unit=data["unit"],
         cg_data=data.get("cg_data"),
+        results=data.get("results"),
     )
 
 

@@ -358,6 +358,22 @@ class MainWindow(QMainWindow):
         workdir.mkdir(parents=True, exist_ok=True)
         return workdir
 
+    def _pre_solve_alpha_default(self) -> None:
+        """Expand ``AERO.ALSCHD`` and show the expanded list in the Aero field.
+
+        The field text is what the next ``sync_fields_to_aircraft`` writes back,
+        so leaving it sparse would undo the default.
+        """
+        ac = self.aircraft
+        apply_alpha_default(ac)
+        alschd = ac.AERO.get("ALSCHD")
+        edit = getattr(self, "_field_edits", {}).get("AERO.ALSCHD")
+        if alschd is None or edit is None:
+            return
+        edit.blockSignals(True)
+        edit.setText(str(alschd))
+        edit.blockSignals(False)
+
     def apply_units(self, to_in: bool, *, scale_size: bool) -> None:
         if self.aircraft is None:
             return
@@ -422,7 +438,7 @@ class MainWindow(QMainWindow):
         if not self._require_aircraft():
             return
         sync_fields_to_aircraft(self)
-        apply_alpha_default(self.aircraft)
+        self._pre_solve_alpha_default()
         ac = with_aid_exposed_spans(self.aircraft)
         workdir = self._analysis_workdir("datcom")
         workdir.mkdir(parents=True, exist_ok=True)
@@ -528,7 +544,7 @@ class MainWindow(QMainWindow):
         if not self._require_aircraft():
             return
         sync_fields_to_aircraft(self)
-        apply_alpha_default(self.aircraft)
+        self._pre_solve_alpha_default()
         if not isinstance(mesh, tuple):
             mesh = None
         if mesh is None:
@@ -610,7 +626,7 @@ class MainWindow(QMainWindow):
         if not self._require_aircraft():
             return
         sync_fields_to_aircraft(self)
-        apply_alpha_default(self.aircraft)
+        self._pre_solve_alpha_default()
         if not isinstance(mesh, tuple):
             mesh = None
         if mesh is None:
@@ -653,7 +669,7 @@ class MainWindow(QMainWindow):
         if not self._require_aircraft():
             return
         sync_fields_to_aircraft(self)
-        apply_alpha_default(self.aircraft)
+        self._pre_solve_alpha_default()
         if not isinstance(mesh, tuple):
             mesh = None
         if mesh is None:
@@ -688,7 +704,7 @@ class MainWindow(QMainWindow):
         if not self._require_aircraft():
             return
         sync_fields_to_aircraft(self)
-        apply_alpha_default(self.aircraft)
+        self._pre_solve_alpha_default()
         solver = self.last_analyze_solver or "handbook"
         try:
             report = control_report(self.aircraft, solver, [0.0, 5.0])

@@ -1,3 +1,4 @@
+import ast
 import math
 import os
 from itertools import pairwise
@@ -12,6 +13,7 @@ from aid.aircraft import Aircraft, load_jsonc
 from aid.alpha_schedule import ALPHA_POINTS, alpha_schedule, apply_alpha_default
 from aid.paths import models_dir
 from aid_gui.main_window import MainWindow
+from aid_gui.tabs import sync_fields_to_aircraft
 
 # A deliberately sparse schedule, set explicitly so the tests do not depend on
 # what a shipped model happens to store. The default schedule is that envelope
@@ -159,6 +161,22 @@ def _cessna_window() -> MainWindow:
     return w
 
 
+def _drive(monkeypatch, method, solver, kwargs) -> tuple[MainWindow, list]:
+    """Run one GUI entry point up to its first solver call; return the window
+    and the schedules the solver was handed."""
+    seen: list = []
+
+    def stop(ac, *args, **kw):
+        seen.append(list(ac.AERO["ALSCHD"]))
+        raise _SolverReached
+
+    monkeypatch.setattr(solver, stop)
+    w = _cessna_window()
+    with pytest.raises(_SolverReached):
+        getattr(w, method)(**kwargs)
+    return w, seen
+
+
 @pytest.mark.parametrize(
     ("method", "solver", "kwargs"),
     [
@@ -174,17 +192,19 @@ def test_analyze_entry_points_expand_alschd_before_the_solver(
     monkeypatch, method, solver, kwargs
 ):
     """Every GUI Analyze entry point hands the expanded schedule to its solver."""
-    seen = []
-
-    def stop(ac, *args, **kw):
-        seen.append(list(ac.AERO["ALSCHD"]))
-        raise _SolverReached
-
-    monkeypatch.setattr(solver, stop)
-    w = _cessna_window()
-    with pytest.raises(_SolverReached):
-        getattr(w, method)(**kwargs)
+    w, seen = _drive(monkeypatch, method, solver, kwargs)
     assert seen == [CESSNA_EXPANDED]
+    assert w.aircraft.AERO["ALSCHD"] == CESSNA_EXPANDED
+
+
+def test_aero_field_shows_the_expanded_schedule(monkeypatch):
+    """The Aero field must mirror the model, or the next field sync reverts it."""
+    w, _ = _drive(
+        monkeypatch, "run_flow5", "aid_gui.main_window.run_flow5", {"mesh": ("6", "3")}
+    )
+    text = w._field_edits["AERO.ALSCHD"].text()
+    assert ast.literal_eval(text) == CESSNA_EXPANDED
+    sync_fields_to_aircraft(w)
     assert w.aircraft.AERO["ALSCHD"] == CESSNA_EXPANDED
 
 

@@ -5,6 +5,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from aid.aircraft import Aircraft
+from aid.alpha_schedule import apply_alpha_default
 from aid.avl_io import run_avl_full
 from aid.control_report import control_report
 from aid.datcom_run import run_datcom
@@ -162,22 +163,26 @@ def run_tornado(ac: Aircraft, mesh: tuple[str, ...]) -> dict:
 
 
 def analyze_datcom(ac: Aircraft) -> dict:
+    ac = apply_alpha_default(ac)
     with TemporaryDirectory() as td:
         aid_raw = run_datcom(ac, Path(td))
     return _analyze_result("datcom", aid_raw, ac)
 
 
 def analyze_tornado(ac: Aircraft, mesh: tuple[str, ...]) -> dict:
+    ac = apply_alpha_default(ac)
     return _analyze_result("tornado", run_tornado(ac, mesh), ac)
 
 
 def analyze_avl(ac: Aircraft, mesh: tuple[str, ...]) -> dict:
+    ac = apply_alpha_default(ac)
     with TemporaryDirectory() as td:
         aid_raw = run_avl_full(ac, mesh, Path(td))
     return _analyze_result("avl", aid_raw, ac)
 
 
 def analyze_flow5(ac: Aircraft, mesh: tuple[str, ...]) -> dict:
+    ac = apply_alpha_default(ac)
     return _analyze_result("flow5", run_flow5(ac, mesh), ac)
 
 
@@ -205,6 +210,7 @@ def control_derivatives(
     deltas_deg=None,
     mesh: tuple[str, ...] | None = None,
 ) -> dict:
+    ac = apply_alpha_default(ac)
     if solver in DEFAULT_MESH:
         mesh = _mesh_tuple(solver, mesh)
     return control_report(ac, solver, deltas_deg=deltas_deg, mesh=mesh)

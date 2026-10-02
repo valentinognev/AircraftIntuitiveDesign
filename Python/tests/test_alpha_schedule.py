@@ -1,11 +1,23 @@
 import math
+import os
 from itertools import pairwise
+
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import numpy as np
 import pytest
+from PySide6.QtWidgets import QApplication
 
-from aid.aircraft import Aircraft
+from aid.aircraft import Aircraft, load_jsonc
 from aid.alpha_schedule import ALPHA_POINTS, alpha_schedule, apply_alpha_default
+from aid.paths import models_dir
+from aid_gui.main_window import MainWindow
+
+# A deliberately sparse schedule, set explicitly so the tests do not depend on
+# what a shipped model happens to store. The default schedule is that envelope
+# on a 1-degree step.
+SPARSE_TEXT = "-4, 0, 4, 8, 12"
+CESSNA_EXPANDED = [-4.0 + i for i in range(17)]
 
 
 def _craft(alschd) -> Aircraft:
@@ -132,3 +144,60 @@ def test_absent_key_is_not_introduced():
     out = apply_alpha_default(ac)
     assert out is ac
     assert "ALSCHD" not in ac.AERO
+
+
+class _SolverReached(Exception):
+    """Stops a GUI entry point at its first solver call."""
+
+
+def _cessna_window() -> MainWindow:
+    """Cessna geometry with the sparse ALSCHD typed into the Aero field."""
+    QApplication.instance() or QApplication([])
+    w = MainWindow()
+    w.load_aircraft(load_jsonc(models_dir() / "Cessna 172.jsonc"))
+    w._field_edits["AERO.ALSCHD"].setText(SPARSE_TEXT)
+    return w
+
+
+@pytest.mark.parametrize(
+    ("method", "solver", "kwargs"),
+    [
+        ("run_datcom", "aid_gui.main_window.write_for005", {}),
+        ("run_tornado", "aid_gui.main_window.tornado_io", {"mesh": ("6", "3")}),
+        ("run_avl", "aid_gui.main_window.run_avl_full", {"mesh": ("6", "3")}),
+        ("run_flow5", "aid_gui.main_window.run_flow5", {"mesh": ("6", "3")}),
+        ("run_control_derivatives", "aid_gui.main_window.control_report", {}),
+    ],
+    ids=["datcom", "tornado", "avl", "flow5", "control_derivatives"],
+)
+def test_analyze_entry_points_expand_alschd_before_the_solver(
+    monkeypatch, method, solver, kwargs
+):
+    """Every GUI Analyze entry point hands the expanded schedule to its solver."""
+    seen = []
+
+    def stop(ac, *args, **kw):
+        seen.append(list(ac.AERO["ALSCHD"]))
+        raise _SolverReached
+
+    monkeypatch.setattr(solver, stop)
+    w = _cessna_window()
+    with pytest.raises(_SolverReached):
+        getattr(w, method)(**kwargs)
+    assert seen == [CESSNA_EXPANDED]
+    assert w.aircraft.AERO["ALSCHD"] == CESSNA_EXPANDED
+
+
+def test_analyze_entry_point_does_not_introduce_alschd(monkeypatch):
+    """A blanked ALSCHD field stays absent; an Analyze run must not invent one."""
+
+    def stop(ac, mesh, **kw):
+        raise _SolverReached
+
+    monkeypatch.setattr("aid_gui.main_window.run_flow5", stop)
+    w = _cessna_window()
+    w._field_edits["AERO.ALSCHD"].setText("")
+    w.aircraft.AERO.pop("ALSCHD")
+    with pytest.raises(_SolverReached):
+        w.run_flow5(mesh=("6", "3"))
+    assert "ALSCHD" not in w.aircraft.AERO

@@ -70,6 +70,21 @@ def test_tie_between_ladder_steps_prefers_finer_step():
     assert len(sched) == 21
 
 
+# The endpoint rule appends ``hi`` whenever the ladder falls short, with no floor
+# on the residual, so the last interval can be thinner than half the step -- and
+# that interval is one DATCOM differences along. Endpoint preservation is
+# mandated, so the sliver is kept deliberately.
+def test_sliver_final_interval_is_kept():
+    sched = alpha_schedule(_craft([0.0, 4.2]))
+    assert sched == [0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.2]
+    assert 0 < sched[-1] - sched[-2] < 0.25
+
+
+def test_span_205_is_not_expanded_at_all():
+    """The sliver's own example: 2.05 does not reach the 0.1 grid, so no schedule."""
+    assert alpha_schedule(_craft([0.0, 2.05])) == [0.0, 2.05]
+
+
 @pytest.mark.parametrize(
     ("alschd", "expected"),
     [(0, [0.0]), ([3.5], [3.5]), ((-2.0,), [-2.0]), ([2.0, 2.0], [2.0]),

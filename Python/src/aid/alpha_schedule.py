@@ -61,6 +61,10 @@ def alpha_schedule(ac, target: int = ALPHA_POINTS) -> list[float]:
 
     Sparse schedules are refilled on the ladder step whose point count lands
     nearest ``target``, ties taking the finer step, and the endpoints are kept.
+    ``hi`` is appended whenever the ladder falls short by more than ``1e-9``,
+    with no floor on the residual, so the last interval can be thinner than half
+    the step (span 4.2 steps 0.5 and ends ``..., 4.0, 4.2``) -- a sliver, kept
+    because endpoint preservation is the rule and DATCOM differences along it.
     A schedule that survives ``%.1f`` comes back as plain floats; one stored
     with more points than ``target``, as a scalar, or with no finite value at
     all, comes back normalised by ``_finite_values`` and no longer than stored.

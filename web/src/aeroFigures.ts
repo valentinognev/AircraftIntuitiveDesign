@@ -325,7 +325,7 @@ function pairDatcom(xRaw: unknown[], yRaw: unknown[]): { x: number[]; y: number[
  * spanwise curves really are at the requested one.
  *
  * `base` is the display name the legend already shows, so a named curve keeps its
- * name — the spanwise handbook curve reads "Prandtl (beta=0)", not "datcom (beta=0)".
+ * name — the spanwise handbook curve keeps a bare "Prandtl", not "Prandtl (beta=0)".
  */
 function betaSuffix(base: string, beta: number): { label?: string } {
   return beta === 0 ? {} : { label: `${base} (beta=0)` };

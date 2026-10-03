@@ -39,6 +39,8 @@ MATLAB remains the gold runner. Python `aid` is a headless engine. `aid_gui` (Py
 
 Two solver stacks, one repo, three UIs (MATLAB, PySide, web). DATCOM, AVL, and flow5 are compiled once and invoked as subprocesses from both languages (flow5 is Python-only today). Tornado is a source port, so coefficient compare uses looser tolerances than the shared Fortran parsers. flow5 is GPL-3: the PySide GUI never links `flow5-lib`; only `FLOW5/run/flow5_run` runs as a subprocess (same pattern as AVL). Web Analyze uses the same `aid` runners (no second solver).
 
+All four solvers report their coefficients in Forward-Right-Down (x forward, y right, z down; roll right-wing-down, pitch nose-up, yaw nose-right), and `Python/src/aid/axes.py` is the only place a sign is written down — a runner, parser or plot never carries one of its own.
+
 ```
 Aircraft (WG/HT/VT/F/A/E/R/BD/AERO)
         │
@@ -76,7 +78,7 @@ MATLAB save variables (and JSONC top-level keys):
 | `F` / `A` / `E` / `R` | Flap, aileron, elevator, rudder (`$SYMFLP` / `$ASYFLP`; rudder is Tornado/AVL only here) |
 | `BD` | Body (`NX`, stations `X`, `ZU`/`ZL`, `R`, `S`, `ITYPE`) |
 | `NP` / `NB` | Extra planforms (1×4 cell) and extra bodies (1×2 cell) |
-| `AERO` | Flight: `ALSCHD`, `ALT`, `MACH`, `WT`, `XCG`, reference lengths, component positions (`XW`…`ZV`) |
+| `AERO` | Flight: `ALSCHD`, `ALT`, `BETA` (sideslip, deg), `MACH`, `WT`, `XCG`, reference lengths, component positions (`XW`…`ZV`) |
 | `unit` | `'ft'` or `'in'` (`DIM IN` only for inches) |
 | `plot_cmp` | Component flags `[wing, HT, VT, body]`; DATCOM writes HT/VT/body only when set (wing always) |
 | `results` | JSONC only (`AID.m` never saves it): `{solver, payload, raw}` per solver run, written by web Save and preserved opaquely by Python |

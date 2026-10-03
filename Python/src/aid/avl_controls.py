@@ -151,6 +151,9 @@ def rows_from_sb(
             if value is not None:
                 row[tag] = value
         rows.append(row)
+    # Deliberately no to_frd("avl", ...): these CY/Cl/Cn come straight out of the
+    # .sb body-axis tags, which AVL already prints X fwd / Z down, so they are
+    # Forward-Right-Down on arrival. Wrapping them by reflex would flip them twice.
     return rows
 
 

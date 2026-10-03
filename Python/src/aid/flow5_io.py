@@ -6,6 +6,7 @@ from pathlib import Path
 import numpy as np
 
 from aid.aircraft import Aircraft
+from aid.axes import to_frd
 from aid.paths import flow5_bin
 from aid.flow5_foils import _cmp_enabled, foils_for_aircraft
 from aid.flow5_sections import planform_sections
@@ -108,4 +109,7 @@ def run_flow5_native(deck: dict, *, timeout: float = 180) -> dict:
 
 
 def run_flow5(ac: Aircraft, mesh: tuple[str, str], *, timeout: float = 180) -> dict:
-    return run_flow5_native(write_flow5_deck(ac, mesh), timeout=timeout)
+    # flow5's map is empty today because the emitted channels are longitudinal
+    # only; Task 2.3 fills in the lateral flips, measured and recorded in
+    # aid/axes.py. This call is the boundary where that will take effect.
+    return to_frd("flow5", run_flow5_native(write_flow5_deck(ac, mesh), timeout=timeout))

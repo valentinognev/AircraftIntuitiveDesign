@@ -6,6 +6,7 @@ import copy
 
 import numpy as np
 
+from aid.axes import to_frd
 from aid.tornado.isa import isa_atmosphere
 from aid.tornado.lattice import _config
 
@@ -223,4 +224,10 @@ def coeff_create(results: dict, lattice: dict, state: dict, ref: dict, geo: dict
         out["Cm_d"] = dcm[6:]
         out["Cn_d"] = dcn[6:]
 
-    return out
+    # Tornado's body frame is x aft, y right, z up, so CX/CZ and Cl/Cn -- and the
+    # alpha, beta and control derivatives that inherit their channel's frame --
+    # come out mirrored. The wind-axis CL/CD/CC/Cm, the p/q/r rate derivatives
+    # (already standard) and the raw solver vectors are not in the map. `cp` is
+    # built from FORCE before this point, so FORCE staying raw is what makes it
+    # reproducible.
+    return to_frd("tornado", out)

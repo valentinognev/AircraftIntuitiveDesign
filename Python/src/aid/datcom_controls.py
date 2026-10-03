@@ -100,6 +100,10 @@ def _totals(parsed: dict) -> dict:
             return None
         return _index0(parsed[key])
 
+    # Deliberately no to_frd("datcom", ...) on this dict: the lateral channels are
+    # the lowercase parser keys (cl/cn/cy), which are moments/side force and already
+    # follow the standard convention. The UPPERCASE force pair that run_datcom flips
+    # is not what these read, so wrapping them by reflex would flip them twice.
     return {
         "CL": cl,
         "CD": cd,

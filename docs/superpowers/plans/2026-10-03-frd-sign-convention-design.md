@@ -119,8 +119,8 @@ Evidence:
     stability axes `is`/`ks` at `panelanalysis.cpp:663-665`, applied at
     `:844-846`, and `stabderivatives.cpp:129-137` scales positively), and so are
     `CXa`/`CZa` (`CXa ≈ CL − dCD/dα` matches
-    `Longitudinal_Dynamic_Stability.m:22`; `CZa ≈ −dCL/dα` is negative like
-    `:35`).
+    `Longitudinal_Dynamic_Stability.m:22`; `CZa ≈ −CLa − CD` is negative like
+    `:35` — the `- AC.CD` term is **required**, not optional; see spike 4).
 - **handbook** — `Matlab/fsroot/code/Lateral_Static_Stability.m:100` yields
   `Cnβ > 0`, `Clβ < 0`, `CYβ < 0`, i.e. already F-R-D. No entry needed.
 
@@ -276,11 +276,11 @@ Answered by Task 2.0; evidence in
 
    - `CXa` matches `Longitudinal_Dynamic_Stability.m:22`
      `CXa = AC.CL - AC.CDa;`. Measured residual `CXa − (CL − dCD/dα)` stays within
-     `2.6e-6 … 2.6e-4` over the 15 interior points, i.e. ≤0.1 %.
+     `2.6e-6 … 2.6e-4` over the 14 central-difference points, i.e. ≤0.1 %.
    - `CZa` matches `Longitudinal_Dynamic_Stability.m:35`
      `CZa = -AC.CLa - AC.CD;`. Measured
      residual `CZa − (−dCL/dα − CD)` is **flat at −6.6e-4 … −5.7e-4** across all
-     15 interior points, whereas the `CD`-less form `CZa − (−dCL/dα)` drifts
+     14 central-difference points, whereas the `CD`-less form `CZa − (−dCL/dα)` drifts
      monotonically from −0.0009 to **−0.0607**, tracking −`CD` (which runs
      0.00098 → 0.0602 over the sweep). The `CD` term is therefore **real and
      required**; the flat residual is just the second-order truncation

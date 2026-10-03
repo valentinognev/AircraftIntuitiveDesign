@@ -208,6 +208,17 @@ def test_aero_field_shows_the_expanded_schedule(monkeypatch):
     assert w.aircraft.AERO["ALSCHD"] == CESSNA_EXPANDED
 
 
+def test_units_and_scale_leave_the_expanded_schedule_alone(monkeypatch):
+    """Both re-parse the field, so the mirror has to survive the round trip."""
+    w, _ = _drive(
+        monkeypatch, "run_flow5", "aid_gui.main_window.run_flow5", {"mesh": ("6", "3")}
+    )
+    w.apply_units(True, scale_size=True)
+    w.apply_scale(1.05)
+    assert w.aircraft.AERO["ALSCHD"] == CESSNA_EXPANDED
+    assert ast.literal_eval(w._field_edits["AERO.ALSCHD"].text()) == CESSNA_EXPANDED
+
+
 def test_analyze_entry_point_does_not_introduce_alschd(monkeypatch):
     """A blanked ALSCHD field stays absent; an Analyze run must not invent one."""
 
@@ -317,4 +328,8 @@ def test_shipped_alschd_equals_the_runtime_default(name):
 
 
 def test_scalar_alschd_model_left_alone():
-    assert load_jsonc(models_dir() / SCALAR_ALSCHD_MODEL).AERO["ALSCHD"] == 0
+    """The file keeps its scalar, but a run does not: it expands to one point."""
+    ac = load_jsonc(models_dir() / SCALAR_ALSCHD_MODEL)
+    assert ac.AERO["ALSCHD"] == 0
+    apply_alpha_default(ac)
+    assert ac.AERO["ALSCHD"] == [0.0]

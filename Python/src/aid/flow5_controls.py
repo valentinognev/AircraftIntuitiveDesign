@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from aid.aircraft import Aircraft
+from aid.axes import to_frd
 from aid.control_deriv import (
     COEFFS,
     H_DEG,
@@ -49,7 +50,12 @@ def _row(ac: Aircraft, surface: str, delta: float, mesh, runner) -> dict:
     row = blank_row(surface, delta, available=True)
     for name in _KEEP[surface]:
         row[name] = slope[name]
-    return row
+    # The probe runs go through run_flow5_native, so these rows are still in
+    # flow5's own frame: Cl and Cn are the mirrored channels. Normalize here,
+    # once, rather than in every plot that reads control rows -- a central
+    # difference of two negated samples is the negation of the difference, so
+    # wrapping the slope is equivalent to wrapping each sample.
+    return to_frd("flow5", row)
 
 
 def _unavailable(block) -> str:

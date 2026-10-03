@@ -31,8 +31,43 @@ def _flow5_results() -> dict:
             "Cm": np.array([0.0, -0.1]),
             "CLa": 5.0,
             "Cma": -1.0,
+            # Lateral half: per-point Cl/Cn plus the twelve single-point
+            # stability scalars, all already Forward-Right-Down except the two
+            # moment channels, which Task 2.3's flow5 map mirrors.
+            "Cl": np.array([0.001, -0.02]),
+            "Cn": np.array([-0.002, 0.03]),
+            "CYb": -0.4107,
+            "Cnb": 0.1685,
+            "Clb": -0.053,
         }
     }
+
+
+def _labels(fig, index: int) -> list[str]:
+    return [line.get_label() for line in fig.axes[index].get_lines()]
+
+
+def test_compare_tabs_moments_panels_carry_flow5():
+    # _plot_moments gains Cltot -> flow5 "Cl" and Cntot -> flow5 "Cn"; axes are
+    # Cm, Cl, Cn in declaration order.
+    app = QApplication.instance() or QApplication([])
+    tabs = CompareTabs()
+    tabs.plot(_st(), _flow5_results())
+    fig = tabs.figure("Moments")
+    for index in (1, 2):
+        assert "flow5" in _labels(fig, index), index
+
+
+def test_compare_tabs_beta_derivative_panels_carry_flow5():
+    # _plot_derivatives gains CYb, Cnb and Clb; axes are CLa, Cm_a, CYb, Cnb, Clb.
+    # flow5's scalars are per radian, and overlay_derivative already rescales every
+    # solver's derivative to per degree, so no panel-side unit work is needed.
+    app = QApplication.instance() or QApplication([])
+    tabs = CompareTabs()
+    tabs.plot(_st(), _flow5_results())
+    fig = tabs.figure("Derivatives")
+    for index in (2, 3, 4):
+        assert "flow5" in _labels(fig, index), index
 
 
 def test_compare_tabs_plot_flow5():

@@ -65,16 +65,26 @@ def test_avl_is_identity():
         assert got[key] is raw[key], key
 
 
-def test_flow5_is_identity_until_task_2_3_fills_in_the_lateral_map():
-    # Task 2.3 turns Cx/Cz/Cl/Cn to -1 (ruling R18) and has to update this test
-    # and the fixtures in test_cy_and_cc_are_never_flipped, which assert them
-    # unchanged. CXa/CZa get no entry there: CZa already measures -5.2562.
+def test_flow5_flips_the_four_lateral_channels_and_nothing_else():
+    # R18. flow5 does NOT flip the way Tornado does: the two agree on the force
+    # channels (Cx/Cz are raw aft/up-positive) and disagree on the moment ones.
+    # Cl/Cn come from polar vars 12/13 (Cli/Cni), which are mirrored -- raw Cl
+    # +0.0047339 at beta = +5, alpha = 0, against Clb*beta = -0.0046262. Everything
+    # else takes no entry: computeStabilityDerivatives projects onto the
+    # stability axes (panelanalysis.cpp:845-846), already Forward-Right-Down, so
+    # CXa (which is CL - dCD/dalpha, not a bare -dCD/dalpha), CZa (already
+    # -5.2562), CYb, Clb, Cnb and the rate derivatives all pass through.
     raw = {"Cx": -0.031, "Cz": 0.544, "Cl": 0.0047, "Cn": -0.0143,
-           "CXa": -0.2, "CZa": -5.2562, "CY": 0.06, "Cm": -0.95}
+           "CXa": 0.0595, "CZa": -5.2562, "CY": 0.06, "Cm": -0.95,
+           "CYb": -0.4107, "Clb": -0.053, "Cnb": 0.1685,
+           "Clp": -0.5385, "Cnr": -0.206}
     got = to_frd("flow5", raw)
-    assert got == raw
-    for key in raw:
+    for key in ("Cx", "Cz", "Cl", "Cn"):
+        assert got[key] == pytest.approx(-raw[key]), key
+    for key in ("CXa", "CZa", "CY", "Cm", "CYb", "Clb", "Cnb", "Clp", "Cnr"):
+        assert got[key] == pytest.approx(raw[key]), key
         assert got[key] is raw[key], key
+    assert raw["Cl"] == 0.0047, "to_frd must not mutate its input"
 
 
 def test_cy_and_cc_are_never_flipped():

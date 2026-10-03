@@ -4,8 +4,13 @@ The helper used to emit only polar variables 1, 4, 5 and 9 (``alpha``, ``CL``,
 ``CD``, ``Cm``), which left every lateral panel structurally empty for flow5.
 These channels are flow5's own raw output in its own frame -- x aft, y right,
 z up -- so ``Cx``/``Cz`` are aft/up-positive and ``Cli``/``Cni`` are mirrored
-relative to Forward-Right-Down. None of them is normalized here: ``to_frd`` in
-``aid/axes.py`` owns that, and its ``flow5`` entry is filled in by Task 2.3.
+relative to Forward-Right-Down.
+
+``run_flow5`` returns them **normalized** as of Task 2.3, whose ``flow5`` entry
+in ``aid/axes.py`` is ``{"Cx": -1, "Cz": -1, "Cl": -1, "Cn": -1}``. So the tests
+below that care about the solver's own frame go through ``run_flow5_native``;
+the rest are sign-agnostic and read ``run_flow5`` like every other caller.
+``test_flow5_overlay_signs.py`` covers the normalized side.
 """
 
 import json
@@ -46,6 +51,12 @@ def base_deck():
     return write_flow5_deck(ac, MESH)
 
 
+@pytest.fixture(scope="module")
+def cessna_raw(base_deck):
+    """The same Cessna solve still in flow5's own frame: no ``to_frd``."""
+    return run_flow5_native(base_deck)
+
+
 def test_flow5_emits_the_new_channels(cessna):
     for key in ("beta", "CY", "Cl", "Cn", "Cx", "Cz", "CDvis", "CDind"):
         assert key in cessna, key
@@ -71,7 +82,7 @@ def test_flow5_lateral_channels_are_zero_at_beta_zero(cessna):
         assert np.allclose(cessna[key], 0.0, atol=1e-5), key
 
 
-def test_flow5_cx_is_aft_positive_and_cz_is_up_positive(cessna):
+def test_flow5_cx_is_aft_positive_and_cz_is_up_positive(cessna_raw):
     # Pre-normalization frame: x aft, z up. Settled by Task 2.0 spike 4 -- do NOT
     # assert a bare sign at one alpha. Raw Cx = CD*cos(a) - CL*sin(a), so it is
     # aft-positive only while CD*cos(a) > CL*sin(a) and goes NEGATIVE at high alpha
@@ -79,21 +90,21 @@ def test_flow5_cx_is_aft_positive_and_cz_is_up_positive(cessna):
     # -0.1828 at alpha = +12). A single-point sign test would pass by luck, which
     # is exactly why the brief's original `Cx[i] < 0` at argmax(CL) did. Assert
     # the identity instead, which holds everywhere: residual <= 3.2e-13.
-    a = np.deg2rad(np.asarray(cessna["alpha"]))
+    a = np.deg2rad(np.asarray(cessna_raw["alpha"]))
     assert np.allclose(
-        np.asarray(cessna["Cx"]),
-        np.asarray(cessna["CD"]) * np.cos(a) - np.asarray(cessna["CL"]) * np.sin(a),
+        np.asarray(cessna_raw["Cx"]),
+        np.asarray(cessna_raw["CD"]) * np.cos(a) - np.asarray(cessna_raw["CL"]) * np.sin(a),
         atol=3.2e-13,
     )
     # Aft-positive, checked where the identity is unambiguous: alpha = 0, where
     # Cx reduces to CD exactly (measured Cx = +0.0012434 vs CD = +0.0012434).
-    i = int(np.argmin(np.abs(np.asarray(cessna["alpha"]))))
-    assert cessna["Cx"][i] > 0.0, (
+    i = int(np.argmin(np.abs(np.asarray(cessna_raw["alpha"]))))
+    assert cessna_raw["Cx"][i] > 0.0, (
         "at alpha = 0 the axial component reduces to CD, so it is aft-positive"
     )
     # Up-positive: Cz is +1.1948 at alpha = +12 with CL = +1.2067.
-    j = int(np.argmax(cessna["CL"]))
-    assert cessna["Cz"][j] > 0.0
+    j = int(np.argmax(cessna_raw["CL"]))
+    assert cessna_raw["Cz"][j] > 0.0
     # And note Cz == CL only at alpha = 0 -- do not assert it across the sweep.
     # Measured: Cz - CL is 0 at alpha = 0 but -1.19e-2 at alpha = +12.
 

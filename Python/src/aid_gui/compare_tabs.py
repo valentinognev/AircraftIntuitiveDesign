@@ -162,8 +162,8 @@ class CompareTabs(QTabWidget):
         fig = self._clear("Moments")
         specs = (
             (r"$C_m$", "cm", ("Cm", "Cm_a"), "Cmtot", "Cm"),
-            (r"$C_\ell$", None, ("Cl", "Cl_a"), "Cltot", None),
-            (r"$C_n$", None, ("Cn", "Cn_a"), "Cntot", None),
+            (r"$C_\ell$", None, ("Cl", "Cl_a"), "Cltot", "Cl"),
+            (r"$C_n$", None, ("Cn", "Cn_a"), "Cntot", "Cn"),
         )
         for i, (ylabel, dkey, torn, avl, flow5) in enumerate(specs, start=1):
             ax = fig.add_subplot(2, 2, i)
@@ -189,9 +189,9 @@ class CompareTabs(QTabWidget):
         specs = (
             (r"$C_{L\alpha}$ /deg", "cla", "CL_a", "CLa", "CLa"),
             (r"$C_{m\alpha}$ /deg", "cma", "Cm_a", "Cma", "Cma"),
-            (r"$C_{Y\beta}$ /deg", "cyb", "CY_b", "CYb", None),
-            (r"$C_{n\beta}$ /deg", "cnb", "Cn_b", "Cnb", None),
-            (r"$C_{\ell\beta}$ /deg", "clb", "Cl_b", "Clb", None),
+            (r"$C_{Y\beta}$ /deg", "cyb", "CY_b", "CYb", "CYb"),
+            (r"$C_{n\beta}$ /deg", "cnb", "Cn_b", "Cnb", "Cnb"),
+            (r"$C_{\ell\beta}$ /deg", "clb", "Cl_b", "Clb", "Clb"),
         )
         for i, (ylabel, dkey, torn, avl, flow5) in enumerate(specs, start=1):
             ax = fig.add_subplot(2, 3, i)
@@ -608,6 +608,22 @@ _SKIP_LEFTOVER = frozenset(
         "NP",
         "CL0",
         "Cm0",
+        # flow5 returns exactly these and nothing else (aid/flow5_io.py), so the
+        # whole key set is named here. The eight scalars would otherwise surface
+        # as raw leftovers; the 17-sample arrays (beta, Cx, Cz) are already
+        # excluded by the 0 < size <= 8 filter in _leftover_groups, but naming
+        # them keeps that filter from being load-bearing for correctness.
+        "beta",
+        "Cx",
+        "Cz",
+        "CXa",
+        "CZa",
+        "CYp",
+        "CYr",
+        "Clr",
+        "Cnp",
+        "Cnr",
+        "XNP",
     }
 )
 

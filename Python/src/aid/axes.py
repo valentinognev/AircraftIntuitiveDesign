@@ -88,7 +88,7 @@ _SIGN_MAP: dict[str, dict[str, int]] = {
         "Cl_b": -1, "Cn_b": -1,
         "CX_d": -1, "CZ_d": -1, "Cl_d": -1, "Cn_d": -1,
     },
-    "flow5": {},
+    "flow5": {"Cx": -1, "Cz": -1, "Cl": -1, "Cn": -1},
 }
 
 

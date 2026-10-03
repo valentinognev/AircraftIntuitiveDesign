@@ -35,20 +35,80 @@ read out of documentation:
   therefore mirrored, and their alpha, beta and control derivatives inherit
   their channel's frame, so all of those take a ``-1``.
 
-  The ``p``/``q``/``r`` rate derivatives are the exception and take **no**
-  entry: measured raw Tornado ``Cl_P`` -0.486 against AVL ``Clp`` -0.470 and
-  raw ``Cn_R`` -0.286 against AVL ``Cnr`` -0.212, they already agree with AVL
-  once AVL is left alone, so they are already F-R-D. Flipping them would
-  destroy that agreement -- which is why ``test_damping_derivatives_still_agree``
-  (Task 1.4) asserts ``sign(avl_Clp) == sign(tornado_Cl_P) < 0`` and would
-  fail. The independent cross-check on the other side of the line is flow5's
-  ``CZa``, which measures ``-5.2562`` and is already F-R-D, against Tornado's
-  raw ``CZ_a``, which is up-positive: after ``to_frd`` the two have to land on
-  the same number, which is what fixes the alpha derivatives as flipped and the
-  rate derivatives as not.
+  The rate derivatives follow one rule, and the rule -- not any measured pair --
+  is what the entries above encode. tornado's body frame is x aft / y right /
+  z up and F-R-D is x fwd / y right / z down, so going between them is a 180 deg
+  rotation about y: **x and z reverse, y does not**. A component along axis i
+  therefore picks up ``s_i``, and a body rate about axis j picks up ``s_j`` as
+  well, so ``dC_i/d(omega_j) -> s_i * s_j``. Alpha, beta and control deflections
+  rotate the flow rather than the body axes, so they contribute nothing and the
+  alpha/beta/control derivatives simply inherit ``s_i``.
 
-  ``CY`` and ``CC`` (``coeff.py:104``, wind-axis side force) are already F-R-D
-  and are never flipped, by any solver.
+  Read through that rule, ``p`` and ``r`` are about x and z -- the two axes that
+  reverse -- so for every channel whose own sign is ``-1`` the two signs cancel:
+  ``CX_P``, ``CZ_P``, ``Cl_P``, ``Cn_P``, ``CX_R``, ``CZ_R``, ``Cl_R`` and
+  ``Cn_R`` take **no** entry. ``q`` is about y, the one axis the two frames
+  share, so the cancellation breaks there and the four q-derivatives keep their
+  channel's own sign: ``CX_Q``, ``CZ_Q``, ``Cl_Q`` and ``Cn_Q`` each take a
+  ``-1``. ``Cm_Q`` takes none because ``Cm`` takes none.
+
+  ``CY`` and ``Cm`` are the two channels whose own sign is ``+1`` *and* which are
+  measured against a reversing rate, so the cancellation never gets to happen
+  there: ``CY_P``, ``CY_R``, ``Cm_P`` and ``Cm_R`` all take a ``-1`` while
+  ``CY_Q`` and ``Cm_Q`` take none. This is the case the shorthand "``CY``/``Cm``
+  are never flipped" used to hide -- those channels and their flow-angle
+  derivatives are never flipped, their p/r rate derivatives are.
+
+  The measurements. On the cancelling side, raw tornado ``Cl_P`` -0.486 against
+  AVL ``Clp`` -0.470, ``Cn_R`` -0.286 against ``Cnr`` -0.212 and ``Cm_Q`` -33.3
+  against ``Cmq`` -18.6 all already agree with a solver that needs no conversion,
+  which is why flipping them would break
+  ``test_damping_derivatives_still_agree``. On the non-cancelling side, AVL's own
+  printed values *are* F-R-D (its map is empty), and they are opposite to the
+  unflipped tornado values on every point measured:
+
+  ==============  ================  ==============  ==============
+  key             AVL               tornado raw    after ``to_frd``
+  ==============  ================  ==============  ==============
+  ``CZq`` Cessna  -9.93..-8.86     +9.47..+9.74   -9.47..-9.74
+  ``CZq`` Learjet -8.35..-8.27     +8.84..+8.88   -8.84..-8.88
+  ``CYr`` Cessna  +0.427           -0.387         +0.387
+  ``CYr`` Learjet +0.539           -0.450         +0.450
+  ``CYp`` Cessna  -0.182           +0.160         -0.160
+  ``CYp`` Learjet -0.0360          +0.0622        -0.0622
+  ``Clq`` Cessna  -0.00635         +0.00853       -0.00853
+  ``Cnq`` Cessna  +0.0776          -0.0489        +0.0489
+  ``Cmr`` Cessna  +0.0838          -0.0703        +0.0703
+  ==============  ================  ==============  ==============
+
+  (the ``CZq`` row spans alpha = -4, 0, +4, +6; every other row is alpha = +4 with
+  the ``Clq``/``Cnq``/``Cmr`` ones taken at beta = +5, which is the only condition
+  at which those three are above tornado's own ~1e-5 noise floor. ``Clq`` and
+  ``Cnq`` are ~1e-13 at beta = 0 and AVL prints exactly 0 for both on Learjet 23,
+  a fuselage-less airframe.) Textbook sign agrees on the two best-conditioned of
+  these: a typical transport has ``CY_r`` about +0.3, ``CZ_q`` negative, and
+  ``aid/longitudinal_dynamic.py`` sets ``czq = -clq`` with ``clq > 0``.
+
+  Three of the ten entries rest on the rule alone and have **no** usable
+  second-solver witness. ``Cm_P`` is 1e-6 at beta = 0 and its one larger value
+  (Cessna, beta = 5: -0.113 against AVL's -0.0226) disagrees by 5x in magnitude,
+  which makes it a magnitude disagreement between solvers rather than evidence
+  about a frame. AVL emits no ``CZb``/``CXb`` at all, so ``CX_b``/``CZ_b`` are
+  structural: same channel as the already-confirmed ``CX_a``/``CZ_a``, different
+  invariant angle, therefore the same sign.
+
+  The separate cross-check on the *alpha* derivatives is flow5's ``CZa``: it
+  measures -5.2562 and is already F-R-D, against tornado's raw up-positive
+  ``CZ_a``, and after ``to_frd`` the two have to land on the same number. That
+  pins ``CZ_a`` as flipped. It says nothing at all about the rate derivatives --
+  it constrains alpha derivatives only -- so it is not part of why the p/r keys
+  are absent.
+
+  ``CY`` and ``CC`` (``coeff.py:104``, wind-axis side force) are already F-R-D,
+  as are the wind-axis ``CL``/``CD``/``CC`` and their derivatives
+  (``coeff.py:76-100,164`` computes them from the ``b2w`` rotation directly), so
+  those channels and their alpha/beta/control derivatives are never flipped, by
+  any solver. Only ``CY_P``/``CY_R`` above are exceptions.
 * **flow5** -- ``{"Cx": -1, "Cz": -1, "Cl": -1, "Cn": -1}``, filled in by Task
   2.3 (commit ``588a3a0``); it used to be empty and the text here used to say
   so. All four flips were measured. The header comments at
@@ -76,6 +136,9 @@ that is what makes the round trip exact. This coincidence is a property of the
 values, not of the design: a future non-+/-1 entry (a scale factor, say) would
 make ``from_frd`` need the negation restored, and the map's shape stays honest
 only if the docstring above keeps matching it key for key.
+``test_axes.py``'s ``derived_tornado_signs`` re-derives the tornado map from
+``AXIS_SIGN``/``CHANNEL_AXIS``/``RATE_AXIS`` above and asserts the two are equal
+as sets, so a key added to either side without the other fails by name.
 """
 
 from __future__ import annotations
@@ -92,8 +155,10 @@ _SIGN_MAP: dict[str, dict[str, int]] = {
     "tornado": {
         "CX": -1, "CZ": -1, "Cl": -1, "Cn": -1,
         "CX_a": -1, "CZ_a": -1, "Cl_a": -1, "Cn_a": -1,
-        "Cl_b": -1, "Cn_b": -1,
+        "CX_b": -1, "CZ_b": -1, "Cl_b": -1, "Cn_b": -1,
         "CX_d": -1, "CZ_d": -1, "Cl_d": -1, "Cn_d": -1,
+        "CX_Q": -1, "CZ_Q": -1, "Cl_Q": -1, "Cn_Q": -1,
+        "CY_P": -1, "CY_R": -1, "Cm_P": -1, "Cm_R": -1,
     },
     "flow5": {"Cx": -1, "Cz": -1, "Cl": -1, "Cn": -1},
 }

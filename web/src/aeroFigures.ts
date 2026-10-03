@@ -413,9 +413,13 @@ function numberArray(value: unknown): number[] | null {
 }
 
 /**
- * The handbook's Prandtl curve is a closed-form `lifting_line` solution that never
- * reads AERO["BETA"], so it really is at the aircraft's sideslip and carries no
- * `(beta=0)` mark — same for Tornado's spanwise curves.
+ * The handbook's Prandtl curve is a closed-form `lifting_line` solution, and
+ * `lifting_line.py` / `stability.py` take no beta argument at all — so it is
+ * always computed at β = 0 whatever the aircraft is flown at. It is deliberately
+ * left unmarked: it is a closed-form reference curve rather than a solver run,
+ * exactly like Tornado's own spanwise distribution, and marking it `(beta=0)`
+ * would clutter every panel with a note about a reference line. Do not "fix" it
+ * by reading `AERO["BETA"]` here; there is nothing to read.
  */
 function spanwiseSeries(
   raws: SolverRaws,

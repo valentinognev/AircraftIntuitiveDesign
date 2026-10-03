@@ -16,7 +16,9 @@ Three things this file deliberately does not do:
   it anyway and drew a false conclusion.
 * **It does not assert the sign of a numerically-zero coefficient.** ``Cl_Q``
   measures ``+8.1e-14`` and ``Cn_Q`` ``-7.6e-14`` at alpha = -4 deg -- both are
-  round-off. See ``test_damping_derivatives_still_agree``.
+  round-off. See ``test_damping_derivatives_still_agree``. (They are *in* the
+  sign map, correctly: the map is right by rule and not by which of its entries
+  happen to be non-zero on one airframe.)
 * **It does not assert a tolerance on those either.** A band around an
   analytically-zero quantity passes identically for a correct sign and for a
   frame flip that happens to be small, so it carries no information. The
@@ -33,8 +35,9 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from aid.aircraft import load_jsonc
+from aid.aircraft import aero_beta, load_jsonc
 from aid.avl_io import run_avl_full
+from aid.avl_parse import parse_sb
 from aid.datcom_run import run_datcom
 from aid.paths import datcom_wrapper
 from aid.tornado.boundary import set_boundary
@@ -178,22 +181,33 @@ def test_datcom_beta_derivatives_are_real_only_at_the_first_rung(sweep):
 def test_beta_is_zero(sweep, at_axial):
     """Correction: assert betha == 0 rather than assuming it.
 
-    ``tornado_io.py:384`` hardcodes ``"betha": 0.0``, so DATCOM, AVL and Tornado
-    all fly beta = 0 here and the comparisons below are like-for-like. Task 3.1
-    wires ``AERO["BETA"]`` into that line. When it does, a non-zero beta will
-    fail here loudly, instead of silently making the three solvers disagree for a
-    *physical* reason -- side force and the roll/yaw moments both change with
-    sideslip -- which is precisely the failure this file has to distinguish from
-    a sign error.
+    ``tornado_io.py:384`` used to hardcode ``"betha": 0.0``; since Task 3.1 it
+    reads ``math.radians(aero_beta(ac))``, so ``betha`` is now whatever the model
+    carries in ``AERO["BETA"]`` -- DATCOM and AVL are swept at the same beta, but
+    whether these three solvers are flying a sideslip at all is a property of the
+    *aircraft file*, not of this file.
 
-    ``test_axes_wiring.py:97`` already asserts this. That is deliberate
-    duplication, not an oversight: this file is the cross-solver sign guard and
-    has to stand alone, and a precondition should not depend on another test
-    file's assertions still being present.
+    **So the sideslip is a property of the aircraft file, not of this test.**
+    Cessna 172 does declare ``AERO["BETA"] = 0.0`` explicitly, so the assertions
+    above are satisfied by a stated zero rather than by the key's absence -- but
+    the comparisons below would silently start mixing three solvers flown at
+    different conditions the moment someone gave that model a sideslip, which is
+    the failure this file exists to separate from a sign error. So the
+    precondition is asserted rather than assumed, against the *value*, so that
+    change fails loudly and names itself.
+
+    When the model does gain a sideslip, the fix is not to relax the assertion. It
+    is to sweep all three solvers at that beta and keep the comparisons
+    like-for-like.
     """
     for solvers in (sweep, at_axial):
         _datcom, _avl, _tornado, state = solvers
         assert float(state["betha"]) == 0.0, "the cross-solver comparison assumes betha = 0"
+    assert aero_beta(load_jsonc(CESSNA)) == 0.0, (
+        "Cessna 172's AERO.BETA is no longer 0, so the sweeps above were flown at a "
+        "sideslip that the derivative rows below are not compared at. Sweep all three "
+        "solvers at that beta instead of relaxing the assertion."
+    )
 
 
 def test_normal_force_agrees_in_sign(sweep, at_axial):
@@ -320,30 +334,25 @@ def test_beta_derivatives_agree_in_sign(sweep):
 def test_damping_derivatives_still_agree(sweep):
     """Roll and yaw damping stay negative and keep agreeing with AVL.
 
-    These three are the falsifiable core of ruling R17, which is why six rate
-    derivatives are absent from ``_SIGN_MAP``: raw Tornado already agrees with
-    AVL on them, so flipping them would destroy the agreement. Measured at
-    alpha = -4 deg:
+    These three are the falsifiable core of the tornado rate-derivative entries.
+    They are there for a structural reason, not a measured one: ``p`` is about x
+    and ``r`` about z, the two axes that reverse between tornado's frame and
+    F-R-D, while the roll and yaw moment channels reverse too -- so the two signs
+    cancel and ``Cl_P``/``Cl_R``/``Cn_P``/``Cn_R`` take no entry. The measurement
+    below confirms that is what the map already does. Measured at alpha = -4 deg:
 
         Clp:  AVL -0.486877, Tornado Cl_P -0.475617  (ratio 0.98)
         Cnr:  AVL -0.204695, Tornado Cn_R -0.293870  (ratio 1.44)
         Cmq:  AVL -18.466129, Tornado Cm_Q -33.251274 (ratio 1.80)
 
-    **Cl_Q and Cn_Q are deliberately absent, and this is not an oversight.**
-    Measured at the same alpha they are ``+8.107832903858427e-14`` and
-    ``-7.560631253502989e-14`` -- numerically zero -- against AVL's ``Clq``
-    -0.017441 and ``Cnq`` +0.094895. ``np.sign`` of those pairs is
-    ``{-1, +1}`` and ``{+1, -1}``, so a sign assertion here fails on a 1e-14
-    rounding residue rather than on any sign convention. (At the model's own
-    +4 deg reference the residue is ``+2.12e-12`` and ``+2.36e-13``, and only the
-    ``Cn_Q`` pair happens to agree -- an accident of AVL's ``Cnq`` being
-    non-zero, not evidence of anything.)
-
-    The alternative, a magnitude tolerance on the near-zero pair, was rejected: a
-    band around an analytically-zero quantity passes identically for a correct
-    sign and for a frame flip that happens to be small. Asserting
-    ``Clp``/``Cnr``/``Cm_Q``, which are well conditioned, pins the invariant that
-    matters.
+    **The cancellation is not universal, and these three do not show it.** It
+    holds only for channels whose own sign is -1. ``Cm_Q`` survives it for the
+    trivial reason that ``Cm`` does not reverse at all, and it says nothing about
+    the q axis; a q-derivative whose channel *does* reverse keeps that sign,
+    because q is about y and y is the one axis both frames share. That is
+    ``CZ_Q``, and it is asserted against AVL in
+    ``test_pitch_rate_derivative_agrees_with_avl``. Likewise ``CY_P``/``CY_R`` and
+    ``Cm_P``/``Cm_R`` do not cancel, their channels being +1.
     """
     _datcom, avl, tornado, _state = sweep
     a = _avl_at(avl, _ALPHA_NEG4)
@@ -352,11 +361,62 @@ def test_damping_derivatives_still_agree(sweep):
     assert np.sign(a["Cmq"]) == np.sign(tornado["Cm_Q"]) < 0
 
 
+@pytest.fixture(scope="module")
+def pitch_rate_frame(tmp_path_factory):
+    """Tornado's ``CZ_Q`` beside AVL's own ``CZq``, at one shared alpha.
+
+    ``run_avl_full`` returns the merged ``.st`` block, which has no ``CZq``; that
+    one is in the ``.sb`` geometry-axis block (``avl_parse.parse_sb``), so this
+    fixture parses it directly rather than widening every other caller.
+    """
+    tmp = tmp_path_factory.mktemp("frd_pitchrate")
+    ac = load_jsonc(CESSNA)
+    ac.AERO["ALSCHD"] = [_ALPHA_NEG4]
+    tornado, state = _run_tornado(ac, tmp)
+    assert float(np.degrees(state["alpha"])) == pytest.approx(_ALPHA_NEG4)
+    avl_ac = load_jsonc(CESSNA)
+    avl_ac.AERO["ALSCHD"] = [_ALPHA_NEG4]
+    avl_dir = tmp / "avl"
+    run_avl_full(avl_ac, ("10", "10"), avl_dir)
+    sb = parse_sb(avl_dir / "geometry.sb")
+    assert sb.get("CZq") is not None, "AVL printed no CZq; this fixture is broken, not the map"
+    return tornado, sb
+
+
+def test_pitch_rate_derivative_agrees_with_avl(pitch_rate_frame):
+    """``CZ_Q`` has the same sign in tornado and AVL, and is the same size.
+
+    The one live, cross-solver, magnitude-bearing witness for the q-derivatives.
+    q is the only body rate whose axis (y, right) both frames share, so a
+    q-derivative keeps its channel's sign instead of cancelling -- and ``CZ_Q``
+    is the q-derivative with a number on it. AVL is natively F-R-D, so its
+    printed ``CZq`` is already the answer: **-9.927762** at alpha = -4 deg on
+    Cessna 172, against tornado's ``-9.465924`` after ``to_frd``. Before the
+    ``CZ_Q`` entry it read **+9.465924**, i.e. the opposite sign.
+
+    The magnitude band is what stops the sign assertion from passing on two
+    same-signed but unrelated quantities: the measured agreement is 4.7% here and
+    under 8% across alpha = -4, 0, +4, +6 on Cessna and -4..+6 on Learjet 23,
+    while an unflipped value is off by -95%. 0.5..2.0 is the band around that.
+    """
+    tornado, sb = pitch_rate_frame
+    assert np.sign(tornado["CZ_Q"]) == np.sign(sb["CZq"]) < 0
+    ratio = abs(tornado["CZ_Q"]) / abs(sb["CZq"])
+    assert 0.5 <= ratio <= 2.0, f"|CZ_Q| / |CZq| = {ratio}"
+
+
 def test_cl_r_derivative_agrees_in_sign(sweep):
-    """``Cl_R`` is the fourth sign-stable member of R17's basis.
+    """``Cl_R`` is the fourth sign-stable member of the p/r cancellation.
+
+    ``Cl_R`` needs no map entry for a structural reason -- ``Cl`` and the yaw rate
+    axis both reverse, so the two signs cancel -- and this is the measurement that
+    says the map has it right, not the reason. Do not read it as support for
+    "rate derivatives are never flipped": that is false, and ``CZ_Q``
+    (``test_pitch_rate_derivative_agrees_with_avl``) and ``CY_R``/``Cm_R`` are the
+    counter-examples.
 
     The brief's damping test covers ``Clp``/``Cnr``/``Cmq`` only, which leaves
-    R17's other sign-stable pair unpinned. Measured at alpha = -4 deg, AVL ``Clr``
+    this other sign-stable pair unpinned. Measured at alpha = -4 deg, AVL ``Clr``
     +0.013363 against Tornado ``Cl_R`` +0.047417 (ratio 3.55) -- same sign at
     both -4 deg and +4 deg (+0.135087 / +0.044525, ratio 0.33).
 

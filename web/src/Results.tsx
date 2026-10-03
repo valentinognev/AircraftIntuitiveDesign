@@ -1,5 +1,4 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { aeroBeta } from "./aircraft";
 import { aircraftForRequest } from "./api";
 import { chartRows, type ControlChartSeries, type ControlDerivPayload } from "./controlDeriv";
 import {
@@ -26,6 +25,7 @@ import {
   plotDomain,
   stabilityText,
   svgPolyline,
+  type HandshakePayload,
   type PlotSeries,
 } from "./payload";
 import store, { type AidState } from "./store";
@@ -499,23 +499,47 @@ function FigureView({ figure, beta }: { figure: AeroFigure; beta: number }) {
   return <BarFigureView figure={figure} beta={beta} />;
 }
 
+/**
+ * The sideslip this block of results was **run at**, in degrees.
+ *
+ * Taken from the run's own payload, never from the aircraft in the editor. Every
+ * curve on this page is drawn from `s.raws`, i.e. from the last run, so labelling
+ * it from a Beta field that has been edited since would claim the data was flown
+ * at a condition it was not — a false provenance claim, and the one this whole
+ * labelling rule exists to prevent.
+ *
+ * `analyze.py`'s `_analyze_result` fills `axes.beta` from `_flown_beta`, which
+ * reports the real sideslip for the two solvers that can fly one (`tornado`,
+ * `flow5`) and 0 for the ones that cannot (`datcom`, `avl`). So "some payload in
+ * this block reporting non-zero" is exactly the condition the block was flown at,
+ * and a block flown at β = 0 reports zero throughout — the right answer, since no
+ * series needs a `(beta=0)` mark then.
+ */
+export function flownBeta(payloads: readonly HandshakePayload[]): number {
+  for (const payload of payloads) {
+    const beta = payload?.axes?.beta?.[0];
+    if (typeof beta === "number" && Number.isFinite(beta) && beta !== 0) return beta;
+  }
+  return 0;
+}
+
 export function Results({ initialTab = "forces" }: { initialTab?: string }) {
   const lastPayload = useAid((s) => s.lastPayload);
   const payloads = useAid((s) => s.payloads);
   const lastStability = useAid((s) => s.lastStability);
   const rawRecord = useAid((s) => s.raws);
   const handbook = useAid((s) => s.handbook);
-  const aircraft = useAid((s) => s.aircraft);
   const [tabId, setTabId] = useState(initialTab);
   const [controlSeries, setControlSeries] = useState<ControlChartSeries[]>([]);
   const [controlError, setControlError] = useState<string | null>(null);
-  const series = overlaySeries(
-    lastPayload == null ? [] : Object.values(payloads).length ? Object.values(payloads) : [lastPayload],
-  );
+  const runPayloads = lastPayload == null
+    ? []
+    : Object.values(payloads).length ? Object.values(payloads) : [lastPayload];
+  const series = overlaySeries(runPayloads);
   const summary = stabilityText(lastStability);
   const solverRaws = knownSolverRaws(rawRecord);
   const showTabs = hasSolverRaw(solverRaws);
-  const beta = aircraft == null ? 0 : aeroBeta(aircraft);
+  const beta = flownBeta(runPayloads);
   const tabs = showTabs
     ? aeroTabs(solverRaws, stabilityAlphaOf(lastStability), handbook, beta)
     : [];

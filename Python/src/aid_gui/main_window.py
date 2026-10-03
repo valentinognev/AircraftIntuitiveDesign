@@ -315,7 +315,9 @@ class MainWindow(QMainWindow):
         if st is None:
             st = self.stability_for_display()
         if self._plot_mode == "Stability":
-            self.results_panel.plot_stability(st, self.last_results)
+            self.results_panel.plot_stability(
+                st, self.last_results, beta=aero_beta(self.aircraft)
+            )
         elif self._plot_mode == "Aerodynamics":
             self.results_panel.plot_drag(st)
             self.compare_tabs.plot(

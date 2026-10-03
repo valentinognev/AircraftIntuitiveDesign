@@ -1,5 +1,10 @@
 # Updates
 
+## 1.35.1 - Beta=0 marks on the CL / C_m results panel
+- `ResultsPanel.plot_stability` takes keyword-only `beta`, holds it on the widget, and labels the DATCOM and AVL series through `aid.solver_overlay.beta_zero_label`; the four bare `label="DATCOM"` / `label="AVL"` curves (CL and C_m, both vs-alpha plots) now read `"DATCOM (beta=0)"` / `"AVL (beta=0)"` when `AERO.BETA != 0`, and stay byte-identical at `BETA == 0`
+- flow5's `CL`/`Cm` and Tornado keep their bare names: the polar forces and `state["betha"]` do follow the field. DATCOM and AVL have no sideslip capability at all
+- `MainWindow._refresh_plots` hands the panel `beta=aero_beta(self.aircraft)`, the value `compare_tabs.plot` already took on the next line
+
 ## 1.35.0 - 15-point default alpha sweep
 - `aid.alpha_schedule` adds `apply_alpha_default(ac)`; `ALPHA_POINTS = 15` is the density target. A sparse `AERO.ALSCHD` is refilled on the step ladder (`0.1`…`10.0`, the rungs DATCOM's `%.1f` `$FLTCON` carries exactly) to the count nearest 15, endpoints kept; a degenerate range collapses to one point, a 15-or-more input is left as stored, an absent key stays absent, and an envelope off the 0.1 grid gets no expansion at all rather than a lossy one
 - Applied at all 10 Analyze entry points (5 in `aid_gui/main_window.py`, 5 in `aid_web/analyze.py`); the GUI's `_pre_solve_alpha_default` also mirrors it into the `AERO.ALSCHD` field, or the next `sync_fields_to_aircraft` reverts it, and `apply_units`/`apply_scale` re-read that field without disturbing it. Handbook and stability get no default

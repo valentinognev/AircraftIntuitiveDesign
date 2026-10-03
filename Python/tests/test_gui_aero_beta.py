@@ -36,6 +36,7 @@ from aid.solver_overlay import (
 from aid.tornado_io import tornado_io
 from aid_gui import main_window as main_window_mod
 from aid_gui.main_window import MainWindow
+from aid_gui.results_panel import ResultsPanel
 
 
 class _ReachedState(Exception):
@@ -463,3 +464,107 @@ def test_compare_tabs_defaults_to_no_suffix():
     labels = _legend_labels(w.compare_tabs.figure("Derivatives").axes[2])
     assert "flow5" in labels
     assert not any("(beta=0)" in label for label in labels)
+
+
+# --- the CL / C_m results panel (aid_gui.results_panel) ------------------------
+# The panel users see first. Every series on it is vs-alpha, so the split is the
+# vs-alpha one: DATCOM and AVL cannot fly a sideslip at all, while flow5's CL and
+# Cm come straight off its polar and did move with beta.
+
+
+def _panel_results() -> dict:
+    """One vs-alpha series per solver, on both the CL and the C_m sub-axes."""
+    return {
+        "datcom": {
+            "alpha": [-4.0, 0.0, 4.0],
+            "cl": [-0.2, 0.13, 0.52],
+            "cm": [0.05, 0.02, -0.06],
+        },
+        "avl": {
+            "alpha": [-4.0, 0.0, 4.0],
+            "CLtot": [0.10, 0.30, 0.51],
+            "Cmtot": [0.04, 0.01, -0.07],
+        },
+        "flow5": {
+            "alpha": np.array([-4.0, 0.0, 4.0]),
+            "CL": np.array([-0.1, 0.2, 0.5]),
+            "Cm": np.array([0.03, 0.0, -0.08]),
+        },
+        "tornado": {
+            "alpha": float(np.deg2rad(4.0)),
+            "CL": 0.50,
+            "CL_a": 5.0,
+            "Cm": -0.80,
+            "Cm_a": -0.80,
+        },
+    }
+
+
+def _panel(beta: float):
+    app = QApplication.instance() or QApplication([])
+    del app
+    panel = ResultsPanel()
+    panel.plot_stability(_st(), _panel_results(), beta=beta)
+    return panel
+
+
+def test_results_panel_marks_datcom_and_avl_at_beta():
+    panel = _panel(5.0)
+    for ax in panel.figure.axes[:2]:
+        labels = _legend_labels(ax)
+        assert "DATCOM (beta=0)" in labels, ax.get_ylabel()
+        assert "AVL (beta=0)" in labels, ax.get_ylabel()
+
+
+def test_results_panel_leaves_flow5_and_tornado_unmarked_at_beta():
+    """flow5's polar forces and Tornado's betha both follow the field."""
+    panel = _panel(5.0)
+    for ax in panel.figure.axes[:2]:
+        labels = _legend_labels(ax)
+        assert "flow5" in labels, ax.get_ylabel()
+        assert "Tornado" in labels, ax.get_ylabel()
+        assert not any(
+            lab.startswith(("flow5 (", "Tornado (")) for lab in labels
+        ), labels
+
+
+def test_results_panel_labels_are_byte_identical_at_beta_zero():
+    panel = _panel(0.0)
+    for ax in panel.figure.axes[:2]:
+        assert _legend_labels(ax) == [
+            "Cruise",
+            "Approximated",
+            "DATCOM",
+            "Tornado",
+            "AVL",
+            "flow5",
+        ], ax.get_ylabel()
+
+
+def test_results_panel_defaults_to_no_suffix():
+    app = QApplication.instance() or QApplication([])
+    del app
+    panel = ResultsPanel()
+    panel.plot_stability(_st(), _panel_results())
+    assert "DATCOM" in _legend_labels(panel.figure.axes[0])
+
+
+def test_stability_panel_follows_the_model_beta():
+    """The panel must be handed the model's sideslip, not default to zero."""
+    w = _window(beta=5.0)
+    w.last_results = _panel_results()
+    w.set_plot_mode("Stability")
+    ax_cl, ax_cm = w.results_panel.figure.axes[:2]
+    for ax in (ax_cl, ax_cm):
+        labels = _legend_labels(ax)
+        assert "DATCOM (beta=0)" in labels, ax.get_ylabel()
+        assert "AVL (beta=0)" in labels, ax.get_ylabel()
+        assert "flow5" in labels, ax.get_ylabel()
+
+
+def test_stability_panel_is_unmarked_without_a_sideslip():
+    w = _window(beta=None)
+    w.last_results = _panel_results()
+    w.set_plot_mode("Stability")
+    for ax in w.results_panel.figure.axes[:2]:
+        assert "DATCOM" in _legend_labels(ax), ax.get_ylabel()

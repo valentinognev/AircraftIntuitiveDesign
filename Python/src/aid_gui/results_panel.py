@@ -2,6 +2,7 @@ import numpy as np
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 
+from aid.solver_overlay import beta_zero_label
 from aid.stability import drag_vs_speed, stability_lines
 
 
@@ -13,6 +14,7 @@ class ResultsPanel(FigureCanvasQTAgg):
         self._ax = self._figure.add_subplot(111)
         self._ax.set_xlabel("alpha (deg)")
         self._ax.set_ylabel("CL")
+        self.beta = 0.0
         self.hide()
 
     def plot_datcom(self, coeffs: dict) -> None:
@@ -27,7 +29,20 @@ class ResultsPanel(FigureCanvasQTAgg):
         self._safe_tight_layout()
         self.draw()
 
-    def plot_stability(self, st: dict, results: dict) -> None:
+    def _mark(self, text: str) -> str:
+        """Label text for a series that ran at zero sideslip under a non-zero one.
+
+        Every series here is vs-alpha: DATCOM and AVL have no sideslip capability,
+        so they stayed at beta=0 whatever the model asked for. flow5's CL and Cm
+        come off its polar and Tornado's betha follows the field, so those two
+        keep their bare names.
+        """
+        return beta_zero_label(text, self.beta)
+
+    def plot_stability(self, st: dict, results: dict, *, beta: float = 0.0) -> None:
+        # Held on the widget, as CompareTabs does, so a redraw that omits the
+        # keyword keeps the sideslip it was last given.
+        self.beta = float(beta)
         lines = stability_lines(st)
         self._figure.clear()
         ax_cl = self._figure.add_subplot(211)
@@ -39,9 +54,9 @@ class ResultsPanel(FigureCanvasQTAgg):
         ax_cm.plot(lines["alpha"], lines["Cm"], "b", label="Approximated")
         datcom = results.get("datcom")
         if datcom and "cl" in datcom:
-            ax_cl.plot(datcom["alpha"], datcom["cl"], "g.-", label="DATCOM")
+            ax_cl.plot(datcom["alpha"], datcom["cl"], "g.-", label=self._mark("DATCOM"))
             if "cm" in datcom:
-                ax_cm.plot(datcom["alpha"], datcom["cm"], "g.-", label="DATCOM")
+                ax_cm.plot(datcom["alpha"], datcom["cm"], "g.-", label=self._mark("DATCOM"))
         tornado = results.get("tornado")
         if tornado and "CL_a" in tornado:
             alpha_rad = tornado.get("alpha")
@@ -75,11 +90,11 @@ class ResultsPanel(FigureCanvasQTAgg):
             if "CLtot" in avl:
                 cl_avl = np.asarray(avl["CLtot"], dtype=float).reshape(-1)
                 if cl_avl.size == alpha_avl.size and alpha_avl.size > 0:
-                    ax_cl.plot(alpha_avl, cl_avl, "m.-", label="AVL")
+                    ax_cl.plot(alpha_avl, cl_avl, "m.-", label=self._mark("AVL"))
             if "Cmtot" in avl:
                 cm_avl = np.asarray(avl["Cmtot"], dtype=float).reshape(-1)
                 if cm_avl.size == alpha_avl.size and alpha_avl.size > 0:
-                    ax_cm.plot(alpha_avl, cm_avl, "m.-", label="AVL")
+                    ax_cm.plot(alpha_avl, cm_avl, "m.-", label=self._mark("AVL"))
         flow5 = results.get("flow5")
         if flow5 and "alpha" in flow5:
             alpha_f5 = np.asarray(flow5["alpha"], dtype=float)

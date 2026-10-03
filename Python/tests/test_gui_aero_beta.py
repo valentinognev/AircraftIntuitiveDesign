@@ -17,6 +17,7 @@ Two separate claims, and the second is the reason this file exists:
 import inspect
 import math
 import os
+import warnings
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -29,13 +30,16 @@ from aid.paths import models_dir
 from aid.solver_overlay import (
     BETA_CAPABLE_CONTROL_SOLVERS,
     FLOW5_BETA_FLAT,
+    Flow5BetaFlatGap,
     control_probe_label,
+    flow5_emitted_stab_derivatives,
     overlay_derivative,
     overlay_vs_alpha,
 )
 from aid.tornado_io import tornado_io
 from aid_gui import main_window as main_window_mod
 from aid_gui.main_window import MainWindow
+from aid import solver_overlay as solver_overlay_mod
 from aid_gui.results_panel import ResultsPanel
 
 
@@ -204,6 +208,48 @@ def test_flow5_force_series_keeps_the_plain_label():
     assert labels == ["flow5"]
 
 
+def test_overlay_vs_alpha_skips_flow5_without_an_alpha_key():
+    """A result set with no alpha vector is skipped, exactly like DATCOM and AVL.
+
+    The per-point channel exists but there is nothing to plot it against, and
+    reading fres["alpha"] unguarded raises KeyError.
+    """
+    res = {"flow5": {"CL": np.array([0.1, 0.2])}}
+    assert overlay_vs_alpha(res, _st(), flow5="CL", beta=5.0) == []
+
+
+def test_every_stab_derivative_flow5_emits_is_marked_beta_flat():
+    """The set cannot drift from the C++: this compares against the parsed source."""
+    emitted = flow5_emitted_stab_derivatives()
+    assert len(emitted) == 12, "flow5_run.cpp's derivative literals were not found"
+    assert emitted == FLOW5_BETA_FLAT
+
+
+def test_a_stab_derivative_missing_from_the_set_is_loud(monkeypatch):
+    """A 13th derivative must not plot as if it flew the flight condition."""
+    monkeypatch.setattr(
+        solver_overlay_mod,
+        "flow5_emitted_stab_derivatives",
+        lambda: frozenset(FLOW5_BETA_FLAT | {"Cmq"}),
+    )
+    with pytest.warns(Flow5BetaFlatGap, match="Cmq"):
+        series = overlay_derivative({"flow5": {"Cmq": -1.5}}, _st(), flow5="Cmq", beta=5.0)
+    assert [s["label"] for s in series] == ["flow5"]
+
+
+def test_an_unknown_non_derivative_channel_stays_silent(monkeypatch):
+    monkeypatch.setattr(
+        solver_overlay_mod,
+        "flow5_emitted_stab_derivatives",
+        lambda: frozenset(FLOW5_BETA_FLAT),
+    )
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        for key in ("CLa", "Cma", "CLq", "Cm_d"):
+            series = overlay_derivative({"flow5": {key: 1.0}}, _st(), flow5=key, beta=5.0)
+            assert [s["label"] for s in series] == ["flow5"], key
+
+
 @pytest.mark.parametrize("key", sorted(FLOW5_BETA_FLAT))
 def test_flow5_stab_derivatives_claim_beta_zero(key):
     res = {"flow5": {key: 0.5, "CLa": 5.0}}
@@ -233,7 +279,14 @@ def test_flow5_beta_flat_set_is_the_twelve_stab_derivatives():
             "XNP",
         }
     )
-    assert not FLOW5_BETA_FLAT & {"CLa", "Cma", "CL", "CD", "Cm", "CY", "beta"}
+    # Everything the Forces panel hands overlay_vs_alpha as a flow5 key, plus the
+    # two OLS slopes and the per-point arrays, is a polar channel and is absent.
+    assert not FLOW5_BETA_FLAT & {
+        "CL", "CD", "Cm", "Cl", "Cn", "CY",   # per-point polar forces/moments
+        "Cx", "Cz",                          # the other two per-point polar arrays
+        "beta",                              # the polar's own beta vector
+        "CLa", "Cma",                        # OLS slopes, which do move with beta
+    }
 
 
 def test_flow5_derivative_series_claims_beta_zero():

@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 import math
+import re
+import warnings
+from functools import lru_cache
 
 import numpy as np
 
+from aid import paths
 from aid.stability import stability_lines
 
 _DATCOM_STYLE = "g.-"
@@ -20,13 +24,25 @@ _ND = 99998.0
 BETA_ZERO_SUFFIX = " (beta=0)"
 
 # flow5's twelve StabDerivatives, and nothing else in its output, are flat in
-# sideslip: computeStabilityDerivatives fixes the stability axes at
-# windDirection(alphaeq, 0.0) (FLOW5/flow5-lib/analysis3d/panelanalysis.cpp:614
-# and :660), so these twelve are byte-identical at beta = 0, +5 and -5. The two
-# slopes are NOT in this set: CLa and Cma are ordinary least squares over the
-# polar's own alpha sweep (FLOW5/run/flow5_run.cpp:526-527), and the polar is
-# flown at the deck's beta, so they move (Cessna 172: 5.5402334 at beta 0,
-# 5.5003748 at both +5 and -5; the +5/-5 equality is the polar's own symmetry).
+# sideslip. Measured, not inferred: on Cessna 172, Learjet 23 and F-16 every one of
+# the twelve is byte-identical at beta = 0, +5 and -5, max |delta| exactly 0.0 across
+# all 17 alphas of the sweep. The mechanism agrees: neither differentiation ever sees
+# the sideslip. computeStabilityDerivatives (panelanalysis.cpp:614) and
+# computeAngularDerivatives (:887) each declare their own `double beta(0.0);` (:636
+# and :897) and each pin the stability axes at windDirection(alphaeq, 0.0) (:660 and
+# :922); panelanalysis.cpp contains no betaSpec at all. The angular-rate keys (CYp,
+# CYr, Clp, Clr, Cnp, Cnr) were first listed here by inference from that code and only
+# later measured. They are kept, and now on the measurement.
+#
+# The two slopes are NOT in this set: CLa and Cma are ordinary least squares over the
+# polar's own alpha sweep (FLOW5/run/flow5_run.cpp:526-527), and the polar is flown at
+# the deck's beta, so they move (Cessna 172: 5.5402333786223235 at beta 0,
+# 5.500374829746751 at +5, 5.500374817599451 at -5; the +5/-5 equality is the polar's
+# own symmetry).
+#
+# Note on names: Clq, Cmp and Cmr are AVL spellings (aid/avl_parse.py). flow5 has no
+# such channels -- its rate derivatives are CYp, CYr, Clp, Clr, Cnp and Cnr -- so a
+# mirror listing Clq/Cmp/Cmr is reading the wrong solver's namespace.
 FLOW5_BETA_FLAT = frozenset(
     {
         "CXa",
@@ -43,6 +59,36 @@ FLOW5_BETA_FLAT = frozenset(
         "XNP",
     }
 )
+
+# The twelve names, read from the C++ that emits them rather than copied from the set
+# above: FLOW5/run/flow5_run.cpp's stab_derivative_fields() holds one
+# {"NAME", &StabDerivatives::NAME} literal per channel (:283-297). Parsing that is what
+# makes FLOW5_BETA_FLAT verifiable instead of merely asserted -- a 13th derivative added
+# there shows up as a gap instead of silently claiming it flew at beta.
+_FLOW5_STAB_DERIVATIVE_FIELDS = re.compile(
+    r'\{"(\w+)",\s*&StabDerivatives::\w+\}'
+)
+_FLOW5_RUN_CPP = "FLOW5/run/flow5_run.cpp"
+
+
+class Flow5BetaFlatGap(UserWarning):
+    """A flow5 StabDerivative is emitted but missing from FLOW5_BETA_FLAT."""
+
+
+@lru_cache(maxsize=1)
+def flow5_emitted_stab_derivatives() -> frozenset[str]:
+    """The StabDerivative names ``flow5_run.cpp`` emits, or empty if unreadable.
+
+    The C++ is the single source of truth for this list; nothing here duplicates it.
+    Empty rather than raising when the source is not in the tree, so an installed
+    ``aid`` without the FLOW5 checkout keeps working -- it just cannot run the guard.
+    """
+    try:
+        source = (paths.repo_root() / _FLOW5_RUN_CPP).read_text(encoding="utf-8")
+    except OSError:
+        return frozenset()
+    return frozenset(_FLOW5_STAB_DERIVATIVE_FIELDS.findall(source))
+
 
 # Control-derivative paths, keyed by the solver name aid.control_report prints.
 # tornado and flow5 reach the model's sideslip (tornado/control_deriv.py:54 goes
@@ -75,8 +121,25 @@ def _label(name: str, beta: float, *, at_zero_sideslip: bool) -> str:
 
 
 def _flow5_label(key: str, beta: float) -> str:
-    """flow5 is beta-flat per channel, so the key decides, not the solver name."""
-    return _label("flow5", beta, at_zero_sideslip=key in FLOW5_BETA_FLAT)
+    """flow5 is beta-flat per channel, so the key decides, not the solver name.
+
+    An unknown channel stays unmarked, which is the panel's default and is wrong
+    only for a channel that is beta-flat -- so exactly that case is checked against
+    the C++ and made loud. A new StabDerivative must be added to
+    :data:`FLOW5_BETA_FLAT` or it will plot as if it flew the flight condition.
+    """
+    if key in FLOW5_BETA_FLAT:
+        return _label("flow5", beta, at_zero_sideslip=True)
+    emitted = flow5_emitted_stab_derivatives()
+    if key in emitted:
+        warnings.warn(
+            f"flow5 emits {key!r} as a StabDerivative but it is missing from "
+            "FLOW5_BETA_FLAT, so its series is labelled as if it flew the model's "
+            "sideslip. Add it if computeStabilityDerivatives still pins beta = 0.",
+            Flow5BetaFlatGap,
+            stacklevel=3,
+        )
+    return _label("flow5", beta, at_zero_sideslip=False)
 
 
 def alpha_grid(results: dict, st: dict, n: int = 80) -> np.ndarray:
@@ -150,7 +213,7 @@ def overlay_vs_alpha(
                 }
             )
     fres = results.get("flow5") or {}
-    if flow5 and flow5 in fres:
+    if flow5 and flow5 in fres and "alpha" in fres:
         series.append(
             {
                 "label": _flow5_label(flow5, beta),

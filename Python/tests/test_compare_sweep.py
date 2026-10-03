@@ -52,7 +52,7 @@ def _stub_runs(monkeypatch, seen: dict) -> None:
         monkeypatch.setattr(compare, attr, leaf(name))
 
 
-def test_only_the_datcom_leg_flies_the_gold_sweep(monkeypatch):
+def test_only_the_datcom_leg_flies_the_gold_sweep(monkeypatch, isolated_results):
     """The pin is justified by DATCOM alone; the other two keep the model's."""
     seen: dict = {}
     _stub_runs(monkeypatch, seen)
@@ -64,7 +64,9 @@ def test_only_the_datcom_leg_flies_the_gold_sweep(monkeypatch):
     assert seen["avl"].AERO["ALSCHD"] == model
 
 
-def test_the_pinned_aircraft_is_separate_and_the_model_is_not_mutated(monkeypatch):
+def test_the_pinned_aircraft_is_separate_and_the_model_is_not_mutated(
+    monkeypatch, isolated_results
+):
     """The pin must not hand the same object to another solver, nor edit in place."""
     seen: dict = {}
     _stub_runs(monkeypatch, seen)
@@ -75,7 +77,7 @@ def test_the_pinned_aircraft_is_separate_and_the_model_is_not_mutated(monkeypatc
     assert seen["datcom"].AERO is not seen["tornado"].AERO
 
 
-def test_report_records_the_sweep_and_its_provenance(monkeypatch):
+def test_report_records_the_sweep_and_its_provenance(monkeypatch, isolated_results):
     seen: dict = {}
     _stub_runs(monkeypatch, seen)
     report = compare.compare_to_matlab(CESSNA)
@@ -87,11 +89,18 @@ def test_report_records_the_sweep_and_its_provenance(monkeypatch):
         assert report[solver]["alpha_source"] == "model"
 
 
-def test_the_written_report_is_self_describing(monkeypatch):
+def test_the_report_is_written_under_results_compare(monkeypatch, isolated_results):
+    """The one write a compare run performs, at the path readers look for."""
+    _stub_runs(monkeypatch, {})
+    compare.compare_to_matlab(CESSNA)
+    assert (isolated_results / "compare" / f"{CESSNA}.json").is_file()
+
+
+def test_the_written_report_is_self_describing(monkeypatch, isolated_results):
     """A reader of the artifact alone must see which schedule ran, and where from."""
     _stub_runs(monkeypatch, {})
     compare.compare_to_matlab(CESSNA)
-    written = json.loads((results_dir() / "compare" / f"{CESSNA}.json").read_text())
+    written = json.loads((isolated_results / "compare" / f"{CESSNA}.json").read_text())
     assert written["datcom"]["alpha"] == _gold_sweep()
     assert written["datcom"]["alpha_source"] == "gold"
     assert written["tornado"]["alpha"] == _model_sweep()
@@ -99,7 +108,9 @@ def test_the_written_report_is_self_describing(monkeypatch):
     assert written["avl"]["alpha_source"] == "model"
 
 
-def test_report_records_the_model_sweep_when_no_gold_alpha_exists(monkeypatch):
+def test_report_records_the_model_sweep_when_no_gold_alpha_exists(
+    monkeypatch, isolated_results
+):
     monkeypatch.setattr(compare, "_gold_alpha", lambda matlab_dir: None)
     seen: dict = {}
     _stub_runs(monkeypatch, seen)

@@ -11,6 +11,7 @@ from typing import Any
 import numpy as np
 
 from aid.aircraft import Aircraft, load_jsonc
+from aid.axes import from_frd
 from aid.avl_io import run_avl_full
 from aid.datcom_run import run_datcom
 from aid.paths import models_dir, results_dir
@@ -237,16 +238,31 @@ def _compare_avl(python: dict, gold: dict) -> bool:
     return True
 
 
+_COMPARATORS = {
+    "datcom": _compare_datcom,
+    "tornado": _compare_tornado,
+    "avl": _compare_avl,
+}
+
+
 def _compare_coeffs(solver: str, python: dict | None, gold: dict) -> bool:
+    """Grade one solver's coefficients against its MATLAB gold.
+
+    The solvers emit Forward-Right-Down, but ``Results/matlab/*.json`` was written
+    before that normalization and stays in each solver's own frame, so the Python
+    side is re-rawed here -- in memory, and only for this diff. Nothing inverted
+    is written back, so ``Results/python/<name>/*.json`` stays F-R-D.
+
+    The solver is resolved to its comparator *before* the inversion: ``from_frd``
+    raises ``KeyError`` on an unknown solver, which would mask this function's
+    own ``ValueError`` for the same mistake.
+    """
     if python is None:
         return False
-    if solver == "datcom":
-        return _compare_datcom(python, gold)
-    if solver == "tornado":
-        return _compare_tornado(python, gold)
-    if solver == "avl":
-        return _compare_avl(python, gold)
-    raise ValueError(f"unknown solver {solver!r}")
+    compare = _COMPARATORS.get(solver)
+    if compare is None:
+        raise ValueError(f"unknown solver {solver!r}")
+    return compare(from_frd(solver, python), gold)
 
 
 def _solver_pass(

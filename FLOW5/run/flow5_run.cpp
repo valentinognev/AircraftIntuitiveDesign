@@ -10,9 +10,11 @@
 #include <objects2d.h>
 #include <objects3d.h>
 #include <panelanalysis.h>
+#include <planeopp.h>
 #include <planepolar.h>
 #include <planetask.h>
 #include <planexfl.h>
+#include <stabderivatives.h>
 #include <vector3d.h>
 
 #include "nlohmann/json.hpp"
@@ -263,10 +265,82 @@ bool read_beta_spec(const json& polar_json, double& beta_deg, std::string& err)
     return true;
 }
 
+// The stability scalars copied out of the library's StabDerivatives block, in
+// the order they are written to the JSON. Deliberately NOT the whole block:
+// Cma keeps its OLS key (the library's own Cma measures -1.0966 at the reference
+// point, the OLS slope -1.5770), and the u-derivatives CXu/CZu/Cmu have no
+// counterpart in the comparison tables. Every name here takes NO sign-map entry:
+// PanelAnalysis::computeStabilityDerivatives projects onto the stability axes
+// (panelanalysis.cpp:845-846, axes defined at :663-665), which is already
+// Forward-Right-Down. Values are emitted raw, exactly as flow5 computes them.
+struct StabDerivativeField {
+    const char* name;
+    double StabDerivatives::*member;
+};
+
+const std::vector<StabDerivativeField>& stab_derivative_fields()
+{
+    static const std::vector<StabDerivativeField> fields = {
+        {"CXa", &StabDerivatives::CXa},
+        {"CZa", &StabDerivatives::CZa},
+        {"CYb", &StabDerivatives::CYb},
+        {"CYp", &StabDerivatives::CYp},
+        {"CYr", &StabDerivatives::CYr},
+        {"Clb", &StabDerivatives::Clb},
+        {"Clp", &StabDerivatives::Clp},
+        {"Clr", &StabDerivatives::Clr},
+        {"Cnb", &StabDerivatives::Cnb},
+        {"Cnp", &StabDerivatives::Cnp},
+        {"Cnr", &StabDerivatives::Cnr},
+        {"XNP", &StabDerivatives::XNP},
+    };
+    return fields;
+}
+
+// Fills `out` with the reference operating point's stability derivatives. The
+// reference point is the scheduled alpha closest to zero -- the trim the sweep
+// is written around, and the point every measured value in this plan was taken
+// at (alpha = 0 of the -4..+12 Cessna sweep).
+//
+// A non-finite derivative is a hard failure, not a 0.0: the locked thin-surface
+// VLM2 triple used for the native solve is fragile, and a silent zero reads as a
+// perfectly stable aircraft -- Cnb = 0.0 in particular is indistinguishable from
+// "we computed this" at a glance in a coefficient table.
+bool dump_reference_derivatives(
+    PlaneTask* pPlaneTask, json& out, std::string& err)
+{
+    const std::vector<PlaneOpp*>& opps = pPlaneTask->planeOppList();
+    if (opps.empty()) {
+        err = "flow5 returned no operating points; PlaneTask::setKeepOpps(true) is required";
+        return false;
+    }
+
+    const PlaneOpp* pRef = opps.front();
+    for (const PlaneOpp* pOpp : opps) {
+        if (std::abs(pOpp->alpha()) < std::abs(pRef->alpha())) {
+            pRef = pOpp;
+        }
+    }
+
+    for (const StabDerivativeField& field : stab_derivative_fields()) {
+        const double value = pRef->m_SD.*(field.member);
+        if (!std::isfinite(value)) {
+            err = std::string("flow5 stability derivative ") + field.name
+                + " is not finite (" + std::to_string(value)
+                + ") at the reference operating point alpha = "
+                + std::to_string(pRef->alpha()) + " deg";
+            return false;
+        }
+        out[field.name] = value;
+    }
+    return true;
+}
+
 bool build_polar_and_run(
     PlaneXfl* pPlane,
     const json& polar_json,
     PlanePolar*& pPolarOut,
+    json& derivatives,
     std::string& err)
 {
     if (!polar_json.contains("alpha_deg")) {
@@ -323,7 +397,12 @@ bool build_polar_and_run(
     PanelAnalysis::setMaxThreadCount(1);
     pPlaneTask->outputToStdIO(false);
     pPlaneTask->setObjects(pPlane, pPlPolar);
-    pPlaneTask->setComputeDerivatives(false);
+    pPlaneTask->setComputeDerivatives(true);
+    // Without this the library builds every StabDerivatives block and then throws
+    // it away: PlaneTask::storePOpp only retains the opps when m_bKeepOpps is
+    // set (planetask.cpp:2267-2271) and deletes them at :2273, so planeOppList()
+    // would be empty and the dump below would silently emit nothing.
+    pPlaneTask->setKeepOpps(true);
     pPlaneTask->setOppList(alpha_deg);
     pPlaneTask->run();
 
@@ -333,7 +412,12 @@ bool build_polar_and_run(
         return false;
     }
 
+    const bool dumped = dump_reference_derivatives(pPlaneTask, derivatives, err);
+
     delete pPlaneTask;
+    if (!dumped) {
+        return false;
+    }
     pPolarOut = pPlPolar;
     return true;
 }
@@ -355,6 +439,9 @@ json skeleton_output(const json& alpha_deg)
     }
     out["CLa"] = 0;
     out["Cma"] = 0;
+    for (const StabDerivativeField& field : stab_derivative_fields()) {
+        out[field.name] = 0.0;
+    }
     return out;
 }
 
@@ -492,13 +579,15 @@ int main(int argc, char* argv[])
     }
 
     PlanePolar* pPlPolar = nullptr;
-    if (!build_polar_and_run(pPlane, deck["polar"], pPlPolar, err)) {
+    json derivatives;
+    if (!build_polar_and_run(pPlane, deck["polar"], pPlPolar, derivatives, err)) {
         std::cerr << err << '\n';
         globals::deleteObjects();
         return 1;
     }
 
-    const json out = polar_to_json(pPlPolar);
+    json out = polar_to_json(pPlPolar);
+    out.update(derivatives);
     std::cout << out.dump() << '\n';
 
     globals::deleteObjects();

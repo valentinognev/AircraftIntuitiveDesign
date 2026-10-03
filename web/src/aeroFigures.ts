@@ -318,7 +318,20 @@ function pairDatcom(xRaw: unknown[], yRaw: unknown[]): { x: number[]; y: number[
   return { x, y };
 }
 
-function controlFigures(raws: SolverRaws): AeroFigure[] {
+/**
+ * `(beta=0)` for the panels the overlay functions do not build, so a DATCOM or AVL
+ * curve shown there is marked the same way as one shown on a Forces or Derivatives
+ * panel. Only those two solvers need it: they cannot fly a sideslip, and Tornado's
+ * spanwise curves really are at the requested one.
+ *
+ * `base` is the display name the legend already shows, so a named curve keeps its
+ * name — the spanwise handbook curve reads "Prandtl (beta=0)", not "datcom (beta=0)".
+ */
+function betaSuffix(base: string, beta: number): { label?: string } {
+  return beta === 0 ? {} : { label: `${base} (beta=0)` };
+}
+
+function controlFigures(raws: SolverRaws, beta: number): AeroFigure[] {
   const blocks = Array.isArray(raws.datcom?.high_lift) ? raws.datcom.high_lift : [];
   const records = blocks.filter(isRecord);
   const increments: ControlBars = {
@@ -345,6 +358,7 @@ function controlFigures(raws: SolverRaws): AeroFigure[] {
       kind: "line",
       x: samples.x,
       y: samples.y,
+      ...betaSuffix("datcom", beta),
     });
   }
 
@@ -364,6 +378,7 @@ function controlFigures(raws: SolverRaws): AeroFigure[] {
           kind: "line",
           x: surfaceObjects.map((_, index) => index),
           y: surfaceObjects.map((surface) => finiteScalar(surface.angle) ?? 0),
+          ...betaSuffix("avl", beta),
         },
       ],
     );
@@ -395,6 +410,7 @@ function numberArray(value: unknown): number[] | null {
 function spanwiseSeries(
   raws: SolverRaws,
   handbook: { y: number[]; Cl: number[] } | null,
+  beta: number,
 ): OverlayPointSeries[] {
   const series: OverlayPointSeries[] = [];
   if (handbook && Array.isArray(handbook.y) && Array.isArray(handbook.Cl) && handbook.y.length === handbook.Cl.length) {
@@ -408,6 +424,7 @@ function spanwiseSeries(
         name: "Prandtl",
         x: y,
         y: cl,
+        ...betaSuffix("Prandtl", beta),
       });
     }
   }
@@ -612,11 +629,13 @@ export function aeroTabs(
         alphaLines("q/q∞", raws, stabilityAlpha, { datcom: "q_qinf" }, beta),
       ],
     },
-    { id: "controls", label: "Controls", figures: controlFigures(raws) },
+    { id: "controls", label: "Controls", figures: controlFigures(raws, beta) },
     {
       id: "spanwise",
       label: "Spanwise",
-      figures: [lineFigure("Spanwise lift", "Cl", "y (ft)", spanwiseSeries(raws, handbook))],
+      figures: [
+        lineFigure("Spanwise lift", "Cl", "y (ft)", spanwiseSeries(raws, handbook, beta)),
+      ],
     },
     { id: "sections", label: "Sections", figures: sectionFigures },
   ];

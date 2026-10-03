@@ -25,21 +25,44 @@ const ND_ABS = 99998;
 type SolverName = OverlayPointSeries["solver"];
 
 /**
- * Solvers whose numbers cannot be the requested sideslip, so they need the
- * `(beta=0)` suffix when the flight is not upright.
+ * Solvers whose every series is beta = 0 whatever sideslip is asked of them, so they
+ * need the `(beta=0)` suffix when the flight is not upright.
  *
- * DATCOM's `$FLTCON` and AVL's run-case menu have no sideslip at all, so both stay
- * at beta = 0 whatever is asked of them. flow5's force channels *do* follow the
- * requested sideslip (`setBetaSpec`), but its twelve stability derivatives do not:
- * `computeStabilityDerivatives` builds its axes from `objects::windDirection(alpha, 0.0)`
- * (FLOW5/flow5-lib/analysis3d/panelanalysis.cpp:614, its WindDirection at :660), so every derivative is identical
- * at beta = 0, +5 and -5. Only Tornado's `state["betha"]` really flies the sideslip.
+ * DATCOM's `$FLTCON` and AVL's run-case menu have no sideslip at all — the first has
+ * no beta variable, the second offers only bank / CL / velocity / mass / density /
+ * gravity / CG. Tornado is the mirror case: `state["betha"]` is radians(AERO["BETA"]),
+ * so every one of its series really is at the requested sideslip.
+ *
+ * flow5 is *not* in this set, because it is not a property of the solver but of the
+ * channel — see FLOW5_BETA_FLAT_DERIVATIVES.
  */
 const NO_SIDESLIP: ReadonlySet<SolverName> = new Set<SolverName>(["datcom", "avl"]);
-const NO_SIDESLIP_DERIVATIVES: ReadonlySet<SolverName> = new Set<SolverName>([
-  "datcom",
-  "avl",
-  "flow5",
+
+/**
+ * The twelve flow5 `StabDerivatives` keys that are frozen at beta = 0: they are built
+ * from `objects::windDirection(alphaeq, 0.0)` in
+ * `PanelAnalysis::computeStabilityDerivatives`
+ * (FLOW5/flow5-lib/analysis3d/panelanalysis.cpp:614, WindDirection at :660) and in the
+ * p/q/r half of `computeAngularDerivatives` (:887, :922), so every one of them is
+ * byte-identical at beta = 0, +5 and -5.
+ *
+ * `CLa` and `Cma` are deliberately absent. Those are the polar's OLS slopes
+ * (FLOW5/run/flow5_run.cpp:526-527), not StabDerivatives, and they do move with the
+ * sideslip — CLa is 5.5402333786223235 at beta = 0 against 5.500374829746751 at +5.
+ */
+const FLOW5_BETA_FLAT_DERIVATIVES: ReadonlySet<string> = new Set([
+  "CXa",
+  "CZa",
+  "CYb",
+  "CYp",
+  "CYr",
+  "Clb",
+  "Clp",
+  "Clr",
+  "Cnb",
+  "Cnp",
+  "Cnr",
+  "XNP",
 ]);
 
 function finiteNumber(value: unknown): number | null {
@@ -145,14 +168,24 @@ function series(
   };
 }
 
-/** `(beta=0)` for a solver that could not fly the requested sideslip, else nothing. */
+/**
+ * `(beta=0)` for a series that could not be flown at the requested sideslip, else
+ * nothing. `pinned` names the solvers that cannot fly one at all; `betaFlatKeys` names
+ * the per-channel exceptions among the solvers that otherwise would.
+ */
 function pinnedLabel(
   solver: SolverName,
   beta: number,
   pinned: ReadonlySet<SolverName>,
+  betaFlatKeys: ReadonlySet<string> = new Set(),
+  key?: string,
 ): string | undefined {
-  if (beta === 0 || !pinned.has(solver)) return undefined;
-  return `${solver} (beta=0)`;
+  if (beta === 0) return undefined;
+  if (pinned.has(solver)) return `${solver} (beta=0)`;
+  if (solver === "flow5" && key != null && betaFlatKeys.has(key)) {
+    return `${solver} (beta=0)`;
+  }
+  return undefined;
 }
 
 /**
@@ -235,7 +268,7 @@ export function seriesDerivative(
   ) {
     const samples = pairedSamples(datcom.alpha, datcom[spec.datcom], true);
     out.push(
-      series("datcom", samples.x, samples.y, "line", pinnedLabel("datcom", beta, NO_SIDESLIP_DERIVATIVES)),
+      series("datcom", samples.x, samples.y, "line", pinnedLabel("datcom", beta, NO_SIDESLIP)),
     );
   }
 
@@ -254,7 +287,7 @@ export function seriesDerivative(
         grid,
         grid.map(() => perDeg),
         "hline",
-        pinnedLabel(solver, beta, NO_SIDESLIP_DERIVATIVES),
+        pinnedLabel(solver, beta, NO_SIDESLIP, FLOW5_BETA_FLAT_DERIVATIVES, key),
       ),
     );
   };
@@ -262,7 +295,7 @@ export function seriesDerivative(
   horizontal("tornado", spec.tornado, raws.tornado);
 
   const avl = raws.avl;
-  const avlLabel = pinnedLabel("avl", beta, NO_SIDESLIP_DERIVATIVES);
+  const avlLabel = pinnedLabel("avl", beta, NO_SIDESLIP);
   if (spec.avl && avl && has(avl, spec.avl) && has(avl, "alpha")) {
     const alpha = avl.alpha;
     const value = avl[spec.avl];

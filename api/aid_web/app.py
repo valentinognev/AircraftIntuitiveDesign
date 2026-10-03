@@ -44,11 +44,11 @@ class AnalyzeBody(BaseModel):
     aircraft: dict
     solver: str = "datcom"
     mesh: list[str] | None = None
-    beta: float = 0.0
+    beta: float | None = None
 
 
 class StabilityBody(AircraftBody):
-    beta: float = 0.0
+    beta: float | None = None
 
 
 class ControlDerivativesBody(BaseModel):
@@ -56,6 +56,7 @@ class ControlDerivativesBody(BaseModel):
     solver: str
     deltas_deg: list[float] | None = None
     mesh: list[str] | None = None
+    beta: float | None = None
 
 
 def aircraft_to_json(ac: Aircraft) -> dict:
@@ -158,6 +159,7 @@ def control_derivatives(body: ControlDerivativesBody):
                 solver=body.solver,
                 deltas_deg=body.deltas_deg,
                 mesh=mesh,
+                beta=body.beta,
             )
         )
     except (

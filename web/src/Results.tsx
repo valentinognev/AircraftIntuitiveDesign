@@ -389,11 +389,17 @@ function categoriesFor(figure: BarFigure | ControlBars | HingeBars): BarCategory
   return hingeBarCategories(figure);
 }
 
-function BarFigureView({ figure }: { figure: BarFigure | ControlBars | HingeBars }) {
+function BarFigureView({
+  figure,
+  beta,
+}: {
+  figure: BarFigure | ControlBars | HingeBars;
+  beta: number;
+}) {
   const categories = categoriesFor(figure);
   const { width, plot } = LAYOUT;
   const laid = layoutBars(categories, plot);
-  const legend = barLegend(categories);
+  const legend = barLegend(categories, beta);
   const domain = laid.domain;
   return (
     <figure className="min-w-0">
@@ -487,10 +493,10 @@ function TableFigureView({ figure }: { figure: TableFigure }) {
   );
 }
 
-function FigureView({ figure }: { figure: AeroFigure }) {
+function FigureView({ figure, beta }: { figure: AeroFigure; beta: number }) {
   if (figure.kind === "lines") return <LineFigureView figure={figure} />;
   if (figure.kind === "table") return <TableFigureView figure={figure} />;
-  return <BarFigureView figure={figure} />;
+  return <BarFigureView figure={figure} beta={beta} />;
 }
 
 export function Results({ initialTab = "forces" }: { initialTab?: string }) {
@@ -509,8 +515,9 @@ export function Results({ initialTab = "forces" }: { initialTab?: string }) {
   const summary = stabilityText(lastStability);
   const solverRaws = knownSolverRaws(rawRecord);
   const showTabs = hasSolverRaw(solverRaws);
+  const beta = aircraft == null ? 0 : aeroBeta(aircraft);
   const tabs = showTabs
-    ? aeroTabs(solverRaws, stabilityAlphaOf(lastStability), handbook, aircraft == null ? 0 : aeroBeta(aircraft))
+    ? aeroTabs(solverRaws, stabilityAlphaOf(lastStability), handbook, beta)
     : [];
   const selected = tabs.find((tab) => tab.id === tabId) ?? tabs[0];
 
@@ -593,7 +600,11 @@ export function Results({ initialTab = "forces" }: { initialTab?: string }) {
           </div>
           <div className="space-y-2">
             {selected.figures.map((figure, i) => (
-              <FigureView key={`${figure.kind}-${figure.title}-${i}`} figure={figure} />
+              <FigureView
+                key={`${figure.kind}-${figure.title}-${i}`}
+                figure={figure}
+                beta={beta}
+              />
             ))}
             {controlChart}
           </div>

@@ -9,7 +9,7 @@ import {
   type LineFigure,
   type TableFigure,
 } from "./aeroFigures";
-import { seriesLegend } from "./aeroChart";
+import { barLegend, controlBarCategories, seriesLegend } from "./aeroChart";
 import type { OverlayPointSeries, SolverRaws } from "./coeffOverlay";
 
 const PER_RAD = 180 / Math.PI;
@@ -687,21 +687,85 @@ it("threads the sideslip from aeroTabs into the series labels", () => {
   expect(lines(tab(upright, "Forces"), "CL").series.map(displayName)).toEqual(["datcom", "avl"]);
 });
 
-it("labels the flow5 derivative panels at a sideslip", () => {
+it("leaves the flow5 alpha-derivative panels plain, because CLa and Cma do move with beta", () => {
+  // The two flow5 derivative channels this app plots are the polar OLS slopes, not
+  // StabDerivatives, so neither takes the suffix. The panels that would qualify are
+  // CYb, Cnb and Clb — and the app plots no flow5 channel on those at all.
   const raws: SolverRaws = {
-    tornado: { CL_a: PER_RAD },
-    flow5: { CLa: PER_RAD },
+    datcom: { alpha: [0, 2] },
+    tornado: { CL_a: PER_RAD, Cm_a: PER_RAD },
+    flow5: { CLa: PER_RAD, Cma: PER_RAD },
   };
   const swept = aeroTabs(raws, null, null, 5);
   expect(lines(tab(swept, "Derivatives"), "CLα").series.map(displayName)).toEqual([
     "tornado",
-    "flow5 (beta=0)",
+    "flow5",
+  ]);
+  expect(lines(tab(swept, "Derivatives"), "Cmα").series.map(displayName)).toEqual([
+    "tornado",
+    "flow5",
+  ]);
+  // The panels the suffix *would* apply to carry no flow5 channel at all.
+  for (const title of ["CYβ", "Cnβ", "Clβ"]) {
+    expect(
+      lines(tab(swept, "Derivatives"), title).series.some((item) => item.solver === "flow5"),
+      title,
+    ).toBe(false);
+  }
+});
+
+// R31: the panels the overlay functions do not build carry their own solver-styled
+// series and bar legends. Those are DATCOM and AVL data at beta = 0, so at a non-zero
+// sideslip they need the same suffix or the panel misreports its own condition.
+
+it("marks the spanwise Prandtl curve, which is DATCOM data", () => {
+  const raws: SolverRaws = { tornado: { spanwise: [{ name: "Main", y: [1], Cl: [0.5] }] } };
+  const swept = aeroTabs(raws, null, { y: [0, 10], Cl: [0.2, 0.4] }, 5);
+  const span = lines(tab(swept, "Spanwise"), "Spanwise lift").series;
+  expect(span.map(seriesLegend)).toEqual(["Prandtl (beta=0)", "Tornado Main"]);
+  const upright = aeroTabs(raws, null, { y: [0, 10], Cl: [0.2, 0.4] });
+  expect(lines(tab(upright, "Spanwise"), "Spanwise lift").series.map(seriesLegend)).toEqual([
+    "Prandtl",
+    "Tornado Main",
   ]);
 });
 
-it("leaves the spanwise panels unlabelled at a sideslip", () => {
-  const swept = aeroTabs({ tornado: {} }, null, { y: [0, 1], Cl: [0.2, 0.3] }, 5);
-  const span = lines(tab(swept, "Spanwise"), "Spanwise lift").series;
-  expect(span.map((item) => item.label)).toEqual([undefined]);
-  expect(span.map(seriesLegend)).toEqual(["Prandtl"]);
+it("marks the DATCOM drag-increment curve on the Controls tab", () => {
+  const raws: SolverRaws = {
+    datcom: {
+      high_lift: [{ delta: 15, dcl: 0.2, dcm: 0, dcdi_alpha: [0, 4], dcdi: [0.01, 0.02] }],
+    },
+  };
+  const swept = aeroTabs(raws, null, null, 5);
+  expect(lines(tab(swept, "Controls"), "ΔCDi").series.map(seriesLegend)).toEqual([
+    "datcom (beta=0)",
+  ]);
+  const upright = aeroTabs(raws, null, null);
+  expect(lines(tab(upright, "Controls"), "ΔCDi").series.map(seriesLegend)).toEqual(["datcom"]);
+});
+
+it("marks the AVL control-deflection curve on the Controls tab", () => {
+  const raws: SolverRaws = { avl: { surface: [{ angle: 5 }, { name: "aileron", angle: -2 }] } };
+  const swept = aeroTabs(raws, null, null, 5);
+  expect(
+    lines(tab(swept, "Controls"), "AVL control deflection").series.map(seriesLegend),
+  ).toEqual(["avl (beta=0)"]);
+  const upright = aeroTabs(raws, null, null);
+  expect(
+    lines(tab(upright, "Controls"), "AVL control deflection").series.map(seriesLegend),
+  ).toEqual(["avl"]);
+});
+
+it("keeps the Tornado control keys unqualified, because Tornado flies the sideslip", () => {
+  const raws: SolverRaws = {
+    datcom: { high_lift: [{ delta: 15, dcl: 0.2, dcm: 0 }] },
+    tornado: { CL_d: [[0.5, 0.6]] },
+  };
+  const swept = aeroTabs(raws, null, null, 5);
+  const increments = figure(tab(swept, "Controls").figures, "Control increments") as ControlBars;
+  const labels = controlBarCategories(increments).flatMap((cat) =>
+    cat.slots.map((slot) => barLegend([cat]).find((item) => item.key === slot.key)?.label),
+  );
+  expect(labels).toContain("CL_d");
+  expect(labels.some((label) => label?.includes("(beta=0)"))).toBe(false);
 });

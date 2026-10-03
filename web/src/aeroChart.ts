@@ -217,14 +217,29 @@ const BAR_LEGEND: Record<string, string> = {
   dclMax: "dclMax",
 };
 
-export function barLegend(categories: BarCategory[]): { key: string; label: string }[] {
+/**
+ * Bar legends name their solver for the paired figures and a quantity for the rest.
+ * Only AVL's slot is a solver that cannot fly a sideslip — DATCOM's dcl/dcm and the
+ * hinge quantities are named after what they measure, so they take no suffix — and
+ * Tornado's bars really are at the requested sideslip.
+ */
+const BAR_LEGEND_BETA_FLAT = new Set(["avl"]);
+
+export function barLegend(
+  categories: BarCategory[],
+  beta = 0,
+): { key: string; label: string }[] {
   const seen = new Set<string>();
   const out: { key: string; label: string }[] = [];
   for (const cat of categories) {
     for (const slot of cat.slots) {
       if (!usableY(slot.value) || seen.has(slot.key)) continue;
       seen.add(slot.key);
-      out.push({ key: slot.key, label: BAR_LEGEND[slot.key] ?? slot.key });
+      const label = BAR_LEGEND[slot.key] ?? slot.key;
+      out.push({
+        key: slot.key,
+        label: beta !== 0 && BAR_LEGEND_BETA_FLAT.has(slot.key) ? `${label} (beta=0)` : label,
+      });
     }
   }
   return out;

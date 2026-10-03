@@ -105,6 +105,7 @@ class _SectionsPage(QWidget):
 class CompareTabs(QTabWidget):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
+        self.beta = 0.0
         self._canvases: dict[str, _TabCanvas] = {}
         self._sections = _SectionsPage()
         for name in TAB_NAMES:
@@ -127,7 +128,18 @@ class CompareTabs(QTabWidget):
     def figure(self, name: str):
         return self._canvases[name].figure
 
-    def plot(self, st: dict, results: dict, ac=None, *, angle: bool = True) -> None:
+    def plot(
+        self,
+        st: dict,
+        results: dict,
+        ac=None,
+        *,
+        angle: bool = True,
+        beta: float = 0.0,
+    ) -> None:
+        # Held on the widget so every overlay below can reach it: at a non-zero
+        # sideslip the solvers that cannot fly one get labelled "(beta=0)".
+        self.beta = float(beta)
         self._plot_forces(st, results)
         self._plot_moments(st, results)
         self._plot_derivatives(st, results)
@@ -147,7 +159,7 @@ class CompareTabs(QTabWidget):
         )
         for i, (ylabel, dkey, torn, avl, flow5) in enumerate(specs, start=1):
             ax = fig.add_subplot(2, 3, i)
-            kwargs: dict = {"datcom": dkey, "tornado": torn, "avl": avl}
+            kwargs: dict = {"datcom": dkey, "tornado": torn, "avl": avl, "beta": self.beta}
             if flow5 is not None:
                 kwargs["flow5"] = flow5
             series = overlay_vs_alpha(results, st, **kwargs)
@@ -167,7 +179,7 @@ class CompareTabs(QTabWidget):
         )
         for i, (ylabel, dkey, torn, avl, flow5) in enumerate(specs, start=1):
             ax = fig.add_subplot(2, 2, i)
-            kwargs: dict = {"datcom": dkey, "tornado": torn, "avl": avl}
+            kwargs: dict = {"datcom": dkey, "tornado": torn, "avl": avl, "beta": self.beta}
             if flow5 is not None:
                 kwargs["flow5"] = flow5
             _draw(
@@ -179,7 +191,7 @@ class CompareTabs(QTabWidget):
             ax.set_ylabel(ylabel)
             ax.set_xlabel(r"$\alpha$ (deg)" if i > 2 else "")
         ax_xcp = fig.add_subplot(2, 2, 4)
-        _draw(ax_xcp, overlay_vs_alpha(results, st, datcom="xcp"), xlim=_alpha_xlim(results, st), legend=False)
+        _draw(ax_xcp, overlay_vs_alpha(results, st, datcom="xcp", beta=self.beta), xlim=_alpha_xlim(results, st), legend=False)
         ax_xcp.set_ylabel(r"$X_{CP}$")
         ax_xcp.set_xlabel(r"$\alpha$ (deg)")
         self._finish("Moments")
@@ -195,7 +207,7 @@ class CompareTabs(QTabWidget):
         )
         for i, (ylabel, dkey, torn, avl, flow5) in enumerate(specs, start=1):
             ax = fig.add_subplot(2, 3, i)
-            kwargs: dict = {"datcom": dkey, "tornado": torn, "avl": avl}
+            kwargs: dict = {"datcom": dkey, "tornado": torn, "avl": avl, "beta": self.beta}
             if flow5 is not None:
                 kwargs["flow5"] = flow5
             _draw(

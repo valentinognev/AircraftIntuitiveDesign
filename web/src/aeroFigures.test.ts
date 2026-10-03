@@ -718,12 +718,17 @@ it("leaves the flow5 alpha-derivative panels plain, because CLa and Cma do move 
 // series and bar legends. Those are DATCOM and AVL data at beta = 0, so at a non-zero
 // sideslip they need the same suffix or the panel misreports its own condition.
 
-it("marks the spanwise Prandtl curve, which is DATCOM data", () => {
+it("leaves the spanwise Prandtl curve unmarked, because the handbook solution is analytic", () => {
+  // lifting_line() never reads AERO["BETA"]: it is a closed-form 2D solution, so the
+  // curve really is at the aircraft's sideslip and marking it would be the same lie
+  // R34 was about, in the legend instead of the payload.
   const raws: SolverRaws = { tornado: { spanwise: [{ name: "Main", y: [1], Cl: [0.5] }] } };
-  const swept = aeroTabs(raws, null, { y: [0, 10], Cl: [0.2, 0.4] }, 5);
+  const handbook = { y: [0, 10], Cl: [0.2, 0.4] };
+  const swept = aeroTabs(raws, null, handbook, 5);
   const span = lines(tab(swept, "Spanwise"), "Spanwise lift").series;
-  expect(span.map(seriesLegend)).toEqual(["Prandtl (beta=0)", "Tornado Main"]);
-  const upright = aeroTabs(raws, null, { y: [0, 10], Cl: [0.2, 0.4] });
+  expect(span.map((item) => item.label)).toEqual([undefined, undefined]);
+  expect(span.map(seriesLegend)).toEqual(["Prandtl", "Tornado Main"]);
+  const upright = aeroTabs(raws, null, handbook);
   expect(lines(tab(upright, "Spanwise"), "Spanwise lift").series.map(seriesLegend)).toEqual([
     "Prandtl",
     "Tornado Main",
@@ -768,4 +773,26 @@ it("keeps the Tornado control keys unqualified, because Tornado flies the sidesl
   );
   expect(labels).toContain("CL_d");
   expect(labels.some((label) => label?.includes("(beta=0)"))).toBe(false);
+});
+
+// R31 leftovers: the Sections "Other coefficients" table names its solver in the group
+// header, so those headers are solver labels too and get the same treatment.
+
+it("marks the DATCOM and AVL leftover-table group headers at a sideslip", () => {
+  const raws: SolverRaws = {
+    datcom: { high_lift: [{ delta: 15, dcl: 0.2, dcm: 0 }] },
+    tornado: { L: [1.25, 2] },
+    avl: { bonus: 2.5 },
+  };
+  const swept = aeroTabs(raws, null, null, 5);
+  const headers = table(tab(swept, "Sections"), "Other coefficients")
+    .rows.filter((row) => row.header)
+    .map((row) => row.cells[0]);
+  expect(headers).toEqual(["DATCOM high-lift (beta=0)", "Tornado", "AVL (beta=0)"]);
+  const upright = aeroTabs(raws, null, null);
+  expect(
+    table(tab(upright, "Sections"), "Other coefficients")
+      .rows.filter((row) => row.header)
+      .map((row) => row.cells[0]),
+  ).toEqual(["DATCOM high-lift", "Tornado", "AVL"]);
 });

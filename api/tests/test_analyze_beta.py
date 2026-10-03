@@ -10,6 +10,7 @@ import inspect
 from fastapi.testclient import TestClient
 
 from aid_web import analyze as analyze_mod
+from aid_web.analyze import SOLVERS
 from aid_web.app import app
 
 COEFF = {
@@ -151,17 +152,66 @@ def test_unknown_solver_still_400s():
     assert r.status_code == 400
 
 
-def test_handshake_payload_reports_the_sideslip_it_was_computed_for(monkeypatch):
+# The payload's axes.beta is a flight-condition field, so it must record the condition
+# the data was computed at -- not the condition that was asked for. tornado and flow5 can
+# be flown at a sideslip; DATCOM's $FLTCON and AVL's run-case menu have no beta at all,
+# so their runs are at zero whatever the request says and their payload must say zero.
+BETA_CAPABLE = {"tornado", "flow5"}
+NO_SIDESLIP_CAPABILITY = {"datcom", "avl"}
+
+
+def _payload_beta(client, solver, **extra):
+    r = client.post(
+        "/analyze",
+        json={"aircraft": _cessna(), "solver": solver, "beta": 5.0, **extra},
+    )
+    assert r.status_code == 200, solver
+    return r.json()["payload"]["axes"]["beta"]
+
+
+def test_payload_beta_names_the_sideslip_the_engine_was_handed(monkeypatch):
+    """tornado and flow5 fly the requested sideslip, so the payload reports it."""
     _spy(monkeypatch)
-    swept = TestClient(app).post(
-        "/analyze", json={"aircraft": _cessna(), "solver": "tornado", "beta": 5.0}
-    )
-    assert swept.status_code == 200
-    assert swept.json()["payload"]["axes"]["beta"] == [5.0]
-    upright = TestClient(app).post(
-        "/analyze", json={"aircraft": _cessna(), "solver": "tornado"}
-    )
-    assert upright.json()["payload"]["axes"]["beta"] == [0.0]
+    client = TestClient(app)
+    assert _payload_beta(client, "tornado") == [5.0]
+    assert _payload_beta(client, "flow5") == [5.0]
+
+
+def test_payload_beta_stays_zero_for_datcom_and_avl_at_a_sideslip(monkeypatch):
+    """DATCOM and AVL cannot fly a sideslip, so reporting 5.0 would be a fresh lie."""
+    seen = _spy(monkeypatch)
+    client = TestClient(app)
+    assert _payload_beta(client, "datcom") == [0.0]
+    assert _payload_beta(client, "avl") == [0.0]
+    # The aircraft really did carry the request; only the payload disagrees with it.
+    assert seen["run_datcom"] == [5.0]
+    assert seen["run_avl_full"] == [5.0]
+
+
+def test_payload_beta_stays_zero_for_datcom_and_avl_when_the_aircraft_carries_one(
+    monkeypatch,
+):
+    """An absent top-level beta still defers to AERO["BETA"], and is still not flown."""
+    _spy(monkeypatch)
+    client = TestClient(app)
+    for solver in ("datcom", "avl"):
+        r = client.post("/analyze", json={"aircraft": _swept(9.0), "solver": solver})
+        assert r.status_code == 200, solver
+        assert r.json()["payload"]["axes"]["beta"] == [0.0], solver
+
+
+def test_every_solver_is_classified_by_the_beta_capable_set():
+    """A new solver must be classified, not silently assumed to fly a sideslip."""
+    assert set(analyze_mod.BETA_CAPABLE_SOLVERS) == BETA_CAPABLE
+    assert set(SOLVERS) - set(analyze_mod.BETA_CAPABLE_SOLVERS) == NO_SIDESLIP_CAPABILITY
+
+
+def test_payload_beta_is_zero_at_an_upright_flight(monkeypatch):
+    _spy(monkeypatch)
+    client = TestClient(app)
+    for solver in sorted(BETA_CAPABLE):
+        r = client.post("/analyze", json={"aircraft": _cessna(), "solver": solver})
+        assert r.json()["payload"]["axes"]["beta"] == [0.0], solver
 
 
 # R33: absent and null both mean "keep whatever AERO["BETA"] already says", because

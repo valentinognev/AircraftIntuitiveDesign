@@ -20,6 +20,11 @@ from aid.tornado_io import tornado_io
 from aid.viz import planform_stations
 
 SOLVERS = frozenset({"datcom", "tornado", "avl", "flow5"})
+# The solvers that can actually be flown at a sideslip: Tornado reads it as
+# ``state["betha"]`` and flow5 as the polar's beta spec. DATCOM's ``$FLTCON`` and
+# AVL's run-case menu have no beta at all, so their runs sit at beta = 0 whatever
+# the request asks for. Mirrors BETA_CAPABLE_SOLVERS on the Python GUI side.
+BETA_CAPABLE_SOLVERS = frozenset({"tornado", "flow5"})
 DEFAULT_MESH = {
     "tornado": ("10", "5"),
     "avl": ("10", "10"),
@@ -131,16 +136,28 @@ def handbook_spanwise(ac: Aircraft) -> dict | None:
         return None
 
 
+def _flown_beta(solver: str, ac: Aircraft) -> float:
+    """The sideslip this solver's data was actually computed at, in degrees.
+
+    ``axes.beta`` in the handshake payload is a flight-condition field, so it must
+    name the condition the numbers came from and not the one that was requested.
+    Only the beta-capable solvers move off zero; anything else reports zero, which
+    is what DATCOM and AVL were actually run at.
+    """
+    if solver not in BETA_CAPABLE_SOLVERS:
+        return 0.0
+    return aero_beta(ac)
+
+
 def _analyze_result(solver: str, aid_raw: dict, ac: Aircraft) -> dict:
     raw = mapper_shaped_raw(aid_raw)
     result = {
         "ok": True,
         "solver": solver,
         "raw": raw,
-        # Report the sideslip the run was actually computed for, not a hard-coded
-        # zero: an export that misstates its flight condition is corrupted data.
+        # An export that misstates its own flight condition is corrupted data.
         "payload": to_handshake_payload(
-            raw, _mach_float(raw), solver=solver, beta=aero_beta(ac)
+            raw, _mach_float(raw), solver=solver, beta=_flown_beta(solver, ac)
         ),
     }
     handbook = handbook_spanwise(ac)

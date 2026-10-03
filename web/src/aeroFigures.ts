@@ -331,6 +331,11 @@ function betaSuffix(base: string, beta: number): { label?: string } {
   return beta === 0 ? {} : { label: `${base} (beta=0)` };
 }
 
+/** The same suffix on a table group header, which names its solver just as a legend does. */
+function betaTitle(title: string, beta: number): string {
+  return beta === 0 ? title : `${title} (beta=0)`;
+}
+
 function controlFigures(raws: SolverRaws, beta: number): AeroFigure[] {
   const blocks = Array.isArray(raws.datcom?.high_lift) ? raws.datcom.high_lift : [];
   const records = blocks.filter(isRecord);
@@ -407,10 +412,14 @@ function numberArray(value: unknown): number[] | null {
   return value as number[];
 }
 
+/**
+ * The handbook's Prandtl curve is a closed-form `lifting_line` solution that never
+ * reads AERO["BETA"], so it really is at the aircraft's sideslip and carries no
+ * `(beta=0)` mark — same for Tornado's spanwise curves.
+ */
 function spanwiseSeries(
   raws: SolverRaws,
   handbook: { y: number[]; Cl: number[] } | null,
-  beta: number,
 ): OverlayPointSeries[] {
   const series: OverlayPointSeries[] = [];
   if (handbook && Array.isArray(handbook.y) && Array.isArray(handbook.Cl) && handbook.y.length === handbook.Cl.length) {
@@ -424,7 +433,6 @@ function spanwiseSeries(
         name: "Prandtl",
         x: y,
         y: cl,
-        ...betaSuffix("Prandtl", beta),
       });
     }
   }
@@ -481,7 +489,7 @@ function numbers1d(value: unknown, limit: number, rejectLonger: boolean): number
   return (value as number[]).slice(0, limit);
 }
 
-function leftoverTable(raws: SolverRaws): TableFigure | null {
+function leftoverTable(raws: SolverRaws, beta: number): TableFigure | null {
   const groups: { title: string; rows: { qty: string; vals: number[] }[] }[] = [];
   const hlRows: { qty: string; vals: number[] }[] = [];
   const blocks = raws.datcom?.high_lift;
@@ -496,7 +504,7 @@ function leftoverTable(raws: SolverRaws): TableFigure | null {
       }
     });
   }
-  if (hlRows.length > 0) groups.push({ title: "DATCOM high-lift", rows: hlRows });
+  if (hlRows.length > 0) groups.push({ title: betaTitle("DATCOM high-lift", beta), rows: hlRows });
 
   for (const [title, raw] of [
     ["Tornado", raws.tornado],
@@ -510,7 +518,9 @@ function leftoverTable(raws: SolverRaws): TableFigure | null {
       if (!vals) continue;
       rows.push({ qty: key, vals });
     }
-    if (rows.length > 0) groups.push({ title, rows });
+    if (rows.length > 0) {
+      groups.push({ title: title === "Tornado" ? title : betaTitle(title, beta), rows });
+    }
   }
   if (groups.length === 0) return null;
 
@@ -538,7 +548,7 @@ export function aeroTabs(
   beta = 0,
 ): AeroTab[] {
   const section = sectionTable(raws);
-  const leftover = leftoverTable(raws);
+  const leftover = leftoverTable(raws, beta);
   const sectionFigures: AeroFigure[] = [];
   if (section) sectionFigures.push(section);
   if (leftover) sectionFigures.push(leftover);
@@ -634,7 +644,7 @@ export function aeroTabs(
       id: "spanwise",
       label: "Spanwise",
       figures: [
-        lineFigure("Spanwise lift", "Cl", "y (ft)", spanwiseSeries(raws, handbook, beta)),
+        lineFigure("Spanwise lift", "Cl", "y (ft)", spanwiseSeries(raws, handbook)),
       ],
     },
     { id: "sections", label: "Sections", figures: sectionFigures },

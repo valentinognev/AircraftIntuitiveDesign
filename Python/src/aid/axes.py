@@ -9,9 +9,15 @@ Each solver's own output was measured against the identity that defines it, not
 read out of documentation:
 
 * **avl** -- ``Results/*/avl/geometry.st:12`` prints
-  ``Standard axis orientation, X fwd, Z down``; ``CXtot = -CDtot`` and
-  ``CZtot = -CLtot`` hold to all printed digits on every model checked. Already
-  F-R-D, so the map is empty.
+  ``Standard axis orientation, X fwd, Z down`` on every model checked, which is
+  what the empty map rests on. That frame declaration is the evidence; the
+  coefficient identities are not, and must not be cited as though they were:
+  ``CXtot = -CDtot`` holds *exactly* only at alpha = 0, where the wind and body
+  axes coincide. Away from it the lift tilts into the axial component and
+  ``CXtot + CDtot`` grows to +0.2521 at alpha = 12 deg on Cessna (0.0018 of the
+  force scale at alpha = 4 deg, which is why the solvers straddle the drag
+  crossover there). Only ``CZtot = -CLtot`` keeps its sign against ``CLtot``
+  across the sweep. So AVL is already F-R-D by declaration, and the map is empty.
 * **datcom** -- the table header is ``ALPHA CD CL CM CN CA XCP`` with UPPERCASE
   ``CN`` and ``CA``, i.e. forces (``datcom_parse.py:28``); the wind/body
   rotation ``CL = CN*cos(a) - CA*sin(a)`` and ``CD = CN*sin(a) + CA*cos(a)``
@@ -43,18 +49,19 @@ read out of documentation:
 
   ``CY`` and ``CC`` (``coeff.py:104``, wind-axis side force) are already F-R-D
   and are never flipped, by any solver.
-* **flow5** -- empty for now, because the emitted keys are longitudinal only
-  today. The lateral channels are **known to need flips** and the header
-  comments at ``FLOW5/flow5-lib/api/aeroforces.h:87-88,97-98``, which claim
-  ``Cli()`` and ``Cni()`` are already F-R-D, are wrong: measured on Cessna at
-  beta = +5 deg, alpha = 0, ``Cli`` = +0.0047339 against a F-R-D prediction of
-  ``Clb*beta`` = -0.0046262, and ``Cni`` = -0.0142629 against ``Cnb*beta`` =
-  +0.0147063 -- both opposite, so both take a ``-1``. Task 2.3 owns filling
-  this map in as ``{"Cx": -1, "Cz": -1, "Cl": -1, "Cn": -1}``; ``CXa``/``CZa``
-  get no entry there, because ``CZa`` already measures -5.2562 and raw
-  ``CXa`` is ``CL - dCD/dalpha`` rather than a bare ``-dCD/dalpha``. The
-  measurements are recorded here so that task does not have to re-derive
-  them.
+* **flow5** -- ``{"Cx": -1, "Cz": -1, "Cl": -1, "Cn": -1}``, filled in by Task
+  2.3 (commit ``588a3a0``); it used to be empty and the text here used to say
+  so. All four flips were measured. The header comments at
+  ``FLOW5/flow5-lib/api/aeroforces.h:87-88,97-98``, which claim ``Cli()`` and
+  ``Cni()`` are already F-R-D, are wrong: at beta = +5 deg, alpha = 0, ``Cli`` =
+  +0.0047339 against a F-R-D prediction of ``Clb*beta`` = -0.0046262, and ``Cni``
+  = -0.0142629 against ``Cnb*beta`` = +0.0147063 -- both opposite, so both take a
+  ``-1``. ``Cx``/``Cz`` are aft-positive and up-positive, measured as ``Cx`` =
+  ``CD*cos(a) - CL*sin(a)`` to 1.4e-13 across the sweep and ``Cz`` = ``CL`` at
+  alpha = 0. ``CXa``/``CZa`` deliberately get **no** entry: raw ``CZa`` measures
+  -5.2562 and is already down-positive (it equals the gold's own
+  ``CZa = -CLa - CD``), and raw ``CXa`` is ``CL - dCD/dalpha``, not a bare
+  ``-dCD/dalpha``, so both are already F-R-D.
 * **handbook** -- ``Matlab/fsroot/code/Lateral_Static_Stability.m:100`` already
   yields F-R-D signs. It has no entry here; asking for it raises ``KeyError``.
 

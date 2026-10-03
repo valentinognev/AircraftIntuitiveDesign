@@ -91,6 +91,10 @@ def test_tornado_coeff_create_flips_cz_and_cn():
     # Z = -(D sin a + L cos a), which is what pins the x axis as forward -- at
     # Cessna's default 4 deg the drag contribution is small enough that the
     # lifted L sin a term wins and X legitimately comes out positive.
+    # These two identities hold only at zero sideslip; tornado_io.py:384 hardcodes
+    # betha, and Task 3.1 wires AERO["BETA"], so assert the precondition here
+    # rather than let the rotation quietly stop holding.
+    assert float(state["betha"]) == 0.0, "the rotation identities assume betha = 0"
     alpha = float(state["alpha"])
     assert got["CZ"] == pytest.approx(
         -(got["CD"] * np.sin(alpha) + got["CL"] * np.cos(alpha))
@@ -98,6 +102,62 @@ def test_tornado_coeff_create_flips_cz_and_cn():
     assert got["CX"] == pytest.approx(
         -got["CD"] * np.cos(alpha) + got["CL"] * np.sin(alpha)
     )
+
+
+def test_tornado_control_deriv_passes_coeff_create_through_untouched(monkeypatch):
+    """R1: ``tornado.control_deriv`` must NOT wrap its dict in ``to_frd``.
+
+    Its ``Cl``/``Cn`` are read straight out of ``coeff_create``, which is already
+    Forward-Right-Down, so wrapping here would negate them a second time and
+    re-mirror exactly the quantity this whole plan exists to fix. The plan's own
+    brief instructed that wrap, so the invariant is pinned rather than left to the
+    comment at ``control_deriv.py:142``.
+
+    The reference is ``coeff_create``'s own return for the *identical* condition,
+    captured by a spy, so this is exact equality against the very dict
+    ``_coefficients`` read -- no solver-vs-solver tolerance, no reimplementation of
+    the deflection stepping, and robust to unrelated solver changes. An AVL
+    cross-reference was rejected: the untrimmed Cessna's ``Cl``/``Cn`` at the
+    model's alpha are ~1e-18, so their signs carry no information and any sign
+    comparison against AVL would be vacuous.
+    """
+    from aid.tornado import control_deriv
+    from aid.tornado.coeff import coeff_create
+    from aid.tornado_io import tornado_io
+
+    ac = _cessna()
+    geo, state = tornado_io(ac, ("4", "2"), force_controls=True)
+    control_deriv._keep_fixed_chordwise_panel(geo)
+    strips = control_deriv._surface_strips(geo, ac, "rudder")
+    assert strips, "the rudder must be on the lattice for this test to mean anything"
+
+    seen = []
+
+    def spy(results, lattice, stepped_state, ref, stepped_geo):
+        out = coeff_create(results, lattice, stepped_state, ref, stepped_geo)
+        seen.append(out)
+        return out
+
+    monkeypatch.setattr(control_deriv, "coeff_create", spy)
+
+    got = control_deriv._coefficients(geo, state, strips, control_deriv.H_DEG)
+    assert len(seen) == 1
+    base = seen[0]
+
+    # Non-zero, so the equalities below cannot pass on a -0.0 == 0.0 fluke.
+    for key in ("Cl", "Cn", "CL", "CD", "Cm", "CY"):
+        assert base[key] != 0.0, key
+
+    # Cl/Cn are the load-bearing pair: both sit in the tornado map, so a wrap here
+    # negates exactly them and nothing else in this dict.
+    assert got["Cl"] == base["Cl"]
+    assert got["Cn"] == base["Cn"]
+    # CL/CD/Cm are wind-axis and CY is the CC side force: none is in the map, so
+    # they must survive even if a future entry tried to catch them.
+    assert got["CL"] == base["CL"]
+    assert got["CD"] == base["CD"]
+    assert got["Cm"] == base["Cm"]
+    assert got["CY"] == base["CC"]
 
 
 def test_tornado_coeff_create_leaves_the_raw_vectors_alone():

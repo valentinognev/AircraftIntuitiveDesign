@@ -6,10 +6,13 @@ effect, and this file pins what that boundary does to a real Cessna solve.
 Three things it deliberately does **not** assert, each of which the plan and the
 spikes settled against a more obvious guess:
 
-* ``CXa``/``CZa`` are **not** flipped. ``CZa`` measures -5.2562 already and
-  satisfies ``CZa = -CLa - CD`` (gold ``Longitudinal_Dynamic_Stability.m:35``),
-  and raw ``CXa`` is ``CL - dCD/dalpha`` (gold line 22), not a bare
-  ``-dCD/dalpha``. Neither is up-positive.
+* ``CXa``/``CZa`` are **not** flipped. Both already measure down/forward-negative
+  (``CZa`` -5.2562, ``CXa`` +0.0595), so they are already Forward-Right-Down.
+  The gold's *convention* for that lives at
+  ``Matlab/fsroot/code/Longitudinal_Dynamic_Stability.m:22,35`` -- for anyone
+  who wants the mechanism, not as a number this file could check. See
+  ``test_flow5_cza_is_not_flipped`` below for why the identity itself is not
+  asserted here.
 * ``Cdvis``/``CDind`` say nothing about viscous drag here. ``flow5_run.cpp:301``
   calls ``setViscous(false)``, so ``CDvis`` is identically 0.0 and ``CDind`` is
   identically ``CD``. That is an honest exposure of a locked setup, not a result,
@@ -34,13 +37,30 @@ from aid.paths import flow5_bin, models_dir
 FLOW5_BIN = flow5_bin()
 MESH = ("10", "10")
 
-pytestmark = pytest.mark.skipif(
+# Per-test rather than module-level on purpose: ``_SKIP_LEFTOVER`` needs no
+# solver, and a test gated on an unrelated binary stops running without anyone
+# noticing. Each test that shells out to flow5_run carries this instead.
+needs_flow5 = pytest.mark.skipif(
     not FLOW5_BIN.is_file(), reason="flow5 helper not built"
 )
 
 # The four channels the flow5 sign map names. Everything else run_flow5 returns
 # must come out of to_frd unchanged.
 FLIPPED = ("Cx", "Cz", "Cl", "Cn")
+
+# Every key run_flow5 returns. Hand-written rather than taken from a solve so
+# ``test_every_flow5_key_is_named_in_the_sections_skip_list`` needs no binary;
+# ``test_the_key_list_matches_a_real_solve`` is what keeps this honest, and it is
+# the one that genuinely needs flow5_run.
+FLOW5_KEYS = frozenset(
+    {
+        "alpha", "beta", "CL", "CD", "CDvis", "CDind", "Cm",
+        "CY", "Cl", "Cn", "Cx", "Cz",
+        "CLa", "Cma",
+        "CXa", "CZa", "CYb", "CYp", "CYr",
+        "Clb", "Clp", "Clr", "Cnb", "Cnp", "Cnr", "XNP",
+    }
+)
 
 DERIVATIVES = (
     "CXa", "CZa", "CYb", "CYp", "CYr",
@@ -74,6 +94,7 @@ def _alpha_zero(ces: dict) -> int:
     return int(np.argmin(np.abs(np.asarray(ces["alpha"]))))
 
 
+@needs_flow5
 def test_flow5_cx_flips_into_forward_right_down(cessna_flow5):
     # At alpha = 0 the axial component reduces to CD exactly (raw Cx - CD is 0.0,
     # measured), which is the one alpha where the aft-positive reading is
@@ -96,6 +117,7 @@ def test_flow5_cx_flips_into_forward_right_down(cessna_flow5):
     assert np.allclose(cx, -(cd_a * np.cos(a) - cl_a * np.sin(a)), atol=3.2e-13)
 
 
+@needs_flow5
 def test_flow5_cz_flips_into_forward_right_down(cessna_flow5):
     # Unlike Cx, Cz stays up-positive for every alpha of this sweep, so the
     # argmax(CL) sign test is sound here: raw is +1.1948 at alpha = +12 with
@@ -111,6 +133,7 @@ def test_flow5_cz_flips_into_forward_right_down(cessna_flow5):
     # Note Cz == -CL only at alpha = 0; it is -1.19e-2 away from it at alpha = +12.
 
 
+@needs_flow5
 def test_flow5_cy_is_not_flipped_and_cl_cn_are(cessna_flow5, cessna_flow5_native):
     # CY is wind-axis side force and no solver ever flips it (Global Constraint).
     # Cl/Cn come from polar vars 12/13 (Cli/Cni), which are mirrored -- measured
@@ -123,7 +146,8 @@ def test_flow5_cy_is_not_flipped_and_cl_cn_are(cessna_flow5, cessna_flow5_native
     assert cessna_flow5["Cn"] == [-v for v in cessna_flow5_native["Cn"]]
 
 
-def test_only_the_four_mapped_channels_change(cessna_flow5, cessna_flow5_native):
+@needs_flow5
+def test_only_the_four_mapped_channels_differ_from_the_raw_solve(cessna_flow5, cessna_flow5_native):
     # Exhaustive, so a future key added to run_flow5 cannot slip through
     # unnormalized by omission: every other key must be identical to raw.
     assert set(cessna_flow5) == set(cessna_flow5_native)
@@ -134,6 +158,7 @@ def test_only_the_four_mapped_channels_change(cessna_flow5, cessna_flow5_native)
             assert cessna_flow5[key] == cessna_flow5_native[key], key
 
 
+@needs_flow5
 def test_flow5_lateral_derivatives_survive_normalization(cessna_flow5):
     assert cessna_flow5["Cnb"] > 0.0, "weathercock stability"
     assert cessna_flow5["Clb"] < 0.0, "dihedral effect"
@@ -145,25 +170,46 @@ def test_flow5_lateral_derivatives_survive_normalization(cessna_flow5):
         assert float(cessna_flow5[key]) != 0.0, key
 
 
-def test_flow5_cza_is_not_flipped(cessna_flow5, cessna_flow5_native):
-    # CZa = -CLa - CD, matching the gold's Longitudinal_Dynamic_Stability.m:35,
-    # and that is already negative (measured -5.2562). Flipping it would read
-    # +5.2562. The identity is asserted in test_flow5_derivatives.py against the
-    # reference-point lift slope; it cannot be re-derived here because run_flow5
-    # emits the OLS slope (5.1770), not the local one (5.2550) the gold uses.
+@needs_flow5
+def test_flow5_cza_is_already_forward_right_down_so_it_takes_no_entry(
+    cessna_flow5, cessna_flow5_native
+):
+    # CZa measures -5.2562 per radian, so dCZ/dalpha is already down-negative and
+    # already Forward-Right-Down; a -1 would advertise +5.2562, a lift-curve-slope
+    # positive "downforce" channel. Measured value only -- the identity behind it
+    # is deliberately NOT asserted here.
+    #
+    # The gold's convention is Matlab/fsroot/code/Longitudinal_Dynamic_Stability.m:35,
+    # `CZa = -AC.CLa - AC.CD`, which is negative because both terms are. It cannot
+    # be re-derived from run_flow5's output: it needs the lift slope AT the
+    # reference operating point (5.2550), and run_flow5 emits the OLS slope over
+    # the whole sweep (5.1770) -- a different number that the helper does not also
+    # expose. A comment citing 5.2550 would therefore look verifiable and not be.
     assert cessna_flow5["CZa"] < 0.0
     assert cessna_flow5["CZa"] == cessna_flow5_native["CZa"]
 
 
-def test_every_flow5_key_is_named_in_the_sections_skip_list(cessna_flow5):
-    # Derived from a real solve rather than a hand-written list, so a channel
-    # Task 2.4 or 3.1 adds to run_flow5 cannot slip into the Sections leftover
-    # table unnormalized and unlabelled.
+def test_every_flow5_key_is_named_in_the_sections_skip_list():
+    # No solver involved, deliberately: _SKIP_LEFTOVER is a Python frozenset, so
+    # gating this on flow5_run would mean the guard silently stops running wherever
+    # the helper is not built. FLOW5_KEYS is a hand-written list, so it is the one
+    # place that can drift -- test_the_key_list_matches_a_real_solve is what
+    # catches that, and it is the one that genuinely needs the binary.
     from aid_gui.compare_tabs import _SKIP_LEFTOVER
 
-    assert sorted(set(cessna_flow5) - _SKIP_LEFTOVER) == []
+    assert sorted(FLOW5_KEYS - _SKIP_LEFTOVER) == []
 
 
+@needs_flow5
+def test_the_key_list_matches_a_real_solve(cessna_flow5, cessna_flow5_native):
+    # Keeps FLOW5_KEYS honest: run_flow5 emits exactly these 26 keys, so a
+    # channel a later task adds lands in neither the list nor _SKIP_LEFTOVER and
+    # this fails.
+    assert set(cessna_flow5) == FLOW5_KEYS
+    assert set(cessna_flow5_native) == FLOW5_KEYS
+
+
+@needs_flow5
 def test_non_zero_beta_changes_the_lateral_channels(cessna_flow5, cessna_flow5_beta5):
     # Deliverable 3's flow5 half is only worth plotting if a sideslip actually
     # reaches the solver. At beta = 0 these three channels are panel-method
@@ -184,6 +230,7 @@ def test_non_zero_beta_changes_the_lateral_channels(cessna_flow5, cessna_flow5_b
     assert tilted["Cl"][0] < 0.0
 
 
+@needs_flow5
 def test_beta_leaves_flow5_derivatives_untouched(cessna_flow5, cessna_flow5_beta5):
     # R13: computeStabilityDerivatives builds its axes from
     # windDirection(alpha, 0.0), so the twelve scalars are a beta = 0 curve that
@@ -193,6 +240,7 @@ def test_beta_leaves_flow5_derivatives_untouched(cessna_flow5, cessna_flow5_beta
         assert float(cessna_flow5_beta5[key]) == float(cessna_flow5[key]), key
 
 
+@needs_flow5
 def test_beta_tilts_the_flow_and_not_the_planform(cessna_flow5, cessna_flow5_beta5):
     # The alpha schedule is beta-independent: betaSpec is the polar's second
     # axis' value, not an extra sweep. And because PlaneTask::run rotates the mesh

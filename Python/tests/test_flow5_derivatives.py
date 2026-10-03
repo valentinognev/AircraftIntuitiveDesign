@@ -128,11 +128,18 @@ def test_flow5_damping_derivatives_are_negative(pair):
     assert flow5["Clp"] < 0.0, "roll damping must be negative"
     assert flow5["Cnr"] < 0.0, "yaw damping must be negative"
     # CZa is the ALPHA derivative, dCZ/dalpha -- not a q-derivative, and not a
-    # damping term. It is negative in the raw frame and stays negative in
-    # Forward-Right-Down, so it takes no sign-map entry: measured -5.2562, and
-    # CZa = -CLa - CD exactly (CLa 5.2550, CD 0.0012 at alpha = 0), matching the
-    # gold's Longitudinal_Dynamic_Stability.m:35 `CZa = -AC.CLa - AC.CD`.
-    assert flow5["CZa"] < 0.0, "CZa = -CLa - CD is negative; CZa takes no sign-map entry"
+    # damping term. Measured -5.2562, i.e. already down-negative and therefore
+    # already Forward-Right-Down, so it takes no sign-map entry; a -1 would
+    # advertise +5.2562. That is the whole justification, and it is checkable
+    # from what run_flow5 emits.
+    #
+    # The gold's convention for the quantity is
+    # Matlab/fsroot/code/Longitudinal_Dynamic_Stability.m:35, `CZa = -AC.CLa -
+    # AC.CD`, negative because both terms are. It is cited for the convention
+    # only, NOT asserted here: it needs the lift slope at the reference operating
+    # point (5.2550) and run_flow5 emits the OLS slope over the sweep (5.1770),
+    # a different number the helper does not also expose.
+    assert flow5["CZa"] < 0.0, "CZa measures -5.2562, already down-negative"
 
 
 def test_flow5_lateral_derivatives_are_the_same_order_as_avl(pair):

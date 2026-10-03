@@ -19,7 +19,8 @@ def _aero_scalar(value, default: float = 0.0) -> float:
     """First element of a MATLAB-shaped scalar, with absent/NaN landing on default."""
     if value is None:
         return default
-    out = float(np.asarray(value, dtype=float).reshape(-1)[0])
+    flat = np.asarray(value, dtype=float).reshape(-1)
+    out = float(flat[0]) if flat.size else default
     return default if out != out else out
 
 

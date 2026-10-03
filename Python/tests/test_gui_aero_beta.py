@@ -26,7 +26,13 @@ from PySide6.QtWidgets import QApplication
 
 from aid.aircraft import aero_beta, load_jsonc
 from aid.paths import models_dir
-from aid.solver_overlay import overlay_derivative, overlay_vs_alpha
+from aid.solver_overlay import (
+    BETA_CAPABLE_CONTROL_SOLVERS,
+    FLOW5_BETA_FLAT,
+    control_probe_label,
+    overlay_derivative,
+    overlay_vs_alpha,
+)
 from aid.tornado_io import tornado_io
 from aid_gui import main_window as main_window_mod
 from aid_gui.main_window import MainWindow
@@ -64,12 +70,14 @@ def _results() -> dict:
             "alpha": np.array([-4.0, 0.0, 4.0]),
             "cl": np.array([-0.2, 0.13, 0.52]),
             "cla": np.array([0.085, 0.092, 0.100]),
+            "cma": np.array([-0.78, -0.80, -0.83]),
             "cyb": np.array([-0.012, -0.012, -0.011]),
         },
         "tornado": {
             "alpha": float(np.deg2rad(4.0)),
             "CL": 0.50,
             "CL_a": 5.0,
+            "Cm_a": -0.80,
             "CY_b": 0.15,
         },
         "avl": {
@@ -80,6 +88,8 @@ def _results() -> dict:
         "flow5": {
             "alpha": np.array([-4.0, 0.0, 4.0]),
             "CL": np.array([-0.1, 0.2, 0.5]),
+            "CLa": 5.5,
+            "Cma": -1.58,
             "CYb": 0.014,
         },
     }
@@ -150,9 +160,15 @@ def test_run_flow5_forwards_beta(monkeypatch):
 
 
 def test_datcom_and_avl_take_no_beta_argument():
-    for name in ("run_datcom", "run_avl"):
+    # Exact parameter lists, not just "beta" not in params: a **kwargs would let a
+    # beta reach these two invisibly, and the whole point is that they cannot.
+    expected = {"run_datcom": ["self"], "run_avl": ["self", "mesh"]}
+    for name, names in expected.items():
         params = inspect.signature(getattr(MainWindow, name)).parameters
-        assert "beta" not in params, name
+        assert list(params) == names, name
+        assert all(
+            p.kind is not inspect.Parameter.VAR_KEYWORD for p in params.values()
+        ), name
 
 
 def test_datcom_and_avl_labels_carry_beta_zero():
@@ -185,6 +201,38 @@ def test_flow5_force_series_keeps_the_plain_label():
     series = overlay_vs_alpha(_results(), _st(), flow5="CL", beta=5.0)
     labels = [s["label"] for s in series]
     assert labels == ["flow5"]
+
+
+@pytest.mark.parametrize("key", sorted(FLOW5_BETA_FLAT))
+def test_flow5_stab_derivatives_claim_beta_zero(key):
+    res = {"flow5": {key: 0.5, "CLa": 5.0}}
+    series = overlay_derivative(res, _st(), flow5=key, beta=5.0)
+    assert [s["label"] for s in series] == [f"flow5 (beta=0)"]
+    assert series[0]["kind"] == "hline", key
+
+
+@pytest.mark.parametrize("key", ["CLa", "Cma"])
+def test_flow5_polar_slopes_stay_unmarked(key):
+    """R30: CLa/Cma are OLS slopes over the polar, so they move with beta.
+
+    Measured on Cessna 172: CLa = 5.5402333786223235 at beta 0, 5.500374829746751
+    at +5, 5.500374817599451 at -5. Marking these "(beta=0)" is a false claim.
+    """
+    res = {"flow5": {key: 5.5}}
+    series = overlay_derivative(res, _st(), flow5=key, beta=5.0)
+    assert [s["label"] for s in series] == ["flow5"]
+    assert series[0]["kind"] == "hline", key
+
+
+def test_flow5_beta_flat_set_is_the_twelve_stab_derivatives():
+    assert FLOW5_BETA_FLAT == frozenset(
+        {
+            "CXa", "CZa", "CYb", "CYp", "CYr",
+            "Clb", "Clp", "Clr", "Cnb", "Cnp", "Cnr",
+            "XNP",
+        }
+    )
+    assert not FLOW5_BETA_FLAT & {"CLa", "Cma", "CL", "CD", "Cm", "CY", "beta"}
 
 
 def test_flow5_derivative_series_claims_beta_zero():
@@ -234,10 +282,86 @@ def _legend_labels(ax) -> list[str]:
     return list(labels)
 
 
-def _plotted(beta: float | None):
+def _line_labels(ax) -> list[str]:
+    return [line.get_label() for line in ax.get_lines()]
+
+
+def _bar_labels(ax) -> list[str]:
+    return [patch.get_label() for patch in ax.patches]
+
+
+def _rich_results() -> dict:
+    """Enough solver output to light up every panel that prints a solver name."""
+    res = _results()
+    res["datcom"].update(
+        {
+            "xcp": [4.1, 4.2, 4.3],
+            "epslon": [1.0, 1.1, 1.2],
+            "Cl_P": -0.05,
+            "Cm_Q": -3.1,
+            "Cn_R": -0.11,
+            "CL_P": -0.02,
+            "CL_Q": -4.0,
+            "CL_R": 0.08,
+            "high_lift": [
+                {
+                    "delta": 10.0,
+                    "config": "F 10",
+                    "dcl": 0.31,
+                    "dcm": -0.02,
+                    "cha": 0.11,
+                    "chd": 0.22,
+                    "dcl_max": 1.51,
+                    "dcdi_alpha": [-4.0, 0.0, 4.0],
+                    "dcdi": [0.02, 0.03, 0.05],
+                }
+            ],
+        }
+    )
+    res["tornado"].update(
+        {
+            "CLwing": [0.4, 0.1, 0.05],
+            "CDwing": [0.01, 0.005],
+            "CYwing": [0.0, 0.01],
+            "CC": [0.02],
+            "Cl_P": -0.05,
+            "Cm_Q": -3.2,
+            "Cn_R": -0.10,
+            "CL_P": -0.02,
+            "CL_Q": -3.9,
+            "CL_R": 0.09,
+        }
+    )
+    res["avl"].update(
+        {
+            "CDind": 0.02,
+            "CDvis": 0.01,
+            "e": 0.78,
+            "NP": 1.1,
+            "Clp": -0.05,
+            "Cmq": -3.0,
+            "Cnr": -0.10,
+            "CLp": -0.02,
+            "CLq": -3.8,
+            "CLr": 0.07,
+            "CYa": 0.012,
+            "surface": [{"name": "F", "angle": 10.0}],
+        }
+    )
+    res["control_derivatives"] = {
+        "solver": "avl",
+        "rows": [
+            {"available": True, "surface": "F", "delta_deg": d, "CY": 0.01 * d}
+            for d in (-5.0, 0.0, 10.0)
+        ],
+    }
+    return res
+
+
+def _plotted(beta: float | None, results: dict | None = None):
     """A window whose Aerodynamics panel has been drawn, so the labels are real."""
     w = _window(beta)
-    w.last_results = _results()
+    w.last_results = _rich_results() if results is None else results
     w.set_plot_mode("Aerodynamics")
     return w
 
@@ -257,6 +381,81 @@ def test_compare_tabs_derivative_panel_marks_flow5_too():
     assert "DATCOM (beta=0)" in labels
     assert "flow5 (beta=0)" in labels
     assert "Tornado" in labels
+
+
+def test_compare_tabs_polar_slope_panels_do_not_mark_flow5():
+    """R30, end to end: C_La and C_m_alpha plot flow5's OLS slopes, not a StabDerivative."""
+    w = _plotted(beta=5.0)
+    fig = w.compare_tabs.figure("Derivatives")
+    # Only the first panel carries a legend; read the line labels, which cover
+    # axhline's hline series too.
+    for ax, marked in ((fig.axes[0], False), (fig.axes[1], False), (fig.axes[2], True)):
+        labels = _line_labels(ax)
+        assert ("flow5 (beta=0)" in labels) is marked, ax.get_ylabel()
+        assert "DATCOM (beta=0)" in labels, ax.get_ylabel()
+        assert "Tornado" in labels, ax.get_ylabel()
+
+
+def test_moments_xcp_series_is_marked():
+    """The X_CP sub-axes has no legend, so read the line label, not the legend."""
+    w = _plotted(beta=5.0)
+    assert _line_labels(w.compare_tabs.figure("Moments").axes[3]) == ["DATCOM (beta=0)"]
+
+
+def test_moments_xcp_series_is_unmarked_at_beta_zero():
+    w = _plotted(beta=None)
+    assert _line_labels(w.compare_tabs.figure("Moments").axes[3]) == ["DATCOM"]
+
+
+def test_force_extras_avl_bars_are_marked_next_to_tornado():
+    """The Forces tab prints AVL in _plot_force_extras as well as in the overlays."""
+    w = _plotted(beta=5.0)
+    labels = _legend_labels(w.compare_tabs.figure("Forces").axes[5])
+    assert "AVL (beta=0)" in labels
+    assert "Tornado" in labels
+
+
+def test_rate_bar_avl_bars_are_marked():
+    w = _plotted(beta=5.0)
+    labels = _legend_labels(w.compare_tabs.figure("Derivatives").axes[5])
+    assert "AVL (beta=0)" in labels
+    assert "Tornado" in labels
+
+
+def test_downwash_datcom_line_is_marked():
+    w = _plotted(beta=5.0)
+    assert "DATCOM (beta=0)" in _legend_labels(w.compare_tabs.figure("Downwash").axes[0])
+
+
+def test_controls_datcom_bars_are_marked():
+    w = _plotted(beta=5.0)
+    fig = w.compare_tabs.figure("Controls")
+    labels = _legend_labels(fig.axes[0]) + _legend_labels(fig.axes[1])
+    assert r"DATCOM $\Delta C_L$ (beta=0)" in labels
+    assert r"DATCOM $\Delta C_m$ (beta=0)" in labels
+    assert any(lab.startswith("DATCOM ΔCDi δ=10.0 (beta=0)") for lab in labels)
+
+
+def test_sections_leftover_group_headers_are_marked():
+    w = _plotted(beta=5.0)
+    headers = [
+        w.compare_tabs.leftover_table.item(row, 0).text()
+        for row in range(w.compare_tabs.leftover_table.rowCount())
+    ]
+    assert "DATCOM high-lift (beta=0)" in headers
+    assert "AVL (beta=0)" in headers
+    assert "Tornado" in headers
+
+
+def test_control_probe_curves_follow_the_solver_not_the_panel():
+    # avl has no sideslip capability, tornado and flow5 probe at the model's beta.
+    assert control_probe_label("avl", "F", "CY", 5.0) == "avl F CY (beta=0)"
+    assert control_probe_label("handbook", "F", "CY", 5.0) == "handbook F CY (beta=0)"
+    assert control_probe_label("tornado", "F", "CY", 5.0) == "tornado F CY"
+    assert control_probe_label("flow5", "F", "CY", 5.0) == "flow5 F CY"
+    assert BETA_CAPABLE_CONTROL_SOLVERS == frozenset({"tornado", "flow5"})
+    for solver in ("avl", "handbook", "tornado", "flow5"):
+        assert control_probe_label(solver, "F", "CY", 0.0) == f"{solver} F CY"
 
 
 def test_compare_tabs_defaults_to_no_suffix():

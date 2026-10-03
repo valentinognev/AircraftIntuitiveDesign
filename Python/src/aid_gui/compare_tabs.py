@@ -21,7 +21,13 @@ from PySide6.QtWidgets import (
 )
 
 from aid.lifting_line import lifting_line
-from aid.solver_overlay import alpha_grid, overlay_derivative, overlay_vs_alpha
+from aid.solver_overlay import (
+    alpha_grid,
+    beta_zero_label,
+    control_probe_label,
+    overlay_derivative,
+    overlay_vs_alpha,
+)
 from aid.viz import planform_stations
 
 TAB_NAMES = (
@@ -148,6 +154,10 @@ class CompareTabs(QTabWidget):
         self._plot_spanwise(results, ac, angle=angle)
         self._plot_sections(results)
 
+    def _mark(self, text: str) -> str:
+        """Label text for a series that ran at zero sideslip under a non-zero one."""
+        return beta_zero_label(text, self.beta)
+
     def _plot_forces(self, st: dict, results: dict) -> None:
         fig = self._clear("Forces")
         specs = (
@@ -167,7 +177,7 @@ class CompareTabs(QTabWidget):
             ax.set_ylabel(ylabel)
             ax.set_xlabel(r"$\alpha$ (deg)" if i > 3 else "")
         ax_ex = fig.add_subplot(2, 3, 6)
-        _plot_force_extras(ax_ex, results)
+        _plot_force_extras(ax_ex, results, beta=self.beta)
         self._finish("Forces")
 
     def _plot_moments(self, st: dict, results: dict) -> None:
@@ -219,7 +229,7 @@ class CompareTabs(QTabWidget):
             ax.set_ylabel(ylabel)
             ax.set_xlabel(r"$\alpha$ (deg)" if i > 3 else "")
         ax_bar = fig.add_subplot(2, 3, 6)
-        _plot_rate_bars(ax_bar, results)
+        _plot_rate_bars(ax_bar, results, beta=self.beta)
         self._finish("Derivatives")
 
     def _plot_downwash(self, results: dict) -> None:
@@ -234,7 +244,7 @@ class CompareTabs(QTabWidget):
         for i, (ylabel, key) in enumerate(specs, start=1):
             ax = fig.add_subplot(1, 3, i)
             if alpha is not None and key in dres:
-                ax.plot(alpha, dres[key], "g.-", label="DATCOM")
+                ax.plot(alpha, dres[key], "g.-", label=self._mark("DATCOM"))
                 if i == 1:
                     ax.legend(fontsize=9, loc="best", framealpha=0.75)
             ax.set_ylabel(ylabel)
@@ -248,7 +258,7 @@ class CompareTabs(QTabWidget):
 
     def _plot_controls(self, results: dict) -> None:
         fig = self._clear("Controls")
-        curves = _control_probe_curves(results.get("control_derivatives"))
+        curves = _control_probe_curves(results.get("control_derivatives"), self.beta)
         n_extra = sum(1 for coeff in _PROBE_COEFFS if curves.get(coeff))
         if n_extra:
             cols = max(3, n_extra)
@@ -265,8 +275,8 @@ class CompareTabs(QTabWidget):
         if blocks:
             xs = np.arange(len(blocks))
             labels = [b.get("config", f"δ={b.get('delta', 0)}")[:24] for b in blocks]
-            ax_inc.bar(xs - 0.15, [b["dcl"] for b in blocks], 0.3, label=r"DATCOM $\Delta C_L$")
-            ax_inc.bar(xs + 0.15, [b["dcm"] for b in blocks], 0.3, label=r"DATCOM $\Delta C_m$")
+            ax_inc.bar(xs - 0.15, [b["dcl"] for b in blocks], 0.3, label=self._mark(r"DATCOM $\Delta C_L$"))
+            ax_inc.bar(xs + 0.15, [b["dcm"] for b in blocks], 0.3, label=self._mark(r"DATCOM $\Delta C_m$"))
             ax_inc.set_xticks(list(xs))
             ax_inc.set_xticklabels(labels, rotation=15, ha="right", fontsize=8)
             for b in blocks:
@@ -275,7 +285,7 @@ class CompareTabs(QTabWidget):
                         b["dcdi_alpha"],
                         b["dcdi"],
                         "g.-",
-                        label=f"DATCOM ΔCDi δ={b.get('delta', 0):.1f}",
+                        label=self._mark(f"DATCOM ΔCDi δ={b.get('delta', 0):.1f}"),
                     )
         tres = results.get("tornado") or {}
         offset = float(len(blocks))
@@ -288,7 +298,7 @@ class CompareTabs(QTabWidget):
         surfs = ares.get("surface") or []
         if surfs:
             xs = np.arange(len(surfs))
-            ax_extra.plot(xs, [float(s.get("angle", 0)) for s in surfs], "m^", markersize=8, label="AVL")
+            ax_extra.plot(xs, [float(s.get("angle", 0)) for s in surfs], "m^", markersize=8, label=self._mark("AVL"))
             ax_extra.set_xticks(list(xs))
             ax_extra.set_xticklabels([str(s.get("name", "surf"))[:12] for s in surfs], rotation=20, ha="right", fontsize=8)
             ax_extra.set_ylabel("δ (deg)")
@@ -296,9 +306,9 @@ class CompareTabs(QTabWidget):
             ax_extra.legend(fontsize=8, loc="best", framealpha=0.75)
         elif blocks:
             xs = np.arange(len(blocks))
-            ax_extra.bar(xs - 0.2, [b.get("cha", np.nan) for b in blocks], 0.2, color="g", label=r"DATCOM $(C_h)_a$")
-            ax_extra.bar(xs, [b.get("chd", np.nan) for b in blocks], 0.2, color="g", alpha=0.5, label=r"DATCOM $(C_h)_d$")
-            ax_extra.bar(xs + 0.2, [b.get("dcl_max", np.nan) for b in blocks], 0.2, color="0.5", label=r"DATCOM $\Delta C_{L,\mathrm{max}}$")
+            ax_extra.bar(xs - 0.2, [b.get("cha", np.nan) for b in blocks], 0.2, color="g", label=self._mark(r"DATCOM $(C_h)_a$"))
+            ax_extra.bar(xs, [b.get("chd", np.nan) for b in blocks], 0.2, color="g", alpha=0.5, label=self._mark(r"DATCOM $(C_h)_d$"))
+            ax_extra.bar(xs + 0.2, [b.get("dcl_max", np.nan) for b in blocks], 0.2, color="0.5", label=self._mark(r"DATCOM $\Delta C_{L,\mathrm{max}}$"))
             ax_extra.set_xticks(list(xs))
             ax_extra.set_xticklabels(
                 [b.get("config", f"δ={b.get('delta', 0)}")[:16] for b in blocks],
@@ -377,7 +387,7 @@ class CompareTabs(QTabWidget):
     def _plot_sections(self, results: dict) -> None:
         page = self._sections
         sections = (results.get("datcom") or {}).get("sections") or {}
-        groups = _leftover_groups(results)
+        groups = _leftover_groups(results, self.beta)
         if sections:
             _fill_section_defs(page.defs, sections)
             page.defs.show()
@@ -434,7 +444,7 @@ def _alpha_xlim(results: dict, st: dict | None = None) -> tuple[float, float] | 
     return None
 
 
-def _control_probe_curves(payload) -> dict[str, list[tuple[str, list[float], list[float]]]]:
+def _control_probe_curves(payload, beta: float = 0.0) -> dict[str, list[tuple[str, list[float], list[float]]]]:
     curves: dict[str, list[tuple[str, list[float], list[float]]]] = {coeff: [] for coeff in _PROBE_COEFFS}
     if not isinstance(payload, dict):
         return curves
@@ -459,7 +469,7 @@ def _control_probe_curves(payload) -> dict[str, list[tuple[str, list[float], lis
                 xs.append(float(row["delta_deg"]))
                 ys.append(float(val))
             if xs:
-                curves[coeff].append((f"{solver} {surface} {coeff}", xs, ys))
+                curves[coeff].append((control_probe_label(solver, surface, coeff, beta), xs, ys))
     return curves
 
 
@@ -485,7 +495,7 @@ def _draw(ax, series: list[dict], *, xlim=None, legend: bool = True) -> None:
     _style_ax(ax)
 
 
-def _plot_force_extras(ax, results: dict) -> None:
+def _plot_force_extras(ax, results: dict, *, beta: float = 0.0) -> None:
     labels: list[str] = []
     torn_v: list[float] = []
     avl_v: list[float] = []
@@ -519,7 +529,7 @@ def _plot_force_extras(ax, results: dict) -> None:
     if any(np.isfinite(torn_v)):
         ax.bar(x - width / 2, torn_v, width, color="c", label="Tornado")
     if any(np.isfinite(avl_v)):
-        ax.bar(x + width / 2, avl_v, width, color="m", label="AVL")
+        ax.bar(x + width / 2, avl_v, width, color="m", label=beta_zero_label("AVL", beta))
     if labels:
         ax.set_xticks(list(x))
         ax.set_xticklabels(labels, fontsize=8, rotation=20, ha="right")
@@ -651,7 +661,7 @@ def _fmt_number(val) -> str:
     return f"{x:.4e}"
 
 
-def _leftover_groups(results: dict) -> list[tuple[str, list[tuple[str, list[float]]]]]:
+def _leftover_groups(results: dict, beta: float = 0.0) -> list[tuple[str, list[tuple[str, list[float]]]]]:
     groups: list[tuple[str, list[tuple[str, list[float]]]]] = []
     hl_rows: list[tuple[str, list[float]]] = []
     for i, block in enumerate((results.get("datcom") or {}).get("high_lift") or []):
@@ -661,8 +671,11 @@ def _leftover_groups(results: dict) -> list[tuple[str, list[tuple[str, list[floa
             arr = np.asarray(block[key], dtype=float).reshape(-1)
             hl_rows.append((f"HL{i} {key}", [float(v) for v in arr[:8]]))
     if hl_rows:
-        groups.append(("DATCOM high-lift", hl_rows))
-    for prefix, src in (("Tornado", results.get("tornado") or {}), ("AVL", results.get("avl") or {})):
+        groups.append((beta_zero_label("DATCOM high-lift", beta), hl_rows))
+    for prefix, src in (
+        ("Tornado", results.get("tornado") or {}),
+        (beta_zero_label("AVL", beta), results.get("avl") or {}),
+    ):
         rows: list[tuple[str, list[float]]] = []
         for key in sorted(src):
             if key in _SKIP_LEFTOVER:
@@ -800,7 +813,7 @@ def _finite_scalar(val) -> float:
     return float(arr[0])
 
 
-def _plot_rate_bars(ax, results: dict) -> None:
+def _plot_rate_bars(ax, results: dict, *, beta: float = 0.0) -> None:
     groups = (
         (r"$C_{\ell p}$", "Cl_P", "Clp"),
         (r"$C_{mq}$", "Cm_Q", "Cmq"),
@@ -818,7 +831,7 @@ def _plot_rate_bars(ax, results: dict) -> None:
     if any(np.isfinite(tvals)):
         ax.bar(x - width / 2, tvals, width, color="c", label="Tornado")
     if any(np.isfinite(avals)):
-        ax.bar(x + width / 2, avals, width, color="m", label="AVL")
+        ax.bar(x + width / 2, avals, width, color="m", label=beta_zero_label("AVL", beta))
     ax.set_xticks(list(x))
     ax.set_xticklabels([lab for lab, _, _ in groups], fontsize=8)
     ax.set_title(r"$p,q,r$ (per rad)")

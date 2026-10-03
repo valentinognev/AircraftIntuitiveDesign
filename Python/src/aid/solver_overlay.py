@@ -15,20 +15,68 @@ _FLOW5_DERIV_STYLE = "y-"
 _ND = 99998.0
 
 # Appended to a series whose numbers were produced at zero sideslip while the
-# flight condition carried one. Only two things on this panel really fly at the
-# sideslip angle: Tornado, whose state["betha"] comes from AERO["BETA"], and
-# flow5's force channels, whose polar is the one place flow5 takes a beta. DATCOM
-# and AVL have no sideslip capability in their interfaces at all, so they are at
-# zero whatever the model says -- and so is flow5's stability-derivative block,
-# which ``computeStabilityDerivatives`` builds from windDirection(alpha, 0.0).
-_BETA_ZERO = " (beta=0)"
+# flight condition carried one. Whether a series is one of those is a property of
+# the *channel*, not of the solver that wrote it.
+BETA_ZERO_SUFFIX = " (beta=0)"
+
+# flow5's twelve StabDerivatives, and nothing else in its output, are flat in
+# sideslip: computeStabilityDerivatives fixes the stability axes at
+# windDirection(alphaeq, 0.0) (FLOW5/flow5-lib/analysis3d/panelanalysis.cpp:614
+# and :660), so these twelve are byte-identical at beta = 0, +5 and -5. The two
+# slopes are NOT in this set: CLa and Cma are ordinary least squares over the
+# polar's own alpha sweep (FLOW5/run/flow5_run.cpp:526-527), and the polar is
+# flown at the deck's beta, so they move (Cessna 172: 5.5402334 at beta 0,
+# 5.5003748 at both +5 and -5; the +5/-5 equality is the polar's own symmetry).
+FLOW5_BETA_FLAT = frozenset(
+    {
+        "CXa",
+        "CZa",
+        "CYb",
+        "CYp",
+        "CYr",
+        "Clb",
+        "Clp",
+        "Clr",
+        "Cnb",
+        "Cnp",
+        "Cnr",
+        "XNP",
+    }
+)
+
+# Control-derivative paths, keyed by the solver name aid.control_report prints.
+# tornado and flow5 reach the model's sideslip (tornado/control_deriv.py:54 goes
+# through tornado_io, flow5_controls.py:93,100 call write_flow5_deck with
+# beta=None, and both resolve AERO["BETA"]); datcom, avl and the handbook have no
+# sideslip capability at all.
+BETA_CAPABLE_CONTROL_SOLVERS = frozenset({"tornado", "flow5"})
+
+
+def beta_zero_label(name: str, beta: float) -> str:
+    """``name``, marked when the flight had a sideslip that ``name`` did not fly.
+
+    Byte-identical to ``name`` at ``beta == 0``, so every existing label and
+    every existing legend is unchanged for symmetric flight.
+    """
+    return f"{name}{BETA_ZERO_SUFFIX}" if beta != 0.0 else name
+
+
+def control_probe_label(solver: str, surface: str, coeff: str, beta: float) -> str:
+    """``"<solver> <surface> <coeff>"``, marked for the paths that cannot fly beta."""
+    text = f"{solver} {surface} {coeff}"
+    if solver in BETA_CAPABLE_CONTROL_SOLVERS:
+        return text
+    return beta_zero_label(text, beta)
 
 
 def _label(name: str, beta: float, *, at_zero_sideslip: bool) -> str:
     """The series name, marked when a non-zero flight sideslip did not reach it."""
-    if at_zero_sideslip and beta != 0.0:
-        return f"{name}{_BETA_ZERO}"
-    return name
+    return beta_zero_label(name, beta) if at_zero_sideslip else name
+
+
+def _flow5_label(key: str, beta: float) -> str:
+    """flow5 is beta-flat per channel, so the key decides, not the solver name."""
+    return _label("flow5", beta, at_zero_sideslip=key in FLOW5_BETA_FLAT)
 
 
 def alpha_grid(results: dict, st: dict, n: int = 80) -> np.ndarray:
@@ -53,8 +101,10 @@ def overlay_vs_alpha(
 ) -> list[dict]:
     """Same quantity vs α from each solver that has been run.
 
-    ``beta`` is the flight condition's sideslip angle in degrees. Only DATCOM and
-    AVL are relabelled from it; Tornado and flow5 both actually fly it.
+    ``beta`` is the flight condition's sideslip angle in degrees. DATCOM and AVL
+    have no sideslip capability and are always marked; Tornado flies the field,
+    and so does every flow5 channel this overlay plots, since they are all read
+    off the polar the deck was written at.
     """
     grid = alpha_grid(results, st)
     series: list[dict] = []
@@ -100,10 +150,10 @@ def overlay_vs_alpha(
                 }
             )
     fres = results.get("flow5") or {}
-    if flow5 and flow5 in fres and "alpha" in fres:
+    if flow5 and flow5 in fres:
         series.append(
             {
-                "label": "flow5",
+                "label": _flow5_label(flow5, beta),
                 "x": np.asarray(fres["alpha"], dtype=float),
                 "y": np.asarray(fres[flow5], dtype=float),
                 "style": _FLOW5_STYLE,
@@ -125,10 +175,10 @@ def overlay_derivative(
 ) -> list[dict]:
     """DATCOM derivative vs α (per deg). Tornado and flow5 stay horizontal; AVL is solved samples only.
 
-    Every series here but Tornado's was differentiated at zero sideslip: DATCOM
-    and AVL cannot be flown at one, and flow5's StabDerivatives are built from
-    windDirection(alpha, 0.0) whatever the polar's beta. So flow5 gets the same
-    "(beta=0)" mark as they do, unlike in :func:`overlay_vs_alpha`.
+    DATCOM and AVL cannot be flown at a sideslip, so they are always marked. For
+    flow5 the mark depends on the channel: the twelve :data:`FLOW5_BETA_FLAT`
+    scalars were differentiated at zero sideslip whatever the polar's beta, while
+    CLa and Cma are slopes over that same polar and do move with it.
     """
     grid = alpha_grid(results, st)
     series: list[dict] = []
@@ -174,7 +224,7 @@ def overlay_derivative(
     if flow5 and flow5 in fres:
         series.append(
             {
-                "label": _label("flow5", beta, at_zero_sideslip=True),
+                "label": _flow5_label(flow5, beta),
                 "x": grid,
                 "y": float(fres[flow5]) * math.pi / 180.0,
                 "style": _FLOW5_DERIV_STYLE,

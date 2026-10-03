@@ -29,7 +29,10 @@ _INDEXED_KEY = re.compile(r"^([A-Za-z]+)\.([A-Za-z]+)\[(\d+)\]$")
 _LIST_KEY = re.compile(r"^([A-Za-z]+)\[(\d+)\]\.(.+)$")
 _INDEXED_FIELD = re.compile(r"^([A-Za-z]+)\[(\d+)\]$")
 
-_ANGLE_FIELDS = frozenset(
+# Fields entered in degrees: geometric ones (sweep, dihedral, incidence, washout)
+# and the flight condition AERO.BETA. What the set buys them is the same in both
+# cases -- the +/-max_angle error-check clamp and the wheel-nudge step.
+_DEGREES_FIELDS = frozenset(
     {
         "BETA",
         "SAVSI",
@@ -185,7 +188,7 @@ def _field_kind(key: str) -> str:
         return "chstat"
     if field == "TC" and not key.startswith("AERO."):
         return "tc"
-    if field in _ANGLE_FIELDS:
+    if field in _DEGREES_FIELDS:
         return "angle"
     if field in _LENGTH_FIELDS:
         return "length"
@@ -1073,11 +1076,12 @@ def sync_fields_to_aircraft(window) -> None:
         text = edit.text().strip()
         if not text:
             if key in _BLANK_AS_ZERO:
-                # Blank means symmetric flight here, not "leave the old value":
-                # clearing the field after typing 5 must not keep flying 5.
-                section_data = _section_dict(ac, "AERO", None)
+                # Blank is a value here, not an absence: clearing the sideslip
+                # field after typing 5 must not leave the aircraft flying 5.
+                section, field, index, slot = _parse_field_key(key)
+                section_data = _section_dict(ac, section, slot)
                 if isinstance(section_data, dict):
-                    _assign_field(section_data, "BETA", None, text, 0.0)
+                    _assign_field(section_data, field, index, text, 0.0)
             continue
         section, field, index, slot = _parse_field_key(key)
         section_data = _section_dict(ac, section, slot)

@@ -303,7 +303,25 @@ def _flown_alpha(ac: Aircraft) -> list[float]:
     return [float(a) for a in np.asarray(alschd, dtype=float).reshape(-1)]
 
 
-def compare_to_matlab(name: str) -> dict:
+def datcom_leg(ac: Aircraft, matlab_dir: Path) -> tuple[Aircraft, str]:
+    """The aircraft DATCOM's leg flies for *ac*, and where that sweep came from."""
+    gold_alpha = _gold_alpha(matlab_dir)
+    if gold_alpha is None:
+        return ac, "model"
+    # A separate object, so the loaded model is never edited in place.
+    return replace(ac, AERO={**ac.AERO, "ALSCHD": list(gold_alpha)}), "gold"
+
+
+def flown_sweeps(ac: Aircraft, datcom_ac: Aircraft, datcom_source: str) -> dict:
+    """Per solver, the ``ALSCHD`` sweep its leg flies and that sweep's provenance."""
+    return {
+        "datcom": {"alpha": _flown_alpha(datcom_ac), "alpha_source": datcom_source},
+        "tornado": {"alpha": _flown_alpha(ac), "alpha_source": "model"},
+        "avl": {"alpha": _flown_alpha(ac), "alpha_source": "model"},
+    }
+
+
+def compare_to_matlab(name: str, python: dict | None = None) -> dict:
     """Run Python solvers, compare to MATLAB gold, write ``Results/compare/<name>.json``.
 
     The gold is a fixture with its own inputs, and DATCOM's output depends on the
@@ -311,35 +329,28 @@ def compare_to_matlab(name: str) -> dict:
     it -- so only the DATCOM leg flies the gold's own sweep. Tornado and AVL have
     no gold alpha axis and run on the model's schedule; what each leg actually
     flew, and where that sweep came from, is recorded in the report.
+
+    An already-computed *python* is graded as given, so a batch run that just
+    flew these sweeps does not run them twice. The caller is then responsible for
+    having flown ``datcom_leg``'s aircraft for DATCOM; ``flown_sweeps`` is what
+    records that, and ``run_all.py`` writes it into the batch dump.
     """
     matlab_dir = results_dir() / "matlab" / name
     status = json.loads((matlab_dir / "status.json").read_text())
 
     ac = load_jsonc(models_dir() / f"{name}.jsonc")
-    gold_alpha = _gold_alpha(matlab_dir)
-    datcom_ac = ac
-    datcom_source = "model"
-    if gold_alpha is not None:
-        # A separate object, so the loaded model is never edited in place.
-        datcom_ac = replace(ac, AERO={**ac.AERO, "ALSCHD": list(gold_alpha)})
-        datcom_source = "gold"
+    datcom_ac, datcom_source = datcom_leg(ac, matlab_dir)
+    flown = flown_sweeps(ac, datcom_ac, datcom_source)
+    if python is None:
+        python = run_python(ac, results_dir() / "python" / name, datcom_ac=datcom_ac)
 
-    work = results_dir() / "python" / name
-    python = run_python(ac, work, datcom_ac=datcom_ac)
-
-    flown = {
-        "datcom": (_flown_alpha(datcom_ac), datcom_source),
-        "tornado": (_flown_alpha(ac), "model"),
-        "avl": (_flown_alpha(ac), "model"),
-    }
     report = {
         solver: _solver_pass(
             solver,
             status[solver],
             python[solver],
             matlab_dir / f"{solver}.json",
-            alpha=flown[solver][0],
-            alpha_source=flown[solver][1],
+            **flown[solver],
         )
         for solver in ("datcom", "tornado", "avl")
     }

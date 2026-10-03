@@ -8,14 +8,19 @@ import json
 from pathlib import Path
 
 from aid.aircraft import load_jsonc
-from aid.compare import compare_to_matlab, run_python
+from aid.compare import compare_to_matlab, datcom_leg, flown_sweeps, run_python
 from aid.paths import models_dir, results_dir
 
 
-def write_python_results(work: Path, python: dict) -> None:
-    """Write spec §12 dumps under *work* from *run_python* output."""
+def write_python_results(work: Path, python: dict, sweeps: dict) -> None:
+    """Write spec §12 dumps under *work* from *run_python* output.
+
+    *sweeps* is ``compare.flown_sweeps``' output: per solver, the ``AERO.ALSCHD``
+    sweep that leg flew and where it came from, so the dump says as much about
+    the run as the compare verdict made from it.
+    """
     work.mkdir(parents=True, exist_ok=True)
-    status: dict = {"error": []}
+    status: dict = {"error": [], "sweeps": sweeps}
     for solver in ("datcom", "tornado", "avl"):
         result = python[solver]
         status[solver] = result["status"]
@@ -44,12 +49,14 @@ def main() -> None:
         name = jsonc.stem
         ac = load_jsonc(jsonc)
         work = results_dir() / "python" / name
-        python = run_python(ac, work)
-        write_python_results(work, python)
+        matlab_dir = results_dir() / "matlab" / name
+        has_gold = (matlab_dir / "status.json").is_file()
+        datcom_ac, datcom_source = datcom_leg(ac, matlab_dir) if has_gold else (ac, "model")
+        python = run_python(ac, work, datcom_ac=datcom_ac)
+        write_python_results(work, python, flown_sweeps(ac, datcom_ac, datcom_source))
 
-        matlab_status = results_dir() / "matlab" / name / "status.json"
-        if matlab_status.is_file():
-            compare_to_matlab(name)
+        if has_gold:
+            compare_to_matlab(name, python=python)
         else:
             print(f"skip compare {name}: no MATLAB gold")
 

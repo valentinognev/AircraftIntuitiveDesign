@@ -1,3 +1,4 @@
+#include <cctype>
 #include <cmath>
 #include <fstream>
 #include <iostream>
@@ -231,6 +232,37 @@ bool build_plane(const json& deck, PlaneXfl*& pPlaneOut, std::string& err)
     return true;
 }
 
+// polar.beta_deg is optional and absent means flow5's own default of 0. Absent
+// and present have to be distinguishable, because the helper has no deck
+// whitelist: an unknown key at any depth is silently ignored, so a typo would
+// otherwise masquerade as beta = 0 and quietly void every lateral channel.
+// That is why this checks the beta keys specifically rather than adding a
+// general whitelist -- json_number() would also turn a non-numeric beta_deg
+// into 0.0 without a word.
+bool read_beta_spec(const json& polar_json, double& beta_deg, std::string& err)
+{
+    beta_deg = 0.0;
+    for (const auto& item : polar_json.items()) {
+        std::string lower_key = item.key();
+        for (char& c : lower_key) {
+            c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        }
+        if (lower_key.find("beta") == std::string::npos) {
+            continue;
+        }
+        if (item.key() != "beta_deg") {
+            err = "polar key '" + item.key() + "' is not 'beta_deg'";
+            return false;
+        }
+        if (!item.value().is_number()) {
+            err = "polar beta_deg must be a number";
+            return false;
+        }
+        beta_deg = item.value().get<double>();
+    }
+    return true;
+}
+
 bool build_polar_and_run(
     PlaneXfl* pPlane,
     const json& polar_json,
@@ -248,8 +280,18 @@ bool build_polar_and_run(
         return false;
     }
 
+    double beta_deg = 0.0;
+    if (!read_beta_spec(polar_json, beta_deg, err)) {
+        return false;
+    }
+
     auto* pPlPolar = new PlanePolar;
     pPlPolar->setPlaneName(pPlane->name());
+
+    // The only lever the library offers for a sideslip on a T1 polar: PlaneTask::run
+    // reads betaSpec() at planetask.cpp:605 and rotates the mesh by it about the
+    // CG (planetask.cpp:748), so the geometry stays put and only the flow yaws.
+    pPlPolar->setBetaSpec(beta_deg);
 
     pPlPolar->setType(xfl::T1POLAR);
     pPlPolar->setAnalysisMethod(xfl::VLM2);
@@ -301,13 +343,15 @@ json skeleton_output(const json& alpha_deg)
     const std::size_t n = alpha_deg.size();
     json out;
     out["alpha"] = alpha_deg;
-    out["CL"] = json::array();
-    out["CD"] = json::array();
-    out["Cm"] = json::array();
+    for (const char* key : {"beta", "CL", "CD", "CDvis", "CDind", "Cm",
+                            "CY", "Cl", "Cn", "Cx", "Cz"}) {
+        out[key] = json::array();
+    }
     for (std::size_t i = 0; i < n; ++i) {
-        out["CL"].push_back(0.0);
-        out["CD"].push_back(0.0);
-        out["Cm"].push_back(0.0);
+        for (const char* key : {"beta", "CL", "CD", "CDvis", "CDind", "Cm",
+                                "CY", "Cl", "Cn", "Cx", "Cz"}) {
+            out[key].push_back(0.0);
+        }
     }
     out["CLa"] = 0;
     out["Cma"] = 0;
@@ -350,9 +394,17 @@ json polar_to_json(const PlanePolar* pPlPolar)
 {
     json out;
     out["alpha"] = json::array();
+    out["beta"] = json::array();
     out["CL"] = json::array();
     out["CD"] = json::array();
+    out["CDvis"] = json::array();
+    out["CDind"] = json::array();
     out["Cm"] = json::array();
+    out["CY"] = json::array();
+    out["Cl"] = json::array();
+    out["Cn"] = json::array();
+    out["Cx"] = json::array();
+    out["Cz"] = json::array();
 
     std::vector<double> alpha_deg;
     std::vector<double> cl;
@@ -368,9 +420,17 @@ json polar_to_json(const PlanePolar* pPlPolar)
         const double cd_i = pPlPolar->getVariable(5, i);
         const double cm_i = pPlPolar->getVariable(9, i);
         out["alpha"].push_back(alpha);
+        out["beta"].push_back(pPlPolar->getVariable(2, i));
         out["CL"].push_back(cl_i);
         out["CD"].push_back(cd_i);
+        out["CDvis"].push_back(pPlPolar->getVariable(6, i));
+        out["CDind"].push_back(pPlPolar->getVariable(7, i));
         out["Cm"].push_back(cm_i);
+        out["CY"].push_back(pPlPolar->getVariable(8, i));
+        out["Cl"].push_back(pPlPolar->getVariable(12, i));
+        out["Cn"].push_back(pPlPolar->getVariable(13, i));
+        out["Cx"].push_back(pPlPolar->getVariable(57, i));
+        out["Cz"].push_back(pPlPolar->getVariable(58, i));
         alpha_deg.push_back(alpha);
         cl.push_back(cl_i);
         cm.push_back(cm_i);

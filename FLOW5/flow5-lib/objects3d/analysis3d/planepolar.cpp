@@ -519,7 +519,8 @@ void PlanePolar::setVariableNames()
                                                 "BM ("+ strMoment+")", "m.g.Vz (W)", "Drag x V (W)", "Efficiency", "XCp.Cl",
                                                 "XNP ("+ strLength+")", "Phugoid Freq. (Hz)", "Phugoid Damping", "Short Period Freq. (Hz)",
                                                 "Short Period Damping Ratio", "Dutch Roll Freq. (Hz)", "Dutch Roll Damping", "Roll Damping",
-                                                "Spiral Damping", "Mass ("+strMass+")","CoG_x ("+ strLength+")", "CoG_z ("+ strLength+")"});
+                                                "Spiral Damping", "Mass ("+strMass+")","CoG_x ("+ strLength+")", "CoG_z ("+ strLength+")",
+                                                "Cx", "Cz"});
 }
 
 
@@ -649,6 +650,8 @@ double PlanePolar::getVariable(int iVar, int index) const
         case 54: return m_Mass_var.at(index) * Units::kgtoUnit();
         case 55: return m_CoG_x.at(index) * Units::mtoUnit();
         case 56: return m_CoG_z.at(index) * Units::mtoUnit();
+        case 57: return m_AF.at(index).Cx();
+        case 58: return m_AF.at(index).Cz();
         default:
             break;
     }

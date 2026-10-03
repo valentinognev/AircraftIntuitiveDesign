@@ -223,6 +223,38 @@ def test_analyze_entry_point_does_not_introduce_alschd(monkeypatch):
     assert "ALSCHD" not in w.aircraft.AERO
 
 
+# Text ``ast.literal_eval`` cannot read: a typo, and the space-separated form
+# ``tabs.sync_fields_to_aircraft`` parses as a string rather than a list.
+UNPARSEABLE_TEXT = ["abc", "-4 0 4 8 12"]
+
+
+@pytest.mark.parametrize("text", UNPARSEABLE_TEXT, ids=["typo", "space-separated"])
+def test_unparseable_field_text_is_left_alone(monkeypatch, text):
+    """No finite number to read means no schedule: keep what the user typed.
+
+    Storing ``[]`` instead would erase the field and hand the solvers an empty
+    sweep, which DATCOM writes as ``NALPHA=0.0`` and Tornado indexes.
+    """
+
+    def stop(ac, mesh, **kw):
+        raise _SolverReached
+
+    monkeypatch.setattr("aid_gui.main_window.run_flow5", stop)
+    w = _cessna_window()
+    w._field_edits["AERO.ALSCHD"].setText(text)
+    with pytest.raises(_SolverReached):
+        w.run_flow5(mesh=("6", "3"))
+    assert w.aircraft.AERO["ALSCHD"] == text
+    assert w._field_edits["AERO.ALSCHD"].text() == text
+
+
+def test_apply_alpha_default_keeps_an_unreadable_value():
+    """The stored value stays as it is, so AVL's clear ValueError is the feedback."""
+    ac = _craft("abc")
+    apply_alpha_default(ac)
+    assert ac.AERO["ALSCHD"] == "abc"
+
+
 # (low, high) of every shipped model as it was before the resample. The resample
 # refines the schedule but must not move the envelope it sweeps.
 SHIPPED_ALSCHD_RANGES = {

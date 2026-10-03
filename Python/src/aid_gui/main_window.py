@@ -362,13 +362,14 @@ class MainWindow(QMainWindow):
         """Expand ``AERO.ALSCHD`` and show the expanded list in the Aero field.
 
         The field text is what the next ``sync_fields_to_aircraft`` writes back,
-        so leaving it sparse would undo the default.
+        so leaving it sparse would undo the default. An empty schedule is left
+        alone: overwriting the field with it would erase whatever the user typed.
         """
         ac = self.aircraft
         apply_alpha_default(ac)
         alschd = ac.AERO.get("ALSCHD")
         edit = getattr(self, "_field_edits", {}).get("AERO.ALSCHD")
-        if alschd is None or edit is None:
+        if not alschd or edit is None:
             return
         edit.blockSignals(True)
         edit.setText(str(alschd))

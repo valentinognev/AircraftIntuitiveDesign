@@ -87,8 +87,15 @@ def alpha_schedule(ac, target: int = ALPHA_POINTS) -> list[float]:
 
 
 def apply_alpha_default(ac, target: int = ALPHA_POINTS):
-    """Store the expanded schedule in ``AERO.ALSCHD`` and return the aircraft."""
+    """Store the expanded schedule in ``AERO.ALSCHD`` and return the aircraft.
+
+    An absent ``ALSCHD`` key stays absent, and a stored value with no finite
+    number in it is left exactly as it is: ``[]`` in its place would erase the
+    user's input and hand every solver an empty sweep.
+    """
     if "ALSCHD" not in ac.AERO:
+        return ac
+    if not _finite_values(ac.AERO["ALSCHD"]):
         return ac
     ac.AERO["ALSCHD"] = alpha_schedule(ac, target)
     return ac

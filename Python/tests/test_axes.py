@@ -1,58 +1,100 @@
+"""Pin ``aid.axes._SIGN_MAP``, including the keys that must NOT be flipped.
+
+Every fixture value is non-zero on purpose. A ``0.0`` fixture cannot falsify a
+sign: ``-0.0 == 0.0``, and ``-0.0 == pytest.approx(0.0)`` is also ``True``, so
+any mutation of that key's sign or membership would survive.
+"""
+
 import numpy as np
 import pytest
 
 from aid.axes import from_frd, to_frd
 
-
-def test_datcom_flips_axial_and_normal_only():
-    raw = {"alpha": [0.0, 2.0], "cd": [0.02, 0.03], "cl": [0.1, 0.2],
-           "cm": [0.01, 0.0], "cn": [0.1, 0.2], "ca": [0.02, 0.01],
-           "xcp": [0.1, 0.0], "cla": [0.09, 0.09], "cyb": [-0.01, -0.01],
-           "cnb": [0.001, 0.001], "clb": [-0.002, -0.002]}
-    got = to_frd("datcom", raw)
-    assert got["ca"] == [-0.02, -0.01]
-    assert got["cn"] == [-0.1, -0.2]
-    for key in ("cd", "cl", "cm", "xcp", "cla", "cyb", "cnb", "clb", "alpha"):
-        assert got[key] == raw[key]
-    assert raw["ca"] == [0.02, 0.01], "to_frd must not mutate its input"
+SOLVERS = ("avl", "datcom", "tornado", "flow5")
 
 
 def _negated(value):
     return [-v for v in value] if isinstance(value, list) else -value
 
 
-def test_tornado_flips_axial_normal_roll_yaw_and_their_derivatives():
-    raw = {"CX": -0.04, "CY": 0.0, "CZ": 0.54, "Cl": 0.003, "Cm": -0.95, "Cn": -0.027,
-           "CX_a": -0.2, "CZ_a": 4.2, "Cl_a": 0.01, "Cn_a": -0.07,
-           "CY_a": 0.0, "CY_b": -0.3, "CY_R": 0.4, "CC": -0.0,
+def test_datcom_flips_axial_and_normal_only():
+    raw = {"alpha": [1.0, 2.0], "cd": [0.02, 0.03], "cl": [0.1, 0.2],
+           "cm": [0.01, -0.02], "cn": [0.1, 0.2], "ca": [0.02, 0.01],
+           "xcp": [0.1, 0.05], "cla": [0.09, 0.09], "cyb": [-0.01, -0.01],
+           "cnb": [0.001, 0.001], "clb": [-0.002, -0.002]}
+    got = to_frd("datcom", raw)
+    assert got["ca"] == [-0.02, -0.01]
+    assert got["cn"] == [-0.1, -0.2]
+    for key in ("cd", "cl", "cm", "xcp", "cla", "cyb", "cnb", "clb", "alpha"):
+        assert got[key] == raw[key], key
+        assert got[key] is raw[key], key
+    assert raw["ca"] == [0.02, 0.01], "to_frd must not mutate its input"
+
+
+def test_tornado_flips_axial_normal_roll_yaw_and_their_non_rate_derivatives():
+    raw = {"CX": -0.04, "CY": 0.12, "CZ": 0.54, "Cl": 0.003, "Cm": -0.95, "Cn": -0.027,
+           "CX_a": -0.2, "CY_a": 0.31, "CZ_a": 4.2, "Cl_a": 0.01, "Cm_a": -1.4, "Cn_a": -0.07,
+           "CY_b": -0.3, "CY_R": 0.4, "CC": 0.02,
            "Cl_b": 0.05, "Cn_b": -0.25,
-           "Cl_P": -0.49, "Cl_Q": 0.0, "Cl_R": 0.04,
-           "Cn_P": 0.07, "Cn_Q": 0.0, "Cn_R": -0.29,
+           "Cl_P": -0.49, "Cl_Q": -0.15, "Cl_R": 0.04,
+           "Cm_Q": -8.0, "Cn_P": 0.07, "Cn_Q": -0.09, "Cn_R": -0.29,
            "CX_d": [-1.0], "CZ_d": [-2.0], "Cl_d": [0.5], "Cn_d": [0.6],
            "CY_d": [0.1]}
     got = to_frd("tornado", raw)
-    for key in ("CX", "CZ", "Cl", "Cn", "CX_a", "CZ_a", "Cl_a", "Cn_a",
-                "Cl_b", "Cn_b", "Cl_P", "Cl_Q", "Cl_R", "Cn_P", "Cn_Q", "Cn_R",
-                "CX_d", "CZ_d", "Cl_d", "Cn_d"):
+    flipped = ("CX", "CZ", "Cl", "Cn", "CX_a", "CZ_a", "Cl_a", "Cn_a",
+               "Cl_b", "Cn_b", "CX_d", "CZ_d", "Cl_d", "Cn_d")
+    for key in flipped:
         assert got[key] == pytest.approx(_negated(raw[key])), key
-    for key in ("CY", "Cm", "CY_a", "CY_b", "CY_R", "CC", "CY_d"):
+    # The rate derivatives land standard: raw Tornado Cl_P -0.486 already agrees
+    # with AVL's Clp -0.470, so no -1 may be applied to them.
+    not_flipped = ("CY", "Cm", "CY_a", "CY_b", "CY_R", "CC", "Cm_a",
+                   "Cl_P", "Cl_Q", "Cl_R", "Cm_Q", "Cn_P", "Cn_Q", "Cn_R")
+    for key in not_flipped:
         assert got[key] == pytest.approx(raw[key]), key
     assert got["Cl_d"] == [-0.5] and got["Cn_d"] == [-0.6]
     assert got["CY_d"] == [0.1]
 
 
-def test_avl_and_flow5_are_identity():
-    raw = {"CXtot": 0.03, "CZtot": -0.6, "CYtot": 0.0, "Cltot": 0.0,
-           "Cmtot": -0.2, "Cntot": 0.0, "CYb": -0.3, "Cnb": 0.17, "Clb": -0.03}
-    for solver in ("avl", "flow5"):
-        assert to_frd(solver, raw) == raw
+def test_avl_is_identity():
+    raw = {"CXtot": 0.03, "CZtot": -0.6, "CYtot": -0.02, "Cltot": 0.014,
+           "Cmtot": -0.2, "Cntot": 0.031, "Clp": -0.47, "CYb": -0.3,
+           "Cnb": 0.17, "Clb": -0.028}
+    got = to_frd("avl", raw)
+    assert got == raw
+    for key in raw:
+        assert got[key] is raw[key], key
+
+
+def test_flow5_is_identity_until_task_2_3_fills_in_the_lateral_map():
+    # Task 2.3 turns Cx/Cz/Cl/Cn to -1 (ruling R18) and has to update this test
+    # and the fixtures in test_cy_and_cc_are_never_flipped, which assert them
+    # unchanged. CXa/CZa get no entry there: CZa already measures -5.2562.
+    raw = {"Cx": -0.031, "Cz": 0.544, "Cl": 0.0047, "Cn": -0.0143,
+           "CXa": -0.2, "CZa": -5.2562, "CY": 0.06, "Cm": -0.95}
+    got = to_frd("flow5", raw)
+    assert got == raw
+    for key in raw:
+        assert got[key] is raw[key], key
+
+
+def test_cy_and_cc_are_never_flipped():
+    """The Global Constraint: ``CY`` and ``CC`` pass through every solver."""
+    raw = {"CY": -0.31, "CC": 0.017, "CY_a": 0.42, "CY_b": -0.28,
+           "CY_R": 0.19, "CY_d": [-0.06], "CYtot": -0.09,
+           "Cltot": 0.021, "Cntot": -0.044}
+    for solver in SOLVERS:
+        got = to_frd(solver, raw)
+        assert got == raw, solver
+        for key in raw:
+            assert got[key] == raw[key], (solver, key)
+            assert got[key] is raw[key], (solver, key)
 
 
 def test_round_trip_is_identity_for_every_solver():
     raw = {"CX": -0.04, "CZ": 0.54, "Cl": 0.003, "Cn": -0.027,
-           "cn": 0.1, "ca": 0.02, "CXtot": 0.03}
-    for solver in ("avl", "datcom", "tornado", "flow5"):
-        assert from_frd(solver, to_frd(solver, raw)) == raw
+           "cn": 0.1, "ca": 0.02, "CXtot": 0.03, "Cltot": 0.014, "CZa": -5.2562}
+    for solver in SOLVERS:
+        assert from_frd(solver, to_frd(solver, raw)) == raw, solver
 
 
 def test_unknown_solver_raises():

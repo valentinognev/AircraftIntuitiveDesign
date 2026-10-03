@@ -45,7 +45,12 @@ export function stabilityAlphaOf(st: { alpha?: unknown } | null | undefined): nu
   return typeof alpha === "number" && Number.isFinite(alpha) ? alpha : null;
 }
 
-export function seriesLegend(series: { name?: string; solver: string }): string {
+export function seriesLegend(series: {
+  label?: string;
+  name?: string;
+  solver: string;
+}): string {
+  if (series.label) return series.label;
   return series.name ? series.name : series.solver;
 }
 

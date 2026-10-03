@@ -186,14 +186,29 @@ def analyze_flow5(ac: Aircraft, mesh: tuple[str, ...]) -> dict:
     return _analyze_result("flow5", run_flow5(ac, mesh), ac)
 
 
+def apply_beta(ac: Aircraft, beta: float = 0.0) -> Aircraft:
+    """Put the requested sideslip on the aircraft, in degrees, for every engine to read.
+
+    One value in one place: Tornado reads it through ``tornado_io``'s ``betha`` and
+    flow5 through ``run_flow5``, while DATCOM and AVL have no sideslip capability and
+    stay at zero whatever this says. A saved aircraft may carry no ``BETA`` key at
+    all, since save_jsonc omits AERO keys that equal their default, so the aircraft's
+    own value is read defensively by aid.aircraft.aero_beta.
+    """
+    ac.AERO["BETA"] = float(beta)
+    return ac
+
+
 def analyze(
     ac: Aircraft,
     solver: str = "datcom",
     mesh: tuple[str, ...] | None = None,
+    beta: float = 0.0,
 ) -> dict:
     solver = solver or "datcom"
     if solver not in SOLVERS:
         raise ValueError(f"unknown solver: {solver}")
+    ac = apply_beta(ac, beta)
     if solver == "datcom":
         return analyze_datcom(ac)
     mesh = _mesh_tuple(solver, mesh)

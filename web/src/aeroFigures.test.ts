@@ -9,6 +9,7 @@ import {
   type LineFigure,
   type TableFigure,
 } from "./aeroFigures";
+import { seriesLegend } from "./aeroChart";
 import type { OverlayPointSeries, SolverRaws } from "./coeffOverlay";
 
 const PER_RAD = 180 / Math.PI;
@@ -666,4 +667,41 @@ it("uses a Value column when every leftover row has one number", () => {
     { header: true, cells: ["Tornado", ""] },
     { cells: ["L", "1.25"] },
   ]);
+});
+
+function displayName(series: OverlayPointSeries): string {
+  return series.label ?? series.solver;
+}
+
+it("threads the sideslip from aeroTabs into the series labels", () => {
+  const raws: SolverRaws = {
+    datcom: { alpha: [0, 2], cl: [0.1, 0.2] },
+    avl: { alpha: [0, 2], CLtot: [0.1, 0.2] },
+  };
+  const swept = aeroTabs(raws, null, null, 5);
+  expect(lines(tab(swept, "Forces"), "CL").series.map(displayName)).toEqual([
+    "datcom (beta=0)",
+    "avl (beta=0)",
+  ]);
+  const upright = aeroTabs(raws, null, null);
+  expect(lines(tab(upright, "Forces"), "CL").series.map(displayName)).toEqual(["datcom", "avl"]);
+});
+
+it("labels the flow5 derivative panels at a sideslip", () => {
+  const raws: SolverRaws = {
+    tornado: { CL_a: PER_RAD },
+    flow5: { CLa: PER_RAD },
+  };
+  const swept = aeroTabs(raws, null, null, 5);
+  expect(lines(tab(swept, "Derivatives"), "CLα").series.map(displayName)).toEqual([
+    "tornado",
+    "flow5 (beta=0)",
+  ]);
+});
+
+it("leaves the spanwise panels unlabelled at a sideslip", () => {
+  const swept = aeroTabs({ tornado: {} }, null, { y: [0, 1], Cl: [0.2, 0.3] }, 5);
+  const span = lines(tab(swept, "Spanwise"), "Spanwise lift").series;
+  expect(span.map((item) => item.label)).toEqual([undefined]);
+  expect(span.map(seriesLegend)).toEqual(["Prandtl"]);
 });

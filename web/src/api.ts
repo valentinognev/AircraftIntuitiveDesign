@@ -1,4 +1,4 @@
-import { aircraftToJson, type AircraftDict, type SavedSolverResult } from "./aircraft";
+import { aeroBeta, aircraftToJson, type AircraftDict, type SavedSolverResult } from "./aircraft";
 import { cadacCallbackUrl } from "./cadacSession";
 import type { HandshakePayload } from "./payload";
 
@@ -75,7 +75,11 @@ export async function postAnalyze(
     const res = await fetch("/analyze", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ aircraft: aircraftForRequest(aircraft), solver }),
+      body: JSON.stringify({
+        aircraft: aircraftForRequest(aircraft),
+        solver,
+        beta: aeroBeta(aircraft),
+      }),
     });
     data = (await res.json()) as typeof data;
   } catch (err) {
@@ -118,7 +122,10 @@ export async function fetchStability(
     const res = await fetch("/stability", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ aircraft: aircraftForRequest(aircraft) }),
+      body: JSON.stringify({
+        aircraft: aircraftForRequest(aircraft),
+        beta: aeroBeta(aircraft),
+      }),
     });
     if (!res.ok) return null;
     const data = (await res.json()) as Record<string, unknown>;

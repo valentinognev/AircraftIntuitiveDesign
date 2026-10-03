@@ -13,6 +13,8 @@ export type OverlayPointSeries = {
   x: number[];
   y: number[];
   kind: "line" | "hline";
+  /** Display override, set when the solver could not fly the condition it is plotted in. */
+  label?: string;
   /** Spanwise curves name the handbook and Tornado wings. Other series omit it. */
   name?: string;
 };
@@ -21,6 +23,24 @@ export type OverlayPointSeries = {
 const ND_ABS = 99998;
 
 type SolverName = OverlayPointSeries["solver"];
+
+/**
+ * Solvers whose numbers cannot be the requested sideslip, so they need the
+ * `(beta=0)` suffix when the flight is not upright.
+ *
+ * DATCOM's `$FLTCON` and AVL's run-case menu have no sideslip at all, so both stay
+ * at beta = 0 whatever is asked of them. flow5's force channels *do* follow the
+ * requested sideslip (`setBetaSpec`), but its twelve stability derivatives do not:
+ * `computeStabilityDerivatives` builds its axes from `objects::windDirection(alpha, 0.0)`
+ * (FLOW5/flow5-lib/analysis3d/panelanalysis.cpp:614, its WindDirection at :660), so every derivative is identical
+ * at beta = 0, +5 and -5. Only Tornado's `state["betha"]` really flies the sideslip.
+ */
+const NO_SIDESLIP: ReadonlySet<SolverName> = new Set<SolverName>(["datcom", "avl"]);
+const NO_SIDESLIP_DERIVATIVES: ReadonlySet<SolverName> = new Set<SolverName>([
+  "datcom",
+  "avl",
+  "flow5",
+]);
 
 function finiteNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
@@ -113,8 +133,26 @@ function series(
   x: number[],
   y: number[],
   kind: "line" | "hline",
+  label?: string,
 ): OverlayPointSeries {
-  return { solver, stroke: solverStroke(solver), x, y, kind };
+  return {
+    solver,
+    stroke: solverStroke(solver),
+    x,
+    y,
+    kind,
+    ...(label != null ? { label } : {}),
+  };
+}
+
+/** `(beta=0)` for a solver that could not fly the requested sideslip, else nothing. */
+function pinnedLabel(
+  solver: SolverName,
+  beta: number,
+  pinned: ReadonlySet<SolverName>,
+): string | undefined {
+  if (beta === 0 || !pinned.has(solver)) return undefined;
+  return `${solver} (beta=0)`;
 }
 
 /**
@@ -135,6 +173,7 @@ export function seriesVsAlpha(
     avl?: string;
     flow5?: string;
   },
+  beta = 0,
 ): OverlayPointSeries[] {
   const grid = alphaGrid(raws, stabilityAlpha);
   const out: OverlayPointSeries[] = [];
@@ -147,7 +186,7 @@ export function seriesVsAlpha(
     has(datcom, "alpha")
   ) {
     const samples = pairedSamples(datcom.alpha, datcom[spec.datcom], true);
-    out.push(series("datcom", samples.x, samples.y, "line"));
+    out.push(series("datcom", samples.x, samples.y, "line", pinnedLabel("datcom", beta, NO_SIDESLIP)));
   }
 
   const tornado = raws.tornado;
@@ -164,7 +203,9 @@ export function seriesVsAlpha(
   const avl = raws.avl;
   if (spec.avl && avl && has(avl, spec.avl) && has(avl, "alpha")) {
     const samples = pairedSamples(avl.alpha, avl[spec.avl], false);
-    if (samples.x.length > 0) out.push(series("avl", samples.x, samples.y, "line"));
+    if (samples.x.length > 0) {
+      out.push(series("avl", samples.x, samples.y, "line", pinnedLabel("avl", beta, NO_SIDESLIP)));
+    }
   }
 
   const flow5 = raws.flow5;
@@ -180,6 +221,7 @@ export function seriesDerivative(
   raws: SolverRaws,
   stabilityAlpha: number | null,
   spec: { datcom?: string; tornado?: string; avl?: string; flow5?: string },
+  beta = 0,
 ): OverlayPointSeries[] {
   const grid = alphaGrid(raws, stabilityAlpha);
   const out: OverlayPointSeries[] = [];
@@ -192,7 +234,9 @@ export function seriesDerivative(
     has(datcom, "alpha")
   ) {
     const samples = pairedSamples(datcom.alpha, datcom[spec.datcom], true);
-    out.push(series("datcom", samples.x, samples.y, "line"));
+    out.push(
+      series("datcom", samples.x, samples.y, "line", pinnedLabel("datcom", beta, NO_SIDESLIP_DERIVATIVES)),
+    );
   }
 
   const horizontal = (
@@ -204,12 +248,21 @@ export function seriesDerivative(
     const value = firstFinite(raw[key]);
     if (value == null) return;
     const perDeg = (value * Math.PI) / 180;
-    out.push(series(solver, grid, grid.map(() => perDeg), "hline"));
+    out.push(
+      series(
+        solver,
+        grid,
+        grid.map(() => perDeg),
+        "hline",
+        pinnedLabel(solver, beta, NO_SIDESLIP_DERIVATIVES),
+      ),
+    );
   };
 
   horizontal("tornado", spec.tornado, raws.tornado);
 
   const avl = raws.avl;
+  const avlLabel = pinnedLabel("avl", beta, NO_SIDESLIP_DERIVATIVES);
   if (spec.avl && avl && has(avl, spec.avl) && has(avl, "alpha")) {
     const alpha = avl.alpha;
     const value = avl[spec.avl];
@@ -223,6 +276,7 @@ export function seriesDerivative(
               samples.x,
               samples.y.map((item) => (item * Math.PI) / 180),
               "line",
+              avlLabel,
             ),
           );
         }
@@ -231,7 +285,7 @@ export function seriesDerivative(
       const a0 = oneSample(alpha);
       const v = oneSample(value);
       if (a0 != null && v != null) {
-        out.push(series("avl", [a0], [(v * Math.PI) / 180], "line"));
+        out.push(series("avl", [a0], [(v * Math.PI) / 180], "line", avlLabel));
       }
     }
   }

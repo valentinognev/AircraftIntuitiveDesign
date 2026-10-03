@@ -1,4 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { aeroBeta } from "./aircraft";
 import { aircraftForRequest } from "./api";
 import { chartRows, type ControlChartSeries, type ControlDerivPayload } from "./controlDeriv";
 import {
@@ -498,6 +499,7 @@ export function Results({ initialTab = "forces" }: { initialTab?: string }) {
   const lastStability = useAid((s) => s.lastStability);
   const rawRecord = useAid((s) => s.raws);
   const handbook = useAid((s) => s.handbook);
+  const aircraft = useAid((s) => s.aircraft);
   const [tabId, setTabId] = useState(initialTab);
   const [controlSeries, setControlSeries] = useState<ControlChartSeries[]>([]);
   const [controlError, setControlError] = useState<string | null>(null);
@@ -507,7 +509,9 @@ export function Results({ initialTab = "forces" }: { initialTab?: string }) {
   const summary = stabilityText(lastStability);
   const solverRaws = knownSolverRaws(rawRecord);
   const showTabs = hasSolverRaw(solverRaws);
-  const tabs = showTabs ? aeroTabs(solverRaws, stabilityAlphaOf(lastStability), handbook) : [];
+  const tabs = showTabs
+    ? aeroTabs(solverRaws, stabilityAlphaOf(lastStability), handbook, aircraft == null ? 0 : aeroBeta(aircraft))
+    : [];
   const selected = tabs.find((tab) => tab.id === tabId) ?? tabs[0];
 
   useEffect(() => {

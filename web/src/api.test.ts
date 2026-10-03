@@ -266,3 +266,23 @@ function solverResult(solver: string): SavedSolverResult {
     raw: { solver, lattice: { nodes: [[0, 0, 0], [1, 1, 1]], fields: ["cp"] }, note: "verbatim" },
   };
 }
+it("postAnalyze sends the sideslip from AERO.BETA in the request body", async () => {
+  stubBrowser();
+  const { bodies } = stubFetch();
+  await postAnalyze({ ...populatedAircraft(), AERO: { MACH: 0.03, BETA: 5 } }, "tornado");
+  expect((JSON.parse(bodies[0]) as { beta?: unknown }).beta).toBe(5);
+});
+
+it("postAnalyze sends beta zero when the aircraft carries no BETA key", async () => {
+  stubBrowser();
+  const { bodies } = stubFetch();
+  await postAnalyze(populatedAircraft(), "tornado");
+  expect((JSON.parse(bodies[0]) as { beta?: unknown }).beta).toBe(0);
+});
+
+it("fetchStability sends the sideslip too", async () => {
+  stubBrowser();
+  const { bodies } = stubFetch();
+  await fetchStability({ ...populatedAircraft(), AERO: { MACH: 0.03, BETA: -5 } });
+  expect((JSON.parse(bodies[0]) as { beta?: unknown }).beta).toBe(-5);
+});

@@ -255,3 +255,76 @@ it("plots DATCOM derivatives on DATCOM alpha, not the 80-point grid", () => {
     },
   ]);
 });
+
+// The three engines do not agree about sideslip: DATCOM's $FLTCON and AVL's
+// run-case menu have no beta, and flow5's computeStabilityDerivatives builds its
+// axes from windDirection(alpha, 0.0). Only Tornado's state["betha"] and flow5's
+// force channels fly at the requested beta, so a beta=0 curve among them needs a
+// suffix or the overlay lies about the condition.
+
+function displayName(series: OverlayPointSeries): string {
+  return series.label ?? series.solver;
+}
+
+it("labels datcom and avl with beta=0 when the flight has a sideslip", () => {
+  const raws = {
+    datcom: { alpha: [0, 2], cl: [0.1, 0.2] },
+    avl: { alpha: [0, 2], CLtot: [0.1, 0.2] },
+  };
+  const series = seriesVsAlpha(raws, null, { datcom: "cl", avl: "CLtot" }, 5);
+  expect(series.map(displayName)).toEqual(["datcom (beta=0)", "avl (beta=0)"]);
+});
+
+it("leaves labels alone at beta zero", () => {
+  const raws = { datcom: { alpha: [0, 2], cl: [0.1, 0.2] } };
+  const series = seriesVsAlpha(raws, null, { datcom: "cl" }, 0);
+  expect(series.map(displayName)).toEqual(["datcom"]);
+  expect(series[0].label).toBeUndefined();
+});
+
+it("defaults the beta argument to zero", () => {
+  const raws = { datcom: { alpha: [0, 2], cl: [0.1, 0.2] } };
+  expect(seriesVsAlpha(raws, null, { datcom: "cl" }).map(displayName)).toEqual(["datcom"]);
+});
+
+it("labels a negative sideslip as well", () => {
+  const series = seriesVsAlpha({ avl: { alpha: [0, 2], CLtot: [0.1, 0.2] } }, null, { avl: "CLtot" }, -5);
+  expect(series.map(displayName)).toEqual(["avl (beta=0)"]);
+});
+
+it("leaves tornado and flow5 force labels plain, because they do fly at beta", () => {
+  const raws = {
+    tornado: { alpha: 0, CY: 0.1, CY_a: PER_RAD },
+    flow5: { alpha: [0, 2], CY: [0.0, 0.1] },
+  };
+  const series = seriesVsAlpha(raws, null, { tornado: ["CY", "CY_a"], flow5: "CY" }, 5);
+  expect(series.map(displayName)).toEqual(["tornado", "flow5"]);
+});
+
+it("labels flow5 derivatives beta=0 too, because its axes are built at beta 0", () => {
+  const raws = {
+    datcom: { alpha: [0, 10], cla: [0.05, 0.06] },
+    tornado: { CL_a: 1 },
+    avl: { alpha: [0, 10], CLa: [PER_RAD, PER_RAD] },
+    flow5: { CLa: PER_RAD },
+  };
+  const series = seriesDerivative(
+    raws,
+    null,
+    { datcom: "cla", tornado: "CL_a", avl: "CLa", flow5: "CLa" },
+    5,
+  );
+  expect(series.map(displayName)).toEqual([
+    "datcom (beta=0)",
+    "tornado",
+    "avl (beta=0)",
+    "flow5 (beta=0)",
+  ]);
+});
+
+it("keeps the sample data untouched when a label is added", () => {
+  const raws = { datcom: { alpha: [0, 2], cl: [0.1, 0.2] } };
+  const plain = seriesVsAlpha(raws, null, { datcom: "cl" });
+  const swept = seriesVsAlpha(raws, null, { datcom: "cl" }, 5);
+  expect({ ...swept[0], label: undefined }).toEqual(plain[0]);
+});

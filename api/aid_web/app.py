@@ -15,6 +15,7 @@ from aid_web.analyze import (
     SOLVERS,
     _jsonable,
     analyze as run_analyze,
+    apply_beta,
     control_derivatives as run_control_derivatives,
 )
 from aid_web.paths import MODELS_DIR, ModelPathError, resolve_model
@@ -43,6 +44,11 @@ class AnalyzeBody(BaseModel):
     aircraft: dict
     solver: str = "datcom"
     mesh: list[str] | None = None
+    beta: float = 0.0
+
+
+class StabilityBody(AircraftBody):
+    beta: float = 0.0
 
 
 class ControlDerivativesBody(BaseModel):
@@ -129,7 +135,7 @@ def analyze(body: AnalyzeBody):
     try:
         ac = aircraft_from_json(body.aircraft)
         mesh = tuple(str(x) for x in body.mesh) if body.mesh else None
-        return run_analyze(ac, solver=solver, mesh=mesh)
+        return run_analyze(ac, solver=solver, mesh=mesh, beta=body.beta)
     except (
         FileNotFoundError,
         CalledProcessError,
@@ -166,9 +172,9 @@ def control_derivatives(body: ControlDerivativesBody):
 
 
 @app.post("/stability")
-def stability(body: AircraftBody):
+def stability(body: StabilityBody):
     try:
-        ac = aircraft_from_json(body.aircraft)
+        ac = apply_beta(aircraft_from_json(body.aircraft), body.beta)
         return _jsonable(aircraft_stability(ac))
     except Exception as exc:
         return JSONResponse(status_code=400, content={"ok": False, "error": str(exc)})

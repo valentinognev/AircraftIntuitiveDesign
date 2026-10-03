@@ -129,3 +129,11 @@ it("paints AVL bars magenta so they are not the DATCOM default", () => {
   expect(barFill("avl")).not.toBe(barFill("dcl"));
   expect(barFill("tornado")).toBe("red");
 });
+
+it("prefers an explicit series label over the solver name", () => {
+  expect(seriesLegend({ solver: "datcom", label: "datcom (beta=0)" })).toBe("datcom (beta=0)");
+  expect(seriesLegend({ solver: "avl", name: "Prandtl", label: "avl (beta=0)" })).toBe(
+    "avl (beta=0)",
+  );
+  expect(seriesLegend({ solver: "avl", label: "" })).toBe("avl");
+});

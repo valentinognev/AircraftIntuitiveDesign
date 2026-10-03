@@ -46,7 +46,7 @@ def _step(sched: list[float]) -> float:
 
 @pytest.mark.parametrize(
     ("span", "expected_step", "expected_count"),
-    [(4, 0.25, 17), (16, 1.0, 17), (20, 2.0, 11), (28, 2.0, 15), (40, 2.0, 21)],
+    [(4, 0.2, 21), (16, 1.0, 17), (20, 2.0, 11), (28, 2.0, 15), (40, 2.0, 21)],
 )
 def test_span_fills_to_target_on_round_step(span, expected_step, expected_count):
     sched = alpha_schedule(_craft([-4.0, -4.0 + span]))

@@ -5,7 +5,10 @@ from __future__ import annotations
 import math
 
 ALPHA_POINTS = 15
-_STEP_LADDER = (0.05, 0.1, 0.2, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0)
+# Only steps DATCOM's ``%.1f`` $FLTCON cards carry exactly: a grid finer than
+# 0.1 is written as a different set of alphas than the one differenced here,
+# and ``cla``/``cma`` are finite differences along the *written* grid.
+_STEP_LADDER = (0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0)
 _EPS = 1e-9
 
 
@@ -42,11 +45,30 @@ def _step_for(span: float, target: int) -> float:
     return min(_STEP_LADDER, key=lambda s: (abs(_point_count(span, s) - target), s))
 
 
+def _as_written(value: float) -> float:
+    """*value* snapped to the double DATCOM's ``%.1f`` will carry, when it carries it."""
+    written = float(f"{value:.1f}")
+    return written if abs(written - value) <= _EPS else value
+
+
+def _datcom_faithful(sched: list[float]) -> bool:
+    """Whether the ``%.1f`` $FLTCON cards would carry *sched* unaltered."""
+    return all(float(f"{a:.1f}") == a for a in sched)
+
+
 def alpha_schedule(ac, target: int = ALPHA_POINTS) -> list[float]:
     """``AERO.ALSCHD`` as a list of angles of attack, expanded to about ``target`` points.
 
-    Sparse schedules are refilled on the finest ladder step that lands nearest
-    ``target``; schedules already at or above it are returned as stored.
+    Sparse schedules are refilled on the ladder step whose point count lands
+    nearest ``target``, ties taking the finer step, and the endpoints are kept.
+    A schedule that survives ``%.1f`` comes back as plain floats; one stored
+    with more points than ``target``, as a scalar, or with no finite value at
+    all, comes back normalised by ``_finite_values`` and no longer than stored.
+
+    A generated schedule that DATCOM's cards could not carry unaltered -- the
+    endpoints do not reach 0.1, so the deck would difference over a grid it
+    never received -- is abandoned and the stored schedule returned unchanged:
+    fail safe, never emit a deck that misreports its own sweep.
     """
     values = _finite_values(ac.AERO.get("ALSCHD"))
     if not values or len(values) >= target:
@@ -56,9 +78,11 @@ def alpha_schedule(ac, target: int = ALPHA_POINTS) -> list[float]:
     if span == 0.0:
         return [lo]
     step = _step_for(span, target)
-    sched = [lo + i * step for i in range(_point_count(span, step))]
+    sched = [_as_written(lo + i * step) for i in range(_point_count(span, step))]
     if hi - sched[-1] > _EPS:
-        sched.append(hi)
+        sched.append(_as_written(hi))
+    if not _datcom_faithful(sched):
+        return values
     return sched
 
 

@@ -3,7 +3,7 @@ from copy import deepcopy
 
 import numpy as np
 
-from aid.aircraft import Aircraft
+from aid.aircraft import Aircraft, aero_beta
 from aid.atmosphere import atmosphere
 from aid.geometry import geometry
 
@@ -381,7 +381,7 @@ def _build_state(ac: Aircraft, atm: dict) -> dict:
     return {
         "AS": mach * atm["a"] / 3.28084,
         "alpha": alpha_deg * np.pi / 180,
-        "betha": 0.0,
+        "betha": math.radians(aero_beta(ac)),
         "P": 0.0,
         "Q": 0.0,
         "R": 0.0,

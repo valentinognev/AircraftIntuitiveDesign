@@ -9,6 +9,32 @@ from aid import field_docs
 from aid.jsonc import dumps_jsonc, loads_jsonc
 
 
+# AERO keys every aircraft is guaranteed to have, as Python-only defaults: the
+# MATLAB save list in Matlab/fsroot/code/AID.m does not carry them, so no .mat and
+# no shipped .jsonc has them. Same treatment cg_data and results already get.
+AERO_DEFAULTS: dict[str, float] = {"BETA": 0.0}
+
+
+def _aero_scalar(value, default: float = 0.0) -> float:
+    """First element of a MATLAB-shaped scalar, with absent/NaN landing on default."""
+    if value is None:
+        return default
+    out = float(np.asarray(value, dtype=float).reshape(-1)[0])
+    return default if out != out else out
+
+
+def _aero_from_any(aero) -> dict:
+    """The AERO block with AERO_DEFAULTS filled in and their values as floats.
+
+    Handles the "key missing" and "container missing" cases in one place, so
+    load_jsonc, load_mat and a hand-built dict all resolve AERO["BETA"] to 0.0.
+    """
+    out = {} if not isinstance(aero, dict) else dict(aero)
+    for key, default in AERO_DEFAULTS.items():
+        out[key] = _aero_scalar(out.get(key, default), default)
+    return out
+
+
 @dataclass
 class Aircraft:
     WG: dict
@@ -26,6 +52,11 @@ class Aircraft:
     unit: str
     cg_data: list | None = None
     results: dict | None = None
+
+
+def aero_beta(ac: Aircraft, default: float = 0.0) -> float:
+    """The sideslip angle in degrees, as a float, for engines that read AERO."""
+    return _aero_scalar(ac.AERO.get("BETA", default), default)
 
 
 def _convert_cell_element(obj):
@@ -83,7 +114,7 @@ def _aircraft_from_dict(d: dict) -> Aircraft:
         BD=d["BD"],
         NP=d["NP"],
         NB=d["NB"],
-        AERO=d["AERO"],
+        AERO=_aero_from_any(d.get("AERO")),
         plot_cmp=d["plot_cmp"],
         unit=d["unit"],
         cg_data=d.get("cg_data"),
@@ -102,6 +133,16 @@ def save_jsonc(ac: Aircraft, path: Path) -> None:
     results = data.get("results")
     if not isinstance(results, dict) or not results:
         data.pop("results", None)
+    aero = data.get("AERO")
+    if isinstance(aero, dict):
+        # A loaded model carries every AERO_DEFAULTS key, but the shipped files
+        # predate them, so writing a default back would append a line to all 23
+        # and break the byte-identical geometry round trip. Same reasoning as
+        # dropping an empty cg_data / results above: only non-defaults are news.
+        # A non-default still round-trips, and loads back to the same float.
+        for key, default in AERO_DEFAULTS.items():
+            if key in aero and _aero_scalar(aero[key], default) == default:
+                aero.pop(key)
     path.write_text(dumps_jsonc(data, field_docs.DOCS))
 
 
@@ -120,7 +161,7 @@ def load_mat(path: Path) -> Aircraft:
         BD=_convert_mat(raw["BD"]),
         NP=_convert_mat(raw["NP"]),
         NB=_convert_mat(raw["NB"]),
-        AERO=_convert_mat(raw["AERO"]),
+        AERO=_aero_from_any(_convert_mat(raw["AERO"]) if "AERO" in raw else {}),
         plot_cmp=_convert_mat(raw["plot_cmp"]),
         unit=_convert_mat(raw["unit"]) if "unit" in raw else "ft",
         cg_data=cg_data,

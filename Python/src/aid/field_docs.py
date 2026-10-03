@@ -146,6 +146,7 @@ def _body(prefix: str) -> dict[str, str]:
 def _aero() -> dict[str, str]:
     return {
         "AERO.ALSCHD": "Angle(s) of Attack, deg",
+        "AERO.BETA": "sideslip angle in degrees (0 = symmetric flight)",
         "AERO.ALT": "Altitude, ft",
         "AERO.MACH": "Mach Number",
         "AERO.WT": "Weight, lb",

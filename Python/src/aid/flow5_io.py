@@ -5,7 +5,7 @@ from pathlib import Path
 
 import numpy as np
 
-from aid.aircraft import Aircraft
+from aid.aircraft import Aircraft, aero_beta
 from aid.axes import to_frd
 from aid.paths import flow5_bin
 from aid.flow5_foils import _cmp_enabled, foils_for_aircraft
@@ -27,7 +27,10 @@ def _first(val) -> float:
 
 
 def write_flow5_deck(ac: Aircraft, mesh: tuple[str, str], beta: float | None = None) -> dict:
-    beta = 0.0 if beta is None else float(beta)
+    # ``beta=None`` is the model speaking: AERO["BETA"], degrees, 0.0 by default.
+    # run_flow5 forwards its own ``beta`` unchanged, so this is the one place the
+    # default is resolved for both entry points.
+    beta = aero_beta(ac) if beta is None else float(beta)
     ny = int(mesh[0])
     nx = int(mesh[1])
     cmp = ac.plot_cmp

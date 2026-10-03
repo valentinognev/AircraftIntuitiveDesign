@@ -1,7 +1,7 @@
 # Updates
 
 ## 1.35.0 - 15-point default alpha sweep
-- `aid.alpha_schedule` adds `apply_alpha_default(ac)`; `ALPHA_POINTS = 15` is the density target. A sparse `AERO.ALSCHD` is refilled on the step ladder (`0.05`…`10.0`) to the count nearest 15, endpoints kept; a degenerate range collapses to one point, a 15-or-more input is left as stored, an absent key stays absent
+- `aid.alpha_schedule` adds `apply_alpha_default(ac)`; `ALPHA_POINTS = 15` is the density target. A sparse `AERO.ALSCHD` is refilled on the step ladder (`0.1`…`10.0`, the rungs DATCOM's `%.1f` `$FLTCON` carries exactly) to the count nearest 15, endpoints kept; a degenerate range collapses to one point, a 15-or-more input is left as stored, an absent key stays absent, and an envelope off the 0.1 grid gets no expansion at all rather than a lossy one
 - Applied at all 10 Analyze entry points (5 in `aid_gui/main_window.py`, 5 in `aid_web/analyze.py`); the GUI's `_pre_solve_alpha_default` also mirrors it into the `AERO.ALSCHD` field, or the next `sync_fields_to_aircraft` reverts it, and `apply_units`/`apply_scale` re-read that field without disturbing it. Handbook and stability get no default
 - Analyze → `File→Save` (`menus.py::_on_save`, unsynced by decision) persists the *expanded* schedule: byte-identical for the 18 rewritten models, but it normalises `T-38.jsonc`'s scalar `0` to `[0.0]` and the 4 int-valued models to floats — expect that diff when saving `T-38` or those 4 after a run
 - 23 shipped models resampled: 18 rewritten, 4 already at 15+ and byte-identical, `T-38.jsonc` skipped (scalar `0`). Cessna 5 → 17, HK36 7 → 13, the other 16 rewritten 6 → 11
@@ -10,7 +10,7 @@
 - The gold check pins the fixture's 5-point sweep, because MATLAB's `cla`/`cma` are finite differences along the grid it is handed: at Cessna's shared alphas the 17-point sweep moves `cma` up to 7.7e-3 at α=8, 40% of the gold value there. `compare_to_matlab` flies the gold's `ALSCHD` for the DATCOM leg only; before, it passed just because shipped Cessna carried those 5 points. Regenerating the gold is the real fix, and needs the Windows MATLAB install
 - `_compare_datcom`'s alignment branch is an identity on the production route, covered only by `test_datcom_gold_align.py`. Not dead code: it guards callers whose sweeps differ, and must never let sampling pass a mismatch
 - Each solver entry in `Results/compare/<name>.json` records `alpha` and `alpha_source` (`gold` or `model`) — Cessna: datcom 5/gold, tornado and avl 17/model
-- The 18 rewritten models write floats (`-4.0`) where the 4 untouched keep ints (`-9`) — `jsonc.py:53` via `json.dumps`, not drift, do not "fix" it — and now deliberately differ from `Matlab/fsroot/code/Models/*.mat`, which still hold the original 5-7 point schedules (Cessna `.mat` `[-4 0 4 8 12]` vs 17 points)
+- The 18 rewritten models write floats (`-4.0`) where the 4 untouched keep ints (`-9`) — `jsonc.py:53` via `json.dumps`, not drift, do not "fix" it — and now deliberately differ from `Matlab/fsroot/code/Models/*.mat`, which still hold the original 5-7 point schedules (Cessna `.mat` `[-4 0 4 8 12]` vs 17 points). `scripts/mat_to_jsonc.py` re-applies the default on conversion, so regenerating reproduces them
 - Tests: `cd Python && PYTHONPATH=src python -m pytest tests -q`, `cd api && PYTHONPATH=../Python/src python -m pytest tests -q` (61 passed); Python's 17 failures are pre-existing, mostly missing `Results/` gold fixtures
 
 ## 1.34.1 - Saved results block hardening

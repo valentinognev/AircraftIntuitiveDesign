@@ -2,8 +2,8 @@ import re
 
 import pytest
 
-from aid.alpha_schedule import apply_alpha_default
 from aid.aircraft import load_jsonc
+from aid.alpha_schedule import apply_alpha_default
 from aid.datcom_io import write_fltcon
 from aid.paths import models_dir
 
@@ -22,7 +22,7 @@ def _written_alphas(ac) -> list[float]:
     """``ALSCHD`` as DATCOM's ``%.1f`` cards actually carry it, read back."""
     lines: list = []
     write_fltcon(ac, lines)
-    block = re.search(r"ALSCHD=(.*?)NALT=", "\n".join(lines), re.S).group(1)
+    block = re.search(r"ALSCHD=(.*?)NALT=", "\n".join(lines), re.DOTALL).group(1)
     return [float(tok) for tok in block.replace("\n", " ").split(",") if tok.strip()]
 
 

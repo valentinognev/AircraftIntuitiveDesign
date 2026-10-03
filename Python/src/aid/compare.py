@@ -107,7 +107,11 @@ def run_python(ac: Aircraft, work: Path, datcom_ac: Aircraft | None = None) -> d
 
 
 def _values_close(a, b, *, rtol: float, atol: float) -> bool:
-    return bool(np.allclose(np.asarray(a, dtype=float), np.asarray(b, dtype=float), rtol=rtol, atol=atol))
+    try:
+        return bool(np.allclose(np.asarray(a, dtype=float), np.asarray(b, dtype=float), rtol=rtol, atol=atol))
+    except ValueError:
+        # Shapes that cannot broadcast are two different series, not a match.
+        return False
 
 
 # Alpha values are written out in full decimal, so match them only to this much.
@@ -299,7 +303,9 @@ def _gold_alpha(matlab_dir: Path) -> list | None:
 
 def _flown_alpha(ac: Aircraft) -> list[float]:
     """The ``AERO.ALSCHD`` sweep a solver leg would fly for *ac*."""
-    alschd = ac.AERO.get("ALSCHD") or []
+    alschd = ac.AERO.get("ALSCHD")
+    if alschd is None:
+        return []
     return [float(a) for a in np.asarray(alschd, dtype=float).reshape(-1)]
 
 

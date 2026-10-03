@@ -8,8 +8,8 @@ otherwise regenerating the models quietly takes every plot back to 6 points.
 import importlib.util
 from pathlib import Path
 
-from aid.alpha_schedule import ALPHA_POINTS, alpha_schedule
 from aid.aircraft import Aircraft, load_jsonc
+from aid.alpha_schedule import ALPHA_POINTS, alpha_schedule
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 SPARSE = [-4, 0, 4, 8, 12]

@@ -52,6 +52,12 @@ def test_missing_python_key_fails():
     assert _compare_datcom({"mach": 0.03}, GOLD) is False
 
 
+def test_mismatched_series_lengths_fail_instead_of_raising():
+    """A grading predicate must not raise: a length slip would abort the batch."""
+    python = {"alpha": [-4.0, -3.0, -2.0, -1.0, 0.0, 1.0], "cl": [-0.2, 0.0, 0.2]}
+    assert _compare_datcom(python, {"alpha": [-4.0, 0.0], "cl": [-0.224, 0.132]}) is False
+
+
 def test_gold_alpha_read_from_the_gold_file(tmp_path):
     (tmp_path / "datcom.json").write_text('{"alpha": [-4, 0, 4]}')
     assert _gold_alpha(tmp_path) == [-4, 0, 4]

@@ -51,7 +51,7 @@ from aid_gui.settings import SettingsState
 from aid_gui.results_bar import ResultsBar
 from aid_gui.results_panel import ResultsPanel
 from aid_gui.compare_tabs import CompareTabs
-from aid_gui.tabs import build_tabs, populate_from_aircraft, sync_extra_parts, sync_fields_to_aircraft
+from aid_gui.tabs import _set_edit_text, build_tabs, populate_from_aircraft, sync_extra_parts, sync_fields_to_aircraft
 from aid.viz import lift_overlay, planform_stations
 from aid_gui.view3d import View3D
 from aid_gui.context_menu import isolate_key_for_tab
@@ -371,9 +371,7 @@ class MainWindow(QMainWindow):
         edit = getattr(self, "_field_edits", {}).get("AERO.ALSCHD")
         if not alschd or edit is None:
             return
-        edit.blockSignals(True)
-        edit.setText(str(alschd))
-        edit.blockSignals(False)
+        _set_edit_text(edit, str(alschd))
 
     def apply_units(self, to_in: bool, *, scale_size: bool) -> None:
         if self.aircraft is None:

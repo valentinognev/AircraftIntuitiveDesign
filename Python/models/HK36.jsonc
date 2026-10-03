@@ -416,7 +416,7 @@
     "NP": [null, null, null, null], // extra planform cell array (wing 2, HT 2, VT 2, propeller)
     "NB": [null, null], // extra body cell array (body 2, body 3)
     "AERO": { // flight conditions and reference data
-        "ALSCHD": [2, 3, 4, 5, 6, 7, 8], // Angle(s) of Attack, deg
+        "ALSCHD": [2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 7.5, 8.0], // Angle(s) of Attack, deg
         "ALT": 5000, // Altitude, ft
         "MACH": 0.1, // Mach Number
         "WT": 1698, // Weight, lb

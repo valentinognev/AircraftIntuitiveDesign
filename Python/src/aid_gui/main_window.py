@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 )
 
 from aid.aircraft import Aircraft
+from aid.alpha_schedule import apply_alpha_default
 from aid.control_report import control_report
 from aid.avl_io import run_avl_full
 from aid.datcom_io import DatcomInputWarning, with_aid_exposed_spans, write_for005
@@ -50,7 +51,7 @@ from aid_gui.settings import SettingsState
 from aid_gui.results_bar import ResultsBar
 from aid_gui.results_panel import ResultsPanel
 from aid_gui.compare_tabs import CompareTabs
-from aid_gui.tabs import build_tabs, populate_from_aircraft, sync_extra_parts, sync_fields_to_aircraft
+from aid_gui.tabs import _set_edit_text, build_tabs, populate_from_aircraft, sync_extra_parts, sync_fields_to_aircraft
 from aid.viz import lift_overlay, planform_stations
 from aid_gui.view3d import View3D
 from aid_gui.context_menu import isolate_key_for_tab
@@ -357,6 +358,21 @@ class MainWindow(QMainWindow):
         workdir.mkdir(parents=True, exist_ok=True)
         return workdir
 
+    def _pre_solve_alpha_default(self) -> None:
+        """Expand ``AERO.ALSCHD`` and show the expanded list in the Aero field.
+
+        The field text is what the next ``sync_fields_to_aircraft`` writes back,
+        so leaving it sparse would undo the default. An empty schedule is left
+        alone: overwriting the field with it would erase whatever the user typed.
+        """
+        ac = self.aircraft
+        apply_alpha_default(ac)
+        alschd = ac.AERO.get("ALSCHD")
+        edit = getattr(self, "_field_edits", {}).get("AERO.ALSCHD")
+        if not alschd or edit is None:
+            return
+        _set_edit_text(edit, str(alschd))
+
     def apply_units(self, to_in: bool, *, scale_size: bool) -> None:
         if self.aircraft is None:
             return
@@ -421,6 +437,7 @@ class MainWindow(QMainWindow):
         if not self._require_aircraft():
             return
         sync_fields_to_aircraft(self)
+        self._pre_solve_alpha_default()
         ac = with_aid_exposed_spans(self.aircraft)
         workdir = self._analysis_workdir("datcom")
         workdir.mkdir(parents=True, exist_ok=True)
@@ -526,6 +543,7 @@ class MainWindow(QMainWindow):
         if not self._require_aircraft():
             return
         sync_fields_to_aircraft(self)
+        self._pre_solve_alpha_default()
         if not isinstance(mesh, tuple):
             mesh = None
         if mesh is None:
@@ -607,6 +625,7 @@ class MainWindow(QMainWindow):
         if not self._require_aircraft():
             return
         sync_fields_to_aircraft(self)
+        self._pre_solve_alpha_default()
         if not isinstance(mesh, tuple):
             mesh = None
         if mesh is None:
@@ -649,6 +668,7 @@ class MainWindow(QMainWindow):
         if not self._require_aircraft():
             return
         sync_fields_to_aircraft(self)
+        self._pre_solve_alpha_default()
         if not isinstance(mesh, tuple):
             mesh = None
         if mesh is None:
@@ -683,6 +703,7 @@ class MainWindow(QMainWindow):
         if not self._require_aircraft():
             return
         sync_fields_to_aircraft(self)
+        self._pre_solve_alpha_default()
         solver = self.last_analyze_solver or "handbook"
         try:
             report = control_report(self.aircraft, solver, [0.0, 5.0])

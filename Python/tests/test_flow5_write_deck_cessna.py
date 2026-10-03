@@ -10,9 +10,9 @@ def test_cessna_deck_t1_vlm2_inviscid():
     assert deck["polar"]["method"] == "VLM2"
     assert deck["polar"]["thin"] is True
     assert deck["polar"]["viscous"] is False
-    assert deck["polar"]["alpha_deg"] == [-4, 0, 4, 8, 12] or list(
-        map(float, deck["polar"]["alpha_deg"])
-    ) == [-4.0, 0.0, 4.0, 8.0, 12.0]
+    assert [float(a) for a in deck["polar"]["alpha_deg"]] == [
+        float(a) for a in ac.AERO["ALSCHD"]
+    ]
     roles = [w["role"] for w in deck["wings"]]
     assert "main" in roles
     assert "elevator" in roles

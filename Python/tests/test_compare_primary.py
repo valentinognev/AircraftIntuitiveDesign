@@ -6,7 +6,7 @@ PRIMARY = ["Cessna 172", "Navion", "DA20-C1", "Learjet 23"]
 
 
 @pytest.mark.parametrize("name", PRIMARY)
-def test_primary_all_solvers(name):
+def test_primary_all_solvers(name, isolated_results):
     report = compare_to_matlab(name)
     if name == "Navion":
         assert not report["datcom"]["pass"]

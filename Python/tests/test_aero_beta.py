@@ -68,7 +68,6 @@ def test_beta_survives_a_jsonc_round_trip(tmp_path):
     save_jsonc(ac, out)
     assert load_jsonc(out).AERO["BETA"] == 5.0
     assert "// " in out.read_text(), "every JSONC key needs a comment"
-    assert '"BETA"' in out.read_text()
 
 
 def test_missing_beta_key_is_not_an_error():

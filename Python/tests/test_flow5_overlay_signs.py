@@ -37,9 +37,9 @@ from aid.paths import flow5_bin, models_dir
 FLOW5_BIN = flow5_bin()
 MESH = ("10", "10")
 
-# Per-test rather than module-level on purpose: ``_SKIP_LEFTOVER`` needs no
-# solver, and a test gated on an unrelated binary stops running without anyone
-# noticing. Each test that shells out to flow5_run carries this instead.
+# Per-test rather than module-level so the key-list tests below, which need no
+# solver, keep running where flow5_run is not built; each test that shells out to
+# flow5_run carries this instead.
 needs_flow5 = pytest.mark.skipif(
     not FLOW5_BIN.is_file(), reason="flow5 helper not built"
 )
@@ -48,10 +48,11 @@ needs_flow5 = pytest.mark.skipif(
 # must come out of to_frd unchanged.
 FLIPPED = ("Cx", "Cz", "Cl", "Cn")
 
-# Every key run_flow5 returns. Hand-written rather than taken from a solve so
-# ``test_every_flow5_key_is_named_in_the_sections_skip_list`` needs no binary;
-# ``test_the_key_list_matches_a_real_solve`` is what keeps this honest, and it is
-# the one that genuinely needs flow5_run.
+# Every key run_flow5 returns. Hand-written, and read by the gated solve test
+# below, which is what keeps it honest -- that is the one place a channel added
+# later shows up as a failure. It is deliberately not cross-checked against
+# compare_tabs._SKIP_LEFTOVER: _leftover_groups only ever walks the Tornado and
+# AVL result dicts, so a flow5 key named there could not suppress anything.
 FLOW5_KEYS = frozenset(
     {
         "alpha", "beta", "CL", "CD", "CDvis", "CDind", "Cm",
@@ -189,22 +190,11 @@ def test_flow5_cza_is_already_forward_right_down_so_it_takes_no_entry(
     assert cessna_flow5["CZa"] == cessna_flow5_native["CZa"]
 
 
-def test_every_flow5_key_is_named_in_the_sections_skip_list():
-    # No solver involved, deliberately: _SKIP_LEFTOVER is a Python frozenset, so
-    # gating this on flow5_run would mean the guard silently stops running wherever
-    # the helper is not built. FLOW5_KEYS is a hand-written list, so it is the one
-    # place that can drift -- test_the_key_list_matches_a_real_solve is what
-    # catches that, and it is the one that genuinely needs the binary.
-    from aid_gui.compare_tabs import _SKIP_LEFTOVER
-
-    assert sorted(FLOW5_KEYS - _SKIP_LEFTOVER) == []
-
-
 @needs_flow5
 def test_the_key_list_matches_a_real_solve(cessna_flow5, cessna_flow5_native):
     # Keeps FLOW5_KEYS honest: run_flow5 emits exactly these 26 keys, so a
-    # channel a later task adds lands in neither the list nor _SKIP_LEFTOVER and
-    # this fails.
+    # channel a later task adds lands in neither this list nor the twelve-name
+    # FLOW5_BETA_FLAT set, and this fails.
     assert set(cessna_flow5) == FLOW5_KEYS
     assert set(cessna_flow5_native) == FLOW5_KEYS
 

@@ -100,10 +100,26 @@ def _totals(parsed: dict) -> dict:
             return None
         return _index0(parsed[key])
 
-    # Deliberately no to_frd("datcom", ...) on this dict: the lateral channels are
-    # the lowercase parser keys (cl/cn/cy), which are moments/side force and already
-    # follow the standard convention. The UPPERCASE force pair that run_datcom flips
-    # is not what these read, so wrapping them by reflex would flip them twice.
+    # ``parsed`` arrives already normalized: ``_run_datcom`` goes through
+    # ``run_datcom``, whose ``to_frd("datcom", ...)`` flips the two lowercase force
+    # keys ``ca`` and ``cn`` (aid/axes.py). There is no uppercase pair in play --
+    # ``parse_for006`` emits only the lowercase names in ``_COEF_NAMES`` -- so no
+    # second conversion belongs here, and the ``cl``/``cm``/``cd`` this reads are
+    # already F-R-D moments and totals.
+    #
+    # What actually protects ``lateral("cn")`` is the ``"cy" not in parsed`` guard
+    # above, and nothing else. ``parsed["cn"]`` is the *normal force*, already
+    # sign-flipped by ``to_frd`` and still not a yawing moment, so that guard is the
+    # only thing standing between this function and reporting the normal force as
+    # ``Cn`` on the Controls tab. It holds solely because the static alpha table
+    # emits no side-force key: ``_COEF_NAMES`` has ``cyb`` but no ``cy``. If DATCOM
+    # ever gains a side-force channel, revisit that guard first -- flipping the sign
+    # would not be the fix.
+    #
+    # Likewise the uppercase arms of the three ``_pick`` probes above are dead:
+    # ``parse_for006`` never produces ``CL``, ``CD`` or ``Cm``, so only the
+    # lowercase branch is live. They are harmless, but do not read them as evidence
+    # that a differently-cased payload is supported.
     return {
         "CL": cl,
         "CD": cd,

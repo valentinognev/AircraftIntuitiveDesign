@@ -83,6 +83,7 @@ Matlab/fsroot/code/NACA456/naca.gnu
 # --- AID web ---
 web/node_modules/
 web/dist/
+web/.vite/
 .run/
 
 # --- Python ---

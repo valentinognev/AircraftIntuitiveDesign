@@ -7,6 +7,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QTableWidget
 
 from aid.aircraft import load_jsonc
+from aid.axes import to_frd
 from aid.datcom_parse import parse_for006
 from aid.paths import models_dir
 from aid_gui.main_window import MainWindow
@@ -46,7 +47,7 @@ def test_forces_tab_plots_datcom_when_analyzed():
     w = MainWindow()
     w.show()
     w.load_aircraft(load_jsonc(models_dir() / "Cessna 172.jsonc"))
-    w.last_results["datcom"] = parse_for006(_FOR006)
+    w.last_results["datcom"] = to_frd("datcom", parse_for006(_FOR006))
     w.set_plot_mode("Aerodynamics")
     app.processEvents()
     fig = w.compare_tabs.figure("Forces")
@@ -61,7 +62,7 @@ def test_forces_axes_fill_tab_canvas():
     w.show()
     w.resize(960, 700)
     w.load_aircraft(load_jsonc(models_dir() / "Cessna 172.jsonc"))
-    w.last_results["datcom"] = parse_for006(_FOR006)
+    w.last_results["datcom"] = to_frd("datcom", parse_for006(_FOR006))
     w.set_plot_mode("Aerodynamics")
     w.compare_tabs.setCurrentIndex(0)
     app.processEvents()
@@ -207,7 +208,7 @@ def test_controls_plots_datcom_high_lift():
     w = MainWindow()
     w.show()
     w.load_aircraft(load_jsonc(models_dir() / "Cessna 172.jsonc"))
-    w.last_results["datcom"] = parse_for006(_FOR006)
+    w.last_results["datcom"] = to_frd("datcom", parse_for006(_FOR006))
     w.set_plot_mode("Aerodynamics")
     app.processEvents()
     fig = w.compare_tabs.figure("Controls")
@@ -223,7 +224,7 @@ def test_all_solver_outputs_appear_on_compare_tabs():
     w = MainWindow()
     w.show()
     w.load_aircraft(load_jsonc(models_dir() / "Cessna 172.jsonc"))
-    w.last_results["datcom"] = parse_for006(_FOR006)
+    w.last_results["datcom"] = to_frd("datcom", parse_for006(_FOR006))
     w.last_results["tornado"] = _tornado_sample()
     w.last_results["avl"] = _avl_sample()
     w.set_plot_mode("Aerodynamics")
@@ -263,7 +264,7 @@ def test_derivative_cyb_uses_full_alpha_range():
     w = MainWindow()
     w.show()
     w.load_aircraft(load_jsonc(models_dir() / "Cessna 172.jsonc"))
-    w.last_results["datcom"] = parse_for006(_FOR006)
+    w.last_results["datcom"] = to_frd("datcom", parse_for006(_FOR006))
     w.set_plot_mode("Aerodynamics")
     w.compare_tabs.setCurrentIndex(2)
     app.processEvents()
@@ -358,6 +359,29 @@ def test_sections_leftover_groups_by_solver():
     assert all(not key.startswith("Tornado ") for key in leftover)
 
 
+def test_sections_leftover_keeps_avl_rate_derivatives():
+    """A short AVL sweep must still list its rate derivatives as leftovers.
+
+    ``_leftover_groups`` only ever walks the Tornado and AVL result dicts, so a
+    key in ``_SKIP_LEFTOVER`` that belongs to some *other* solver hides nothing --
+    but the same key spelled the way AVL spells it hides exactly this. Whether
+    these four belong in the table at all is a product question; hiding them is
+    not an answer to it.
+    """
+    app = QApplication.instance() or QApplication([])
+    w = MainWindow()
+    w.show()
+    w.load_aircraft(load_jsonc(models_dir() / "Cessna 172.jsonc"))
+    avl = _avl_sample()
+    avl.update({"CYp": -0.18, "CYr": 0.43, "Clr": 0.01, "Cnp": -0.06})
+    w.last_results["avl"] = avl
+    w.set_plot_mode("Aerodynamics")
+    app.processEvents()
+    leftover = _leftover_map(w.compare_tabs.leftover_table)
+    for key in ("CYp", "CYr", "Clr", "Cnp"):
+        assert key in leftover, key
+
+
 def test_sections_leftover_zeroes_tiny_values():
     app = QApplication.instance() or QApplication([])
     w = MainWindow()
@@ -411,7 +435,7 @@ def test_sections_headers_are_readable():
     w = MainWindow()
     w.show()
     w.load_aircraft(load_jsonc(models_dir() / "Cessna 172.jsonc"))
-    w.last_results["datcom"] = parse_for006(_FOR006)
+    w.last_results["datcom"] = to_frd("datcom", parse_for006(_FOR006))
     w.last_results["tornado"] = _tornado_sample()
     w.last_results["avl"] = _avl_sample()
     w.set_plot_mode("Aerodynamics")
@@ -425,7 +449,7 @@ def test_sections_datcom_defs_is_qt_table():
     w = MainWindow()
     w.show()
     w.load_aircraft(load_jsonc(models_dir() / "Cessna 172.jsonc"))
-    w.last_results["datcom"] = parse_for006(_FOR006)
+    w.last_results["datcom"] = to_frd("datcom", parse_for006(_FOR006))
     w.set_plot_mode("Aerodynamics")
     w.compare_tabs.setCurrentIndex(list(_TABS).index("Sections"))
     app.processEvents()

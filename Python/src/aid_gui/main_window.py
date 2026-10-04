@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 
 from aid.aircraft import Aircraft, aero_beta
 from aid.alpha_schedule import apply_alpha_default
+from aid.axes import to_frd
 from aid.control_report import control_report
 from aid.avl_io import run_avl_full
 from aid.datcom_io import DatcomInputWarning, with_aid_exposed_spans, write_for005
@@ -505,7 +506,11 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "DATCOM", f"{msg}\n\nWorkdir: {workdir}")
         if coeffs is None:
             return
-        self.last_results["datcom"] = coeffs
+        # DATCOM's cn/ca are aft- and up-positive forces; this is the boundary
+        # where they become Forward-Right-Down, exactly as in datcom_run.run_datcom.
+        # parse_for006 itself stays raw so it can still be diffed against MATLAB
+        # gold key for key.
+        self.last_results["datcom"] = to_frd("datcom", coeffs)
         self.last_analyze_solver = "datcom"
         self._refresh_plots()
 

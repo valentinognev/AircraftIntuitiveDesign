@@ -56,6 +56,16 @@ function datcomSeries(fig: LineFigure): OverlayPointSeries {
   return series[0];
 }
 
+function flow5Series(fig: LineFigure): OverlayPointSeries {
+  const series = fig.series.filter((item) => item.solver === "flow5");
+  expect(series, fig.title).toHaveLength(1);
+  return series[0];
+}
+
+function flow5SeriesOf(fig: LineFigure): OverlayPointSeries[] {
+  return fig.series.filter((item) => item.solver === "flow5");
+}
+
 it("returns the seven tabs in order when every figure is empty", () => {
   const tabs = aeroTabs({}, null, null);
   expect(tabs.map((item) => item.id)).toEqual([
@@ -688,9 +698,10 @@ it("threads the sideslip from aeroTabs into the series labels", () => {
 });
 
 it("leaves the flow5 alpha-derivative panels plain, because CLa and Cma do move with beta", () => {
-  // The two flow5 derivative channels this app plots are the polar OLS slopes, not
+  // The two flow5 channels on these two panels are the polar OLS slopes, not
   // StabDerivatives, so neither takes the suffix. The panels that would qualify are
-  // CYb, Cnb and Clb — and the app plots no flow5 channel on those at all.
+  // CYb, Cnb and Clb, and they do get their own flow5 channel — pinnedLabel marks
+  // those; see the beta test below.
   const raws: SolverRaws = {
     datcom: { alpha: [0, 2] },
     tornado: { CL_a: PER_RAD, Cm_a: PER_RAD },
@@ -705,13 +716,109 @@ it("leaves the flow5 alpha-derivative panels plain, because CLa and Cma do move 
     "tornado",
     "flow5",
   ]);
-  // The panels the suffix *would* apply to carry no flow5 channel at all.
+  // The panels the suffix *would* apply to carry no flow5 channel in this fixture.
   for (const title of ["CYβ", "Cnβ", "Clβ"]) {
     expect(
       lines(tab(swept, "Derivatives"), title).series.some((item) => item.solver === "flow5"),
       title,
     ).toBe(false);
   }
+});
+
+it("plots the flow5 side-force, normal-force, axial-force, roll and yaw channels", () => {
+  // flow5 spells the normal force CZ and the axial force CX the way DATCOM prints CN
+  // and CA, so the spec names Cz / Cx and the figure keeps its DATCOM spelling.
+  const raws: SolverRaws = {
+    flow5: {
+      alpha: [0, 4],
+      CY: [0.0, 0.1],
+      Cz: [0.5, 0.7],
+      Cx: [-0.02, -0.04],
+      Cl: [0.01, 0.02],
+      Cn: [0.03, 0.06],
+    },
+  };
+  const tabs = aeroTabs(raws, null, null);
+  const forces = tab(tabs, "Forces");
+  expect(flow5Series(lines(forces, "CY"))).toMatchObject({
+    solver: "flow5",
+    stroke: "yellow",
+    kind: "line",
+    x: [0, 4],
+    y: [0.0, 0.1],
+  });
+  expect(flow5Series(lines(forces, "CN"))).toMatchObject({
+    kind: "line",
+    x: [0, 4],
+    y: [0.5, 0.7],
+  });
+  expect(flow5Series(lines(forces, "CA"))).toMatchObject({
+    kind: "line",
+    x: [0, 4],
+    y: [-0.02, -0.04],
+  });
+  const moments = tab(tabs, "Moments");
+  expect(flow5Series(lines(moments, "Cl"))).toMatchObject({
+    kind: "line",
+    x: [0, 4],
+    y: [0.01, 0.02],
+  });
+  expect(flow5Series(lines(moments, "Cn"))).toMatchObject({
+    kind: "line",
+    x: [0, 4],
+    y: [0.03, 0.06],
+  });
+});
+
+it("plots the flow5 sideslip derivatives as horizontals on CYβ, Cnβ and Clβ", () => {
+  const raws: SolverRaws = {
+    datcom: { alpha: [0, 4] },
+    flow5: { CYb: PER_RAD, Cnb: -PER_RAD, Clb: 2 * PER_RAD },
+  };
+  const derivatives = tab(aeroTabs(raws, null, null), "Derivatives");
+  for (const [title, perDeg] of [
+    ["CYβ", 1],
+    ["Cnβ", -1],
+    ["Clβ", 2],
+  ] as const) {
+    const fig = lines(derivatives, title);
+    const series = flow5Series(fig);
+    expect(series.kind, title).toBe("hline");
+    expect(series.stroke, title).toBe("yellow");
+    expect(series.x, title).toHaveLength(80);
+    expect(yAt(series, 0), title).toBeCloseTo(perDeg, 12);
+    expect(yAt(series, 4), title).toBeCloseTo(perDeg, 12);
+  }
+});
+
+it("plots flow5 Clp and Cnr on the body-axis rate panels only", () => {
+  // Clr is flow5's body-axis roll-per-yaw-rate; the CLr panel is Tornado's WIND-axis
+  // CL_R, so it must not pick flow5's Clr up. Cmq has no flow5 channel at all.
+  const raws: SolverRaws = {
+    datcom: { alpha: [0, 4] },
+    flow5: { Clp: 0.5 * PER_RAD, Cnr: 0.3 * PER_RAD, Clr: 0.2 * PER_RAD, Cnb: 0.4 * PER_RAD },
+  };
+  const derivatives = tab(aeroTabs(raws, null, null), "Derivatives");
+  expect(flow5Series(lines(derivatives, "Clp"))).toMatchObject({ kind: "hline" });
+  expect(yAt(flow5Series(lines(derivatives, "Clp")), 0)).toBeCloseTo(0.5, 12);
+  expect(flow5Series(lines(derivatives, "Cnr"))).toMatchObject({ kind: "hline" });
+  expect(yAt(flow5Series(lines(derivatives, "Cnr")), 0)).toBeCloseTo(0.3, 12);
+  for (const title of ["Cmq", "CLp", "CLq", "CLr"]) {
+    expect(flow5SeriesOf(lines(derivatives, title)), title).toEqual([]);
+  }
+});
+
+it("marks a wired flow5 sideslip derivative beta=0 and leaves its force curve plain", () => {
+  const raws: SolverRaws = {
+    datcom: { alpha: [0, 4] },
+    flow5: { alpha: [0, 4], CY: [0.0, 0.1], CYb: 0.1 },
+  };
+  const swept = aeroTabs(raws, null, null, 5);
+  expect(flow5Series(lines(tab(swept, "Derivatives"), "CYβ")).label).toBe("flow5 (beta=0)");
+  // CY is a per-polar value: flow5 really flew the sideslip, so it takes no suffix.
+  expect(flow5Series(lines(tab(swept, "Forces"), "CY")).label).toBeUndefined();
+  const upright = aeroTabs(raws, null, null);
+  expect(flow5Series(lines(tab(upright, "Derivatives"), "CYβ")).label).toBeUndefined();
 });
 
 // R31: the panels the overlay functions do not build carry their own solver-styled

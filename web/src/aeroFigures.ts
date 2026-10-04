@@ -171,10 +171,12 @@ const SKIP_LEFTOVER = new Set([
   "Cm0",
 ]);
 
-const RATE_GROUPS: { label: string; tornado: string; avl: string }[] = [
-  { label: "Clp", tornado: "Cl_P", avl: "Clp" },
+const RATE_GROUPS: { label: string; tornado: string; avl: string; flow5?: string }[] = [
+  { label: "Clp", tornado: "Cl_P", avl: "Clp", flow5: "Clp" },
   { label: "Cmq", tornado: "Cm_Q", avl: "Cmq" },
-  { label: "Cnr", tornado: "Cn_R", avl: "Cnr" },
+  { label: "Cnr", tornado: "Cn_R", avl: "Cnr", flow5: "Cnr" },
+  // The CL* groups are WIND-axis lift derivatives (CL_P / CL_Q / CL_R), so flow5 has no
+  // counterpart here: its Clr is body-axis roll-per-yaw-rate, a different quantity.
   { label: "CLp", tornado: "CL_P", avl: "CLp" },
   { label: "CLq", tornado: "CL_Q", avl: "CLq" },
   { label: "CLr", tornado: "CL_R", avl: "CLr" },
@@ -577,16 +579,19 @@ export function aeroTabs(
         alphaLines("CY", raws, stabilityAlpha, {
           tornado: ["CY", "CY_a"],
           avl: "CYtot",
+          flow5: "CY",
         }, beta),
         alphaLines("CN", raws, stabilityAlpha, {
           datcom: "cn",
           tornado: ["CZ", "CZ_a"],
           avl: "CZtot",
+          flow5: "Cz",
         }, beta),
         alphaLines("CA", raws, stabilityAlpha, {
           datcom: "ca",
           tornado: ["CX", "CX_a"],
           avl: "CXtot",
+          flow5: "Cx",
         }, beta),
         alphaLines("CDind", raws, stabilityAlpha, { avl: "CDind" }, beta),
         alphaLines("CDvis", raws, stabilityAlpha, { avl: "CDvis" }, beta),
@@ -607,10 +612,12 @@ export function aeroTabs(
         alphaLines("Cl", raws, stabilityAlpha, {
           tornado: ["Cl", "Cl_a"],
           avl: "Cltot",
+          flow5: "Cl",
         }, beta),
         alphaLines("Cn", raws, stabilityAlpha, {
           tornado: ["Cn", "Cn_a"],
           avl: "Cntot",
+          flow5: "Cn",
         }, beta),
         alphaLines("Xcp", raws, stabilityAlpha, { datcom: "xcp" }, beta),
         alphaLines("NP", raws, stabilityAlpha, { avl: "NP" }, beta),
@@ -622,13 +629,14 @@ export function aeroTabs(
       figures: [
         derivLines("CLα", raws, stabilityAlpha, { datcom: "cla", tornado: "CL_a", avl: "CLa", flow5: "CLa" }, beta),
         derivLines("Cmα", raws, stabilityAlpha, { datcom: "cma", tornado: "Cm_a", avl: "Cma", flow5: "Cma" }, beta),
-        derivLines("CYβ", raws, stabilityAlpha, { datcom: "cyb", tornado: "CY_b", avl: "CYb" }, beta),
-        derivLines("Cnβ", raws, stabilityAlpha, { datcom: "cnb", tornado: "Cn_b", avl: "Cnb" }, beta),
-        derivLines("Clβ", raws, stabilityAlpha, { datcom: "clb", tornado: "Cl_b", avl: "Clb" }, beta),
+        derivLines("CYβ", raws, stabilityAlpha, { datcom: "cyb", tornado: "CY_b", avl: "CYb", flow5: "CYb" }, beta),
+        derivLines("Cnβ", raws, stabilityAlpha, { datcom: "cnb", tornado: "Cn_b", avl: "Cnb", flow5: "Cnb" }, beta),
+        derivLines("Clβ", raws, stabilityAlpha, { datcom: "clb", tornado: "Cl_b", avl: "Clb", flow5: "Clb" }, beta),
         ...RATE_GROUPS.map((group) =>
           derivLines(group.label, raws, stabilityAlpha, {
             tornado: group.tornado,
             avl: group.avl,
+            flow5: group.flow5,
           }, beta),
         ),
         { kind: "bars", title: "p, q, r (per rad)", groups: rateBars(raws) },

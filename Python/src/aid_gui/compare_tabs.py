@@ -163,9 +163,11 @@ class CompareTabs(QTabWidget):
         specs = (
             (r"$C_L$", "cl", ("CL", "CL_a"), "CLtot", "CL"),
             (r"$C_D$", "cd", ("CD", "CD_a"), "CDtot", "CD"),
-            (r"$C_Y$", None, ("CY", "CY_a"), "CYtot", None),
-            (r"$C_N$", "cn", ("CZ", "CZ_a"), "CZtot", None),
-            (r"$C_A$", "ca", ("CX", "CX_a"), "CXtot", None),
+            (r"$C_Y$", None, ("CY", "CY_a"), "CYtot", "CY"),
+            # flow5 spells the normal and axial force channels Cz and Cx where
+            # DATCOM says cn/ca and Tornado says CZ/CX -- same three quantities.
+            (r"$C_N$", "cn", ("CZ", "CZ_a"), "CZtot", "Cz"),
+            (r"$C_A$", "ca", ("CX", "CX_a"), "CXtot", "Cx"),
         )
         for i, (ylabel, dkey, torn, avl, flow5) in enumerate(specs, start=1):
             ax = fig.add_subplot(2, 3, i)

@@ -39,12 +39,45 @@ def _flow5_results() -> dict:
             "CYb": -0.4107,
             "Cnb": 0.1685,
             "Clb": -0.053,
+            # Per-polar body-axis forces, read off the flown polar and already
+            # Forward-Right-Down by flow5_io's to_frd("flow5", ...) map: Cz is
+            # the down-positive normal force behind DATCOM cn / Tornado CZtot,
+            # Cx the forward-positive axial force behind ca / CXtot. CY needs no
+            # flip. Distinct magnitudes on purpose, so a swapped mapping between
+            # the three panels fails on values and not only on labels.
+            "CY": np.array([0.004, -0.031]),
+            "Cz": np.array([-0.21, -0.52]),
+            "Cx": np.array([0.011, -0.015]),
         }
     }
 
 
+def _beta_results() -> dict:
+    # flow5 plus the two solvers that cannot fly a sideslip, so the beta mark has
+    # a marked counterpart to contrast against on the very same axes.
+    res = _flow5_results()
+    res["datcom"] = {
+        "alpha": np.array([0.0, 4.0]),
+        "cl": np.array([0.21, 0.52]),
+        "cn": np.array([0.20, 0.51]),
+        "ca": np.array([-0.010, -0.014]),
+    }
+    res["avl"] = {
+        "alpha": np.array([0.0, 4.0]),
+        "CYtot": np.array([0.003, -0.030]),
+    }
+    return res
+
+
 def _labels(fig, index: int) -> list[str]:
     return [line.get_label() for line in fig.axes[index].get_lines()]
+
+
+def _line(fig, index: int, label: str):
+    for line in fig.axes[index].get_lines():
+        if line.get_label() == label:
+            return line
+    raise AssertionError(f"no {label!r} series on Forces axes[{index}]: {_labels(fig, index)}")
 
 
 def test_compare_tabs_moments_panels_carry_flow5():
@@ -108,3 +141,42 @@ def test_results_panel_plot_stability_flow5():
     cm_labels = [line.get_label() for line in ax_cm.get_lines()]
     assert "flow5" in cl_labels
     assert "flow5" in cm_labels
+
+
+def test_compare_tabs_forces_side_and_axial_force_panels_carry_flow5():
+    # _plot_forces fills the flow5 slot on the three side-force/axial-force rows
+    # too; axes are CL, CD, CY, CN, CA, extras in declaration order.
+    app = QApplication.instance() or QApplication([])
+    tabs = CompareTabs()
+    tabs.plot(_st(), _flow5_results())
+    fig = tabs.figure("Forces")
+    for index in (2, 3, 4):
+        assert "flow5" in _labels(fig, index), index
+
+
+def test_compare_tabs_forces_axes_plot_the_right_flow5_channel():
+    # The CN and CA rows map onto flow5's Cz and Cx -- a different spelling for
+    # the same quantity -- so the y data has to match, not just the label.
+    app = QApplication.instance() or QApplication([])
+    tabs = CompareTabs()
+    tabs.plot(_st(), _flow5_results())
+    fig = tabs.figure("Forces")
+    fres = _flow5_results()["flow5"]
+    for index, key in ((2, "CY"), (3, "Cz"), (4, "Cx")):
+        np.testing.assert_allclose(_line(fig, index, "flow5").get_ydata(), fres[key])
+        np.testing.assert_allclose(_line(fig, index, "flow5").get_xdata(), fres["alpha"])
+
+
+def test_compare_tabs_forces_per_polar_flow5_unmarked_at_sideslip():
+    # CY/Cz/Cx come off the polar the deck was written at, so they flew beta = 5
+    # and must stay unmarked; AVL on the same axes cannot fly it and is marked.
+    app = QApplication.instance() or QApplication([])
+    tabs = CompareTabs()
+    tabs.plot(_st(), _beta_results(), beta=5.0)
+    fig = tabs.figure("Forces")
+    labels = _labels(fig, 2)
+    assert "flow5" in labels, labels
+    assert "AVL (beta=0)" in labels, labels
+    np.testing.assert_allclose(
+        _line(fig, 2, "flow5").get_ydata(), _flow5_results()["flow5"]["CY"]
+    )

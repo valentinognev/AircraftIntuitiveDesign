@@ -45,6 +45,9 @@ BETA_ZERO_SUFFIX = " (beta=0)"
 # mirror listing Clq/Cmp/Cmr is reading the wrong solver's namespace.
 FLOW5_BETA_FLAT = frozenset(
     {
+        "CY",
+        "Cz",
+        "Cx",
         "CXa",
         "CZa",
         "CYb",

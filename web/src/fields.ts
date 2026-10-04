@@ -25,6 +25,7 @@ export const PLANFORM_BREAKS = [3, 5, 8, 10, 13] as const;
 
 export const AERO_FIELDS: readonly PlanformRow[] = [
   ["ALSCHD", "Angle(s) of Attack", "deg"],
+  ["BETA", "Beta (deg)", "deg"],
   ["ALT", "Altitude", "alt"],
   ["MACH", "Mach Number", "mach"],
   ["WT", "Weight", "wt"],
@@ -34,7 +35,7 @@ export const AERO_FIELDS: readonly PlanformRow[] = [
   ["YI", "Inertia, Y", "inertia"],
 ];
 
-export const AERO_BREAKS = [1, 4, 6, 8, 11] as const;
+export const AERO_BREAKS = [2, 5, 7, 9, 12] as const;
 
 export const AERO_NACA_FIELDS: readonly [key: string, label: string, cmpIndex: number][] = [
   ["WG.NACA[0]", "Wing Root Airfoil", 0],

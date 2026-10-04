@@ -2,6 +2,7 @@ import { expect, it } from "vitest";
 import type { ControlBars, HingeBars } from "./aeroFigures";
 import {
   barFill,
+  barLegend,
   controlBarCategories,
   groupedBarCategories,
   hingeBarCategories,
@@ -128,4 +129,40 @@ it("paints AVL bars magenta so they are not the DATCOM default", () => {
   expect(barFill("avl")).toBe("magenta");
   expect(barFill("avl")).not.toBe(barFill("dcl"));
   expect(barFill("tornado")).toBe("red");
+});
+
+it("prefers an explicit series label over the solver name", () => {
+  expect(seriesLegend({ solver: "datcom", label: "datcom (beta=0)" })).toBe("datcom (beta=0)");
+  expect(seriesLegend({ solver: "avl", name: "Prandtl", label: "avl (beta=0)" })).toBe(
+    "avl (beta=0)",
+  );
+  expect(seriesLegend({ solver: "avl", label: "" })).toBe("avl");
+});
+
+// R31: the bar figures name their solver in the legend, and AVL's bars are AVL data
+// at beta = 0 whatever the Aero tab says.
+
+it("marks the AVL bar legend beta=0 at a sideslip and leaves Tornado alone", () => {
+  const categories = groupedBarCategories([{ label: "Clp", tornado: -0.4, avl: -0.3 }]);
+  expect(barLegend(categories, 5)).toEqual([
+    { key: "tornado", label: "Tornado" },
+    { key: "avl", label: "AVL (beta=0)" },
+  ]);
+  expect(barLegend(categories, 0)).toEqual([
+    { key: "tornado", label: "Tornado" },
+    { key: "avl", label: "AVL" },
+  ]);
+});
+
+it("defaults the bar legend's beta to zero", () => {
+  const categories = groupedBarCategories([{ label: "Clp", tornado: -0.4, avl: -0.3 }]);
+  expect(barLegend(categories)).toEqual(barLegend(categories, 0));
+});
+
+it("never marks a quantity-named bar legend", () => {
+  const categories = hingeBarCategories({
+    title: "hinge",
+    groups: [{ label: "d1", cha: 0.3, chd: 0.4, dclMax: 1.2 }],
+  });
+  expect(barLegend(categories, 5).map((item) => item.label)).toEqual(["cha", "chd", "dclMax"]);
 });

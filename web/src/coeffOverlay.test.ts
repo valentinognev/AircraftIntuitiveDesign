@@ -255,3 +255,105 @@ it("plots DATCOM derivatives on DATCOM alpha, not the 80-point grid", () => {
     },
   ]);
 });
+
+// The engines do not agree about sideslip, and neither do flow5's own channels.
+// DATCOM's $FLTCON and AVL's run-case menu have no beta at all, so every one of
+// their series is beta=0 whatever is asked. flow5 is per *channel*: the twelve
+// StabDerivatives are built from windDirection(alpha, 0.0) and are byte-identical
+// at beta = 0, +5 and -5, but CLa and Cma are polar OLS slopes and do move with it.
+// Tornado's state["betha"] always flies it. So beta-flatness is a property of the
+// channel, and only a beta=0 curve among the others needs a suffix.
+
+function displayName(series: OverlayPointSeries): string {
+  return series.label ?? series.solver;
+}
+
+it("labels datcom and avl with beta=0 when the flight has a sideslip", () => {
+  const raws = {
+    datcom: { alpha: [0, 2], cl: [0.1, 0.2] },
+    avl: { alpha: [0, 2], CLtot: [0.1, 0.2] },
+  };
+  const series = seriesVsAlpha(raws, null, { datcom: "cl", avl: "CLtot" }, 5);
+  expect(series.map(displayName)).toEqual(["datcom (beta=0)", "avl (beta=0)"]);
+});
+
+it("leaves labels alone at beta zero", () => {
+  const raws = { datcom: { alpha: [0, 2], cl: [0.1, 0.2] } };
+  const series = seriesVsAlpha(raws, null, { datcom: "cl" }, 0);
+  expect(series.map(displayName)).toEqual(["datcom"]);
+  expect(series[0].label).toBeUndefined();
+});
+
+it("defaults the beta argument to zero", () => {
+  const raws = { datcom: { alpha: [0, 2], cl: [0.1, 0.2] } };
+  expect(seriesVsAlpha(raws, null, { datcom: "cl" }).map(displayName)).toEqual(["datcom"]);
+});
+
+it("labels a negative sideslip as well", () => {
+  const series = seriesVsAlpha({ avl: { alpha: [0, 2], CLtot: [0.1, 0.2] } }, null, { avl: "CLtot" }, -5);
+  expect(series.map(displayName)).toEqual(["avl (beta=0)"]);
+});
+
+it("leaves tornado and flow5 force labels plain, because they do fly at beta", () => {
+  const raws = {
+    tornado: { alpha: 0, CY: 0.1, CY_a: PER_RAD },
+    flow5: { alpha: [0, 2], CY: [0.0, 0.1] },
+  };
+  const series = seriesVsAlpha(raws, null, { tornado: ["CY", "CY_a"], flow5: "CY" }, 5);
+  expect(series.map(displayName)).toEqual(["tornado", "flow5"]);
+});
+
+it("labels datcom and avl derivatives beta=0 and nobody else", () => {
+  const raws = {
+    datcom: { alpha: [0, 10], cla: [0.05, 0.06] },
+    tornado: { CL_a: 1 },
+    avl: { alpha: [0, 10], CLa: [PER_RAD, PER_RAD] },
+    flow5: { CLa: PER_RAD },
+  };
+  const series = seriesDerivative(
+    raws,
+    null,
+    { datcom: "cla", tornado: "CL_a", avl: "CLa", flow5: "CLa" },
+    5,
+  );
+  expect(series.map(displayName)).toEqual(["datcom (beta=0)", "tornado", "avl (beta=0)", "flow5"]);
+});
+
+it("labels a flow5 StabDerivatives channel beta=0", () => {
+  // Cnb is one of the twelve emitted from computeStabilityDerivatives, so it is
+  // frozen at beta=0 no matter what the polar flew.
+  const raws = { flow5: { Cnb: 0.1, Cnp: 0.2, Cnr: 0.3, Clb: 0.4, Clp: 0.5, Clr: 0.6 } };
+  const series = seriesDerivative(raws, null, { flow5: "Cnb" }, 5);
+  expect(series.map(displayName)).toEqual(["flow5 (beta=0)"]);
+});
+
+it("labels every flow5 StabDerivatives key beta=0 and no polar slope", () => {
+  const flat = ["CXa", "CZa", "CYb", "CYp", "CYr", "Clb", "Clp", "Clr", "Cnb", "Cnp", "Cnr", "XNP"];
+  for (const key of flat) {
+    const series = seriesDerivative({ flow5: { [key]: 1 } }, null, { flow5: key }, 5);
+    expect(displayName(series[0]), key).toBe("flow5 (beta=0)");
+  }
+  for (const key of ["CLa", "Cma"]) {
+    const series = seriesDerivative({ flow5: { [key]: 1 } }, null, { flow5: key }, 5);
+    expect(displayName(series[0]), key).toBe("flow5");
+  }
+});
+
+it("leaves the flow5 p/q/r rate derivatives beta=0 too", () => {
+  // The p/q/r half comes from computeAngularDerivatives, which is frozen the same way.
+  const series = seriesDerivative({ flow5: { Clp: 0.5, Cmq: 0.1, Cnr: 0.3 } }, null, { flow5: "Clp" }, 5);
+  expect(series.map(displayName)).toEqual(["flow5 (beta=0)"]);
+});
+
+it("leaves flow5 derivatives plain at beta zero", () => {
+  const series = seriesDerivative({ flow5: { Cnb: 0.1 } }, null, { flow5: "Cnb" }, 0);
+  expect(series.map(displayName)).toEqual(["flow5"]);
+  expect(series[0].label).toBeUndefined();
+});
+
+it("keeps the sample data untouched when a label is added", () => {
+  const raws = { datcom: { alpha: [0, 2], cl: [0.1, 0.2] } };
+  const plain = seriesVsAlpha(raws, null, { datcom: "cl" });
+  const swept = seriesVsAlpha(raws, null, { datcom: "cl" }, 5);
+  expect({ ...swept[0], label: undefined }).toEqual(plain[0]);
+});

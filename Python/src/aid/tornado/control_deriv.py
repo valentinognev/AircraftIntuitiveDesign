@@ -139,6 +139,11 @@ def _coefficients(geo: dict, state: dict, strips: list[tuple[int, int]], step_de
     lattice = set_boundary(lattice, stepped, state)
     raw = solve(state, stepped, lattice)
     coeffs = coeff_create(raw, lattice, state, ref, stepped)
+    # No to_frd("tornado", ...) here on purpose. These Cl/Cn are read straight out
+    # of coeff_create, which already returns Forward-Right-Down, so wrapping this
+    # dict would flip them twice and re-mirror the very quantity the F-R-D work
+    # exists to fix. CL/CD/Cm are wind-axis and CY is the CC side force; none of
+    # the four is in the map in any case.
     return {
         "CL": float(coeffs["CL"]),
         "CD": float(coeffs["CD"]),

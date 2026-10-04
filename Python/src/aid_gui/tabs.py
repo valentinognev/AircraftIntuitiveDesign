@@ -21,7 +21,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from aid.aircraft import Aircraft
+from aid.aircraft import Aircraft, aero_beta
 from aid.geometry import geometry
 from aid_gui.profile_sketch_dialog import ProfileSketchDialog
 
@@ -29,8 +29,12 @@ _INDEXED_KEY = re.compile(r"^([A-Za-z]+)\.([A-Za-z]+)\[(\d+)\]$")
 _LIST_KEY = re.compile(r"^([A-Za-z]+)\[(\d+)\]\.(.+)$")
 _INDEXED_FIELD = re.compile(r"^([A-Za-z]+)\[(\d+)\]$")
 
-_ANGLE_FIELDS = frozenset(
+# Fields entered in degrees: geometric ones (sweep, dihedral, incidence, washout)
+# and the flight condition AERO.BETA. What the set buys them is the same in both
+# cases -- the +/-max_angle error-check clamp and the wheel-nudge step.
+_DEGREES_FIELDS = frozenset(
     {
+        "BETA",
         "SAVSI",
         "SAVSO",
         "DHDADI",
@@ -92,13 +96,19 @@ AERO_FIELDS = [
     ("ALSCHD", "Angle(s) of Attack", "deg"),
     ("ALT", "Altitude", "alt"),
     ("MACH", "Mach Number", "mach"),
+    ("BETA", "Beta", "deg"),
     ("WT", "Weight", "wt"),
     ("XCG", "CG Location, X", "len"),
     ("ZCG", "CG Location, Z", "len"),
     ("XI", "Inertia, X", "inertia"),
     ("YI", "Inertia, Y", "inertia"),
 ]
-AERO_BREAKS = (1, 4, 6, 8, 11)
+AERO_BREAKS = (1, 5, 7, 9, 12)
+
+# Fields whose empty text is a value, not an absence. AERO.BETA is 0.0 for every
+# model that never mentions it (save_jsonc omits default-valued AERO keys), so a
+# blank field has to mean the same thing on the way back.
+_BLANK_AS_ZERO = frozenset({"AERO.BETA"})
 
 AERO_NACA_FIELDS = [
     ("WG.NACA[0]", "Wing Root Airfoil", 0),
@@ -178,7 +188,7 @@ def _field_kind(key: str) -> str:
         return "chstat"
     if field == "TC" and not key.startswith("AERO."):
         return "tc"
-    if field in _ANGLE_FIELDS:
+    if field in _DEGREES_FIELDS:
         return "angle"
     if field in _LENGTH_FIELDS:
         return "length"
@@ -332,6 +342,7 @@ def build_tabs(window) -> None:
     window._cmp_boxes: dict[int, QCheckBox] = {}
     window._cmp_edits: dict[int, list[QLineEdit]] = {}
     window._body_station_rows: dict[str, list[tuple[QLineEdit, QLineEdit, QLineEdit]]] = {}
+    window._beta_widgets: dict[str, QLineEdit] = {}
     tab_widget = QTabWidget()
     window._tab_widget = tab_widget
 
@@ -626,7 +637,12 @@ def _aero_tab(window) -> QWidget:
     for field, label, kind in AERO_FIELDS:
         i += 1
         layout.addWidget(_right_label(label), row, 0)
-        layout.addWidget(_make_edit(window, f"AERO.{field}"), row, 1)
+        edit = _make_edit(window, f"AERO.{field}")
+        layout.addWidget(edit, row, 1)
+        if field == "BETA":
+            # The sideslip field has its own handle: it is the one AERO key the
+            # GUI owns end to end, and the overlays need to know its value.
+            window._beta_widgets[field] = edit
         _add_unit(window, layout, row, 2, kind)
         row += 1
         if i in AERO_BREAKS:
@@ -953,11 +969,19 @@ def _set_edit_text(edit: QLineEdit, text: str) -> None:
     edit.blockSignals(False)
 
 
+def _populate_value(ac: Aircraft, key: str):
+    if key == "AERO.BETA":
+        # Resolved, not read raw: a hand-built Aircraft or a .mat model has no
+        # BETA key, and "0.0" is a truer field than a blank one.
+        return aero_beta(ac)
+    return _value_from_aircraft(ac, key)
+
+
 def populate_from_aircraft(window, ac: Aircraft) -> None:
     for key, edit in window._field_edits.items():
         if _is_station_key(key):
             continue
-        value = _value_from_aircraft(ac, key)
+        value = _populate_value(ac, key)
         text = "" if value is None else _format_value(value)
         _set_edit_text(edit, text)
         for extra in window._field_edits_extra.get(key, []):
@@ -1051,6 +1075,13 @@ def sync_fields_to_aircraft(window) -> None:
             continue
         text = edit.text().strip()
         if not text:
+            if key in _BLANK_AS_ZERO:
+                # Blank is a value here, not an absence: clearing the sideslip
+                # field after typing 5 must not leave the aircraft flying 5.
+                section, field, index, slot = _parse_field_key(key)
+                section_data = _section_dict(ac, section, slot)
+                if isinstance(section_data, dict):
+                    _assign_field(section_data, field, index, text, 0.0)
             continue
         section, field, index, slot = _parse_field_key(key)
         section_data = _section_dict(ac, section, slot)

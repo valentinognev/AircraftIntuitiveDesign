@@ -171,10 +171,12 @@ const SKIP_LEFTOVER = new Set([
   "Cm0",
 ]);
 
-const RATE_GROUPS: { label: string; tornado: string; avl: string }[] = [
-  { label: "Clp", tornado: "Cl_P", avl: "Clp" },
+const RATE_GROUPS: { label: string; tornado: string; avl: string; flow5?: string }[] = [
+  { label: "Clp", tornado: "Cl_P", avl: "Clp", flow5: "Clp" },
   { label: "Cmq", tornado: "Cm_Q", avl: "Cmq" },
-  { label: "Cnr", tornado: "Cn_R", avl: "Cnr" },
+  { label: "Cnr", tornado: "Cn_R", avl: "Cnr", flow5: "Cnr" },
+  // The CL* groups are WIND-axis lift derivatives (CL_P / CL_Q / CL_R), so flow5 has no
+  // counterpart here: its Clr is body-axis roll-per-yaw-rate, a different quantity.
   { label: "CLp", tornado: "CL_P", avl: "CLp" },
   { label: "CLq", tornado: "CL_Q", avl: "CLq" },
   { label: "CLr", tornado: "CL_R", avl: "CLr" },
@@ -202,13 +204,14 @@ function alphaLines(
   raws: SolverRaws,
   stabilityAlpha: number | null,
   spec: VsSpec,
+  beta: number,
 ): LineFigure {
   return {
     kind: "lines",
     title,
     ylabel: title,
     xlabel: "α (deg)",
-    series: seriesVsAlpha(raws, stabilityAlpha, spec),
+    series: seriesVsAlpha(raws, stabilityAlpha, spec, beta),
   };
 }
 
@@ -217,13 +220,14 @@ function derivLines(
   raws: SolverRaws,
   stabilityAlpha: number | null,
   spec: DerivSpec,
+  beta: number,
 ): LineFigure {
   return {
     kind: "lines",
     title,
     ylabel: title,
     xlabel: "α (deg)",
-    series: seriesDerivative(raws, stabilityAlpha, spec),
+    series: seriesDerivative(raws, stabilityAlpha, spec, beta),
   };
 }
 
@@ -316,7 +320,25 @@ function pairDatcom(xRaw: unknown[], yRaw: unknown[]): { x: number[]; y: number[
   return { x, y };
 }
 
-function controlFigures(raws: SolverRaws): AeroFigure[] {
+/**
+ * `(beta=0)` for the panels the overlay functions do not build, so a DATCOM or AVL
+ * curve shown there is marked the same way as one shown on a Forces or Derivatives
+ * panel. Only those two solvers need it: they cannot fly a sideslip, and Tornado's
+ * spanwise curves really are at the requested one.
+ *
+ * `base` is the display name the legend already shows, so a named curve keeps its
+ * name — the spanwise handbook curve keeps a bare "Prandtl", not "Prandtl (beta=0)".
+ */
+function betaSuffix(base: string, beta: number): { label?: string } {
+  return beta === 0 ? {} : { label: `${base} (beta=0)` };
+}
+
+/** The same suffix on a table group header, which names its solver just as a legend does. */
+function betaTitle(title: string, beta: number): string {
+  return beta === 0 ? title : `${title} (beta=0)`;
+}
+
+function controlFigures(raws: SolverRaws, beta: number): AeroFigure[] {
   const blocks = Array.isArray(raws.datcom?.high_lift) ? raws.datcom.high_lift : [];
   const records = blocks.filter(isRecord);
   const increments: ControlBars = {
@@ -343,6 +365,7 @@ function controlFigures(raws: SolverRaws): AeroFigure[] {
       kind: "line",
       x: samples.x,
       y: samples.y,
+      ...betaSuffix("datcom", beta),
     });
   }
 
@@ -362,6 +385,7 @@ function controlFigures(raws: SolverRaws): AeroFigure[] {
           kind: "line",
           x: surfaceObjects.map((_, index) => index),
           y: surfaceObjects.map((surface) => finiteScalar(surface.angle) ?? 0),
+          ...betaSuffix("avl", beta),
         },
       ],
     );
@@ -390,6 +414,15 @@ function numberArray(value: unknown): number[] | null {
   return value as number[];
 }
 
+/**
+ * The handbook's Prandtl curve is a closed-form `lifting_line` solution, and
+ * `lifting_line.py` / `stability.py` take no beta argument at all — so it is
+ * always computed at β = 0 whatever the aircraft is flown at. It is deliberately
+ * left unmarked: it is a closed-form reference curve rather than a solver run,
+ * exactly like Tornado's own spanwise distribution, and marking it `(beta=0)`
+ * would clutter every panel with a note about a reference line. Do not "fix" it
+ * by reading `AERO["BETA"]` here; there is nothing to read.
+ */
 function spanwiseSeries(
   raws: SolverRaws,
   handbook: { y: number[]; Cl: number[] } | null,
@@ -462,7 +495,7 @@ function numbers1d(value: unknown, limit: number, rejectLonger: boolean): number
   return (value as number[]).slice(0, limit);
 }
 
-function leftoverTable(raws: SolverRaws): TableFigure | null {
+function leftoverTable(raws: SolverRaws, beta: number): TableFigure | null {
   const groups: { title: string; rows: { qty: string; vals: number[] }[] }[] = [];
   const hlRows: { qty: string; vals: number[] }[] = [];
   const blocks = raws.datcom?.high_lift;
@@ -477,7 +510,7 @@ function leftoverTable(raws: SolverRaws): TableFigure | null {
       }
     });
   }
-  if (hlRows.length > 0) groups.push({ title: "DATCOM high-lift", rows: hlRows });
+  if (hlRows.length > 0) groups.push({ title: betaTitle("DATCOM high-lift", beta), rows: hlRows });
 
   for (const [title, raw] of [
     ["Tornado", raws.tornado],
@@ -491,7 +524,9 @@ function leftoverTable(raws: SolverRaws): TableFigure | null {
       if (!vals) continue;
       rows.push({ qty: key, vals });
     }
-    if (rows.length > 0) groups.push({ title, rows });
+    if (rows.length > 0) {
+      groups.push({ title: title === "Tornado" ? title : betaTitle(title, beta), rows });
+    }
   }
   if (groups.length === 0) return null;
 
@@ -516,9 +551,10 @@ export function aeroTabs(
   raws: SolverRaws,
   stabilityAlpha: number | null,
   handbook: { y: number[]; Cl: number[] } | null,
+  beta = 0,
 ): AeroTab[] {
   const section = sectionTable(raws);
-  const leftover = leftoverTable(raws);
+  const leftover = leftoverTable(raws, beta);
   const sectionFigures: AeroFigure[] = [];
   if (section) sectionFigures.push(section);
   if (leftover) sectionFigures.push(leftover);
@@ -533,30 +569,33 @@ export function aeroTabs(
           tornado: ["CL", "CL_a"],
           avl: "CLtot",
           flow5: "CL",
-        }),
+        }, beta),
         alphaLines("CD", raws, stabilityAlpha, {
           datcom: "cd",
           tornado: ["CD", "CD_a"],
           avl: "CDtot",
           flow5: "CD",
-        }),
+        }, beta),
         alphaLines("CY", raws, stabilityAlpha, {
           tornado: ["CY", "CY_a"],
           avl: "CYtot",
-        }),
+          flow5: "CY",
+        }, beta),
         alphaLines("CN", raws, stabilityAlpha, {
           datcom: "cn",
           tornado: ["CZ", "CZ_a"],
           avl: "CZtot",
-        }),
+          flow5: "Cz",
+        }, beta),
         alphaLines("CA", raws, stabilityAlpha, {
           datcom: "ca",
           tornado: ["CX", "CX_a"],
           avl: "CXtot",
-        }),
-        alphaLines("CDind", raws, stabilityAlpha, { avl: "CDind" }),
-        alphaLines("CDvis", raws, stabilityAlpha, { avl: "CDvis" }),
-        alphaLines("e", raws, stabilityAlpha, { avl: "e" }),
+          flow5: "Cx",
+        }, beta),
+        alphaLines("CDind", raws, stabilityAlpha, { avl: "CDind" }, beta),
+        alphaLines("CDvis", raws, stabilityAlpha, { avl: "CDvis" }, beta),
+        alphaLines("e", raws, stabilityAlpha, { avl: "e" }, beta),
         { kind: "bars", title: "Per-wing / AVL extras", groups: forceExtras(raws) },
       ],
     },
@@ -569,33 +608,36 @@ export function aeroTabs(
           tornado: ["Cm", "Cm_a"],
           avl: "Cmtot",
           flow5: "Cm",
-        }),
+        }, beta),
         alphaLines("Cl", raws, stabilityAlpha, {
           tornado: ["Cl", "Cl_a"],
           avl: "Cltot",
-        }),
+          flow5: "Cl",
+        }, beta),
         alphaLines("Cn", raws, stabilityAlpha, {
           tornado: ["Cn", "Cn_a"],
           avl: "Cntot",
-        }),
-        alphaLines("Xcp", raws, stabilityAlpha, { datcom: "xcp" }),
-        alphaLines("NP", raws, stabilityAlpha, { avl: "NP" }),
+          flow5: "Cn",
+        }, beta),
+        alphaLines("Xcp", raws, stabilityAlpha, { datcom: "xcp" }, beta),
+        alphaLines("NP", raws, stabilityAlpha, { avl: "NP" }, beta),
       ],
     },
     {
       id: "derivatives",
       label: "Derivatives",
       figures: [
-        derivLines("CLα", raws, stabilityAlpha, { datcom: "cla", tornado: "CL_a", avl: "CLa", flow5: "CLa" }),
-        derivLines("Cmα", raws, stabilityAlpha, { datcom: "cma", tornado: "Cm_a", avl: "Cma", flow5: "Cma" }),
-        derivLines("CYβ", raws, stabilityAlpha, { datcom: "cyb", tornado: "CY_b", avl: "CYb" }),
-        derivLines("Cnβ", raws, stabilityAlpha, { datcom: "cnb", tornado: "Cn_b", avl: "Cnb" }),
-        derivLines("Clβ", raws, stabilityAlpha, { datcom: "clb", tornado: "Cl_b", avl: "Clb" }),
+        derivLines("CLα", raws, stabilityAlpha, { datcom: "cla", tornado: "CL_a", avl: "CLa", flow5: "CLa" }, beta),
+        derivLines("Cmα", raws, stabilityAlpha, { datcom: "cma", tornado: "Cm_a", avl: "Cma", flow5: "Cma" }, beta),
+        derivLines("CYβ", raws, stabilityAlpha, { datcom: "cyb", tornado: "CY_b", avl: "CYb", flow5: "CYb" }, beta),
+        derivLines("Cnβ", raws, stabilityAlpha, { datcom: "cnb", tornado: "Cn_b", avl: "Cnb", flow5: "Cnb" }, beta),
+        derivLines("Clβ", raws, stabilityAlpha, { datcom: "clb", tornado: "Cl_b", avl: "Clb", flow5: "Clb" }, beta),
         ...RATE_GROUPS.map((group) =>
           derivLines(group.label, raws, stabilityAlpha, {
             tornado: group.tornado,
             avl: group.avl,
-          }),
+            flow5: group.flow5,
+          }, beta),
         ),
         { kind: "bars", title: "p, q, r (per rad)", groups: rateBars(raws) },
       ],
@@ -604,16 +646,18 @@ export function aeroTabs(
       id: "downwash",
       label: "Downwash",
       figures: [
-        alphaLines("ε", raws, stabilityAlpha, { datcom: "epslon" }),
-        alphaLines("dε/dα", raws, stabilityAlpha, { datcom: "depsda" }),
-        alphaLines("q/q∞", raws, stabilityAlpha, { datcom: "q_qinf" }),
+        alphaLines("ε", raws, stabilityAlpha, { datcom: "epslon" }, beta),
+        alphaLines("dε/dα", raws, stabilityAlpha, { datcom: "depsda" }, beta),
+        alphaLines("q/q∞", raws, stabilityAlpha, { datcom: "q_qinf" }, beta),
       ],
     },
-    { id: "controls", label: "Controls", figures: controlFigures(raws) },
+    { id: "controls", label: "Controls", figures: controlFigures(raws, beta) },
     {
       id: "spanwise",
       label: "Spanwise",
-      figures: [lineFigure("Spanwise lift", "Cl", "y (ft)", spanwiseSeries(raws, handbook))],
+      figures: [
+        lineFigure("Spanwise lift", "Cl", "y (ft)", spanwiseSeries(raws, handbook)),
+      ],
     },
     { id: "sections", label: "Sections", figures: sectionFigures },
   ];

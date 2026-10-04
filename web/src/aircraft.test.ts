@@ -1,5 +1,11 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { aircraftFromJson, aircraftToJson, emptyAircraft, parseJsonc } from "./aircraft";
+import {
+  aeroBeta,
+  aircraftFromJson,
+  aircraftToJson,
+  emptyAircraft,
+  parseJsonc,
+} from "./aircraft";
 import { commitString } from "./Field";
 import {
   AERO_FIELDS,
@@ -241,3 +247,17 @@ function memoryStorage(): Storage {
     },
   };
 }
+
+it("aeroBeta reads AERO.BETA in degrees and falls back to zero", () => {
+  expect(aeroBeta({ ...emptyAircraft(), AERO: { BETA: 5 } })).toBe(5);
+  expect(aeroBeta({ ...emptyAircraft(), AERO: { BETA: [5] } })).toBe(5);
+  expect(aeroBeta(emptyAircraft())).toBe(0);
+  expect(aeroBeta({ ...emptyAircraft(), AERO: { BETA: null } })).toBe(0);
+  expect(aeroBeta({ ...emptyAircraft(), AERO: { BETA: "nonsense" } })).toBe(0);
+});
+
+it("the Aero tab carries a Beta row next to angle of attack", () => {
+  const names = AERO_FIELDS.map(([field]) => field);
+  expect(names.indexOf("BETA")).toBe(names.indexOf("ALSCHD") + 1);
+  expect(AERO_FIELDS[names.indexOf("BETA")]).toEqual(["BETA", "Beta (deg)", "deg"]);
+});

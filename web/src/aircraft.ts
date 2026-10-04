@@ -189,3 +189,16 @@ export function patchArrayItem(
   list[index] = value;
   return { ...ac, [group]: { ...ac[group], [key]: list } };
 }
+
+/**
+ * The sideslip angle in degrees, 0 when unset. A saved aircraft may carry no BETA
+ * key at all, since the writer omits AERO keys that equal their default.
+ */
+export function aeroBeta(ac: AircraftDict): number {
+  const raw = ac.AERO?.BETA;
+  if (typeof raw === "number") return Number.isFinite(raw) ? raw : 0;
+  if (Array.isArray(raw) && typeof raw[0] === "number") {
+    return Number.isFinite(raw[0]) ? (raw[0] as number) : 0;
+  }
+  return 0;
+}

@@ -4,7 +4,7 @@ import math
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from aid.aircraft import Aircraft
+from aid.aircraft import Aircraft, aero_beta
 from aid.alpha_schedule import apply_alpha_default
 from aid.avl_io import run_avl_full
 from aid.control_report import control_report
@@ -20,6 +20,11 @@ from aid.tornado_io import tornado_io
 from aid.viz import planform_stations
 
 SOLVERS = frozenset({"datcom", "tornado", "avl", "flow5"})
+# The solvers that can actually be flown at a sideslip: Tornado reads it as
+# ``state["betha"]`` and flow5 as the polar's beta spec. DATCOM's ``$FLTCON`` and
+# AVL's run-case menu have no beta at all, so their runs sit at beta = 0 whatever
+# the request asks for. Mirrors BETA_CAPABLE_SOLVERS on the Python GUI side.
+BETA_CAPABLE_SOLVERS = frozenset({"tornado", "flow5"})
 DEFAULT_MESH = {
     "tornado": ("10", "5"),
     "avl": ("10", "10"),
@@ -59,14 +64,19 @@ def _coeff_row(raw: dict, *keys: str) -> list[float]:
     return []
 
 
-def to_handshake_payload(raw: dict, mach: float, solver: str = "datcom") -> dict:
+def to_handshake_payload(
+    raw: dict,
+    mach: float,
+    solver: str = "datcom",
+    beta: float = 0.0,
+) -> dict:
     return {
         "source": "aid",
         "solver": solver,
         "axes": {
             "mach": [float(mach)],
             "alpha": _as_float_list(raw.get("alpha")),
-            "beta": [0],
+            "beta": [float(beta)],
         },
         "tables": {
             "cl": [_coeff_row(raw, "CL", "cl", "CLtot")],
@@ -126,13 +136,29 @@ def handbook_spanwise(ac: Aircraft) -> dict | None:
         return None
 
 
+def _flown_beta(solver: str, ac: Aircraft) -> float:
+    """The sideslip this solver's data was actually computed at, in degrees.
+
+    ``axes.beta`` in the handshake payload is a flight-condition field, so it must
+    name the condition the numbers came from and not the one that was requested.
+    Only the beta-capable solvers move off zero; anything else reports zero, which
+    is what DATCOM and AVL were actually run at.
+    """
+    if solver not in BETA_CAPABLE_SOLVERS:
+        return 0.0
+    return aero_beta(ac)
+
+
 def _analyze_result(solver: str, aid_raw: dict, ac: Aircraft) -> dict:
     raw = mapper_shaped_raw(aid_raw)
     result = {
         "ok": True,
         "solver": solver,
         "raw": raw,
-        "payload": to_handshake_payload(raw, _mach_float(raw), solver=solver),
+        # An export that misstates its own flight condition is corrupted data.
+        "payload": to_handshake_payload(
+            raw, _mach_float(raw), solver=solver, beta=_flown_beta(solver, ac)
+        ),
     }
     handbook = handbook_spanwise(ac)
     if isinstance(handbook, dict):
@@ -186,14 +212,36 @@ def analyze_flow5(ac: Aircraft, mesh: tuple[str, ...]) -> dict:
     return _analyze_result("flow5", run_flow5(ac, mesh), ac)
 
 
+def apply_beta(ac: Aircraft, beta: float | None = None) -> Aircraft:
+    """Put the requested sideslip on the aircraft, in degrees, for every engine to read.
+
+    One value in one place: Tornado reads it through ``tornado_io``'s ``betha`` and
+    flow5 through ``run_flow5``, while DATCOM and AVL have no sideslip capability and
+    stay at zero whatever this says. A saved aircraft may carry no ``BETA`` key at
+    all, since save_jsonc omits AERO keys that equal their default, so the aircraft's
+    own value is read defensively by aid.aircraft.aero_beta.
+
+    ``beta=None`` means "no opinion": the aircraft keeps whatever ``AERO["BETA"]``
+    already says. That is what an omitted *and* an explicitly null field resolve to,
+    because the Aero tab's Beta row commits null when blank and that must not be an
+    error. An explicit ``0.0`` is the opposite instruction — fly it upright.
+    """
+    if beta is None:
+        return ac
+    ac.AERO["BETA"] = float(beta)
+    return ac
+
+
 def analyze(
     ac: Aircraft,
     solver: str = "datcom",
     mesh: tuple[str, ...] | None = None,
+    beta: float | None = None,
 ) -> dict:
     solver = solver or "datcom"
     if solver not in SOLVERS:
         raise ValueError(f"unknown solver: {solver}")
+    ac = apply_beta(ac, beta)
     if solver == "datcom":
         return analyze_datcom(ac)
     mesh = _mesh_tuple(solver, mesh)
@@ -209,7 +257,9 @@ def control_derivatives(
     solver: str,
     deltas_deg=None,
     mesh: tuple[str, ...] | None = None,
+    beta: float | None = None,
 ) -> dict:
+    ac = apply_beta(ac, beta)
     ac = apply_alpha_default(ac)
     if solver in DEFAULT_MESH:
         mesh = _mesh_tuple(solver, mesh)

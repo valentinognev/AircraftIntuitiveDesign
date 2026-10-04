@@ -9,6 +9,7 @@ import {
   type LineFigure,
   type TableFigure,
 } from "./aeroFigures";
+import { barLegend, controlBarCategories, seriesLegend } from "./aeroChart";
 import type { OverlayPointSeries, SolverRaws } from "./coeffOverlay";
 
 const PER_RAD = 180 / Math.PI;
@@ -53,6 +54,16 @@ function datcomSeries(fig: LineFigure): OverlayPointSeries {
   const series = fig.series.filter((item) => item.solver === "datcom");
   expect(series).toHaveLength(1);
   return series[0];
+}
+
+function flow5Series(fig: LineFigure): OverlayPointSeries {
+  const series = fig.series.filter((item) => item.solver === "flow5");
+  expect(series, fig.title).toHaveLength(1);
+  return series[0];
+}
+
+function flow5SeriesOf(fig: LineFigure): OverlayPointSeries[] {
+  return fig.series.filter((item) => item.solver === "flow5");
 }
 
 it("returns the seven tabs in order when every figure is empty", () => {
@@ -666,4 +677,229 @@ it("uses a Value column when every leftover row has one number", () => {
     { header: true, cells: ["Tornado", ""] },
     { cells: ["L", "1.25"] },
   ]);
+});
+
+function displayName(series: OverlayPointSeries): string {
+  return series.label ?? series.solver;
+}
+
+it("threads the sideslip from aeroTabs into the series labels", () => {
+  const raws: SolverRaws = {
+    datcom: { alpha: [0, 2], cl: [0.1, 0.2] },
+    avl: { alpha: [0, 2], CLtot: [0.1, 0.2] },
+  };
+  const swept = aeroTabs(raws, null, null, 5);
+  expect(lines(tab(swept, "Forces"), "CL").series.map(displayName)).toEqual([
+    "datcom (beta=0)",
+    "avl (beta=0)",
+  ]);
+  const upright = aeroTabs(raws, null, null);
+  expect(lines(tab(upright, "Forces"), "CL").series.map(displayName)).toEqual(["datcom", "avl"]);
+});
+
+it("leaves the flow5 alpha-derivative panels plain, because CLa and Cma do move with beta", () => {
+  // The two flow5 channels on these two panels are the polar OLS slopes, not
+  // StabDerivatives, so neither takes the suffix. The panels that would qualify are
+  // CYb, Cnb and Clb, and they do get their own flow5 channel — pinnedLabel marks
+  // those; see the beta test below.
+  const raws: SolverRaws = {
+    datcom: { alpha: [0, 2] },
+    tornado: { CL_a: PER_RAD, Cm_a: PER_RAD },
+    flow5: { CLa: PER_RAD, Cma: PER_RAD },
+  };
+  const swept = aeroTabs(raws, null, null, 5);
+  expect(lines(tab(swept, "Derivatives"), "CLα").series.map(displayName)).toEqual([
+    "tornado",
+    "flow5",
+  ]);
+  expect(lines(tab(swept, "Derivatives"), "Cmα").series.map(displayName)).toEqual([
+    "tornado",
+    "flow5",
+  ]);
+  // The panels the suffix *would* apply to carry no flow5 channel in this fixture.
+  for (const title of ["CYβ", "Cnβ", "Clβ"]) {
+    expect(
+      lines(tab(swept, "Derivatives"), title).series.some((item) => item.solver === "flow5"),
+      title,
+    ).toBe(false);
+  }
+});
+
+it("plots the flow5 side-force, normal-force, axial-force, roll and yaw channels", () => {
+  // flow5 spells the normal force CZ and the axial force CX the way DATCOM prints CN
+  // and CA, so the spec names Cz / Cx and the figure keeps its DATCOM spelling.
+  const raws: SolverRaws = {
+    flow5: {
+      alpha: [0, 4],
+      CY: [0.0, 0.1],
+      Cz: [0.5, 0.7],
+      Cx: [-0.02, -0.04],
+      Cl: [0.01, 0.02],
+      Cn: [0.03, 0.06],
+    },
+  };
+  const tabs = aeroTabs(raws, null, null);
+  const forces = tab(tabs, "Forces");
+  expect(flow5Series(lines(forces, "CY"))).toMatchObject({
+    solver: "flow5",
+    stroke: "yellow",
+    kind: "line",
+    x: [0, 4],
+    y: [0.0, 0.1],
+  });
+  expect(flow5Series(lines(forces, "CN"))).toMatchObject({
+    kind: "line",
+    x: [0, 4],
+    y: [0.5, 0.7],
+  });
+  expect(flow5Series(lines(forces, "CA"))).toMatchObject({
+    kind: "line",
+    x: [0, 4],
+    y: [-0.02, -0.04],
+  });
+  const moments = tab(tabs, "Moments");
+  expect(flow5Series(lines(moments, "Cl"))).toMatchObject({
+    kind: "line",
+    x: [0, 4],
+    y: [0.01, 0.02],
+  });
+  expect(flow5Series(lines(moments, "Cn"))).toMatchObject({
+    kind: "line",
+    x: [0, 4],
+    y: [0.03, 0.06],
+  });
+});
+
+it("plots the flow5 sideslip derivatives as horizontals on CYβ, Cnβ and Clβ", () => {
+  const raws: SolverRaws = {
+    datcom: { alpha: [0, 4] },
+    flow5: { CYb: PER_RAD, Cnb: -PER_RAD, Clb: 2 * PER_RAD },
+  };
+  const derivatives = tab(aeroTabs(raws, null, null), "Derivatives");
+  for (const [title, perDeg] of [
+    ["CYβ", 1],
+    ["Cnβ", -1],
+    ["Clβ", 2],
+  ] as const) {
+    const fig = lines(derivatives, title);
+    const series = flow5Series(fig);
+    expect(series.kind, title).toBe("hline");
+    expect(series.stroke, title).toBe("yellow");
+    expect(series.x, title).toHaveLength(80);
+    expect(yAt(series, 0), title).toBeCloseTo(perDeg, 12);
+    expect(yAt(series, 4), title).toBeCloseTo(perDeg, 12);
+  }
+});
+
+it("plots flow5 Clp and Cnr on the body-axis rate panels only", () => {
+  // Clr is flow5's body-axis roll-per-yaw-rate; the CLr panel is Tornado's WIND-axis
+  // CL_R, so it must not pick flow5's Clr up. Cmq has no flow5 channel at all.
+  const raws: SolverRaws = {
+    datcom: { alpha: [0, 4] },
+    flow5: { Clp: 0.5 * PER_RAD, Cnr: 0.3 * PER_RAD, Clr: 0.2 * PER_RAD, Cnb: 0.4 * PER_RAD },
+  };
+  const derivatives = tab(aeroTabs(raws, null, null), "Derivatives");
+  expect(flow5Series(lines(derivatives, "Clp"))).toMatchObject({ kind: "hline" });
+  expect(yAt(flow5Series(lines(derivatives, "Clp")), 0)).toBeCloseTo(0.5, 12);
+  expect(flow5Series(lines(derivatives, "Cnr"))).toMatchObject({ kind: "hline" });
+  expect(yAt(flow5Series(lines(derivatives, "Cnr")), 0)).toBeCloseTo(0.3, 12);
+  for (const title of ["Cmq", "CLp", "CLq", "CLr"]) {
+    expect(flow5SeriesOf(lines(derivatives, title)), title).toEqual([]);
+  }
+});
+
+it("marks a wired flow5 sideslip derivative beta=0 and leaves its force curve plain", () => {
+  const raws: SolverRaws = {
+    datcom: { alpha: [0, 4] },
+    flow5: { alpha: [0, 4], CY: [0.0, 0.1], CYb: 0.1 },
+  };
+  const swept = aeroTabs(raws, null, null, 5);
+  expect(flow5Series(lines(tab(swept, "Derivatives"), "CYβ")).label).toBe("flow5 (beta=0)");
+  // CY is a per-polar value: flow5 really flew the sideslip, so it takes no suffix.
+  expect(flow5Series(lines(tab(swept, "Forces"), "CY")).label).toBeUndefined();
+  const upright = aeroTabs(raws, null, null);
+  expect(flow5Series(lines(tab(upright, "Derivatives"), "CYβ")).label).toBeUndefined();
+});
+
+// R31: the panels the overlay functions do not build carry their own solver-styled
+// series and bar legends. Those are DATCOM and AVL data at beta = 0, so at a non-zero
+// sideslip they need the same suffix or the panel misreports its own condition.
+
+it("leaves the spanwise Prandtl curve unmarked, because the handbook solution is analytic", () => {
+  // lifting_line() never reads AERO["BETA"]: it is a closed-form 2D solution, so the
+  // curve really is at the aircraft's sideslip and marking it would be the same lie
+  // R34 was about, in the legend instead of the payload.
+  const raws: SolverRaws = { tornado: { spanwise: [{ name: "Main", y: [1], Cl: [0.5] }] } };
+  const handbook = { y: [0, 10], Cl: [0.2, 0.4] };
+  const swept = aeroTabs(raws, null, handbook, 5);
+  const span = lines(tab(swept, "Spanwise"), "Spanwise lift").series;
+  expect(span.map((item) => item.label)).toEqual([undefined, undefined]);
+  expect(span.map(seriesLegend)).toEqual(["Prandtl", "Tornado Main"]);
+  const upright = aeroTabs(raws, null, handbook);
+  expect(lines(tab(upright, "Spanwise"), "Spanwise lift").series.map(seriesLegend)).toEqual([
+    "Prandtl",
+    "Tornado Main",
+  ]);
+});
+
+it("marks the DATCOM drag-increment curve on the Controls tab", () => {
+  const raws: SolverRaws = {
+    datcom: {
+      high_lift: [{ delta: 15, dcl: 0.2, dcm: 0, dcdi_alpha: [0, 4], dcdi: [0.01, 0.02] }],
+    },
+  };
+  const swept = aeroTabs(raws, null, null, 5);
+  expect(lines(tab(swept, "Controls"), "ΔCDi").series.map(seriesLegend)).toEqual([
+    "datcom (beta=0)",
+  ]);
+  const upright = aeroTabs(raws, null, null);
+  expect(lines(tab(upright, "Controls"), "ΔCDi").series.map(seriesLegend)).toEqual(["datcom"]);
+});
+
+it("marks the AVL control-deflection curve on the Controls tab", () => {
+  const raws: SolverRaws = { avl: { surface: [{ angle: 5 }, { name: "aileron", angle: -2 }] } };
+  const swept = aeroTabs(raws, null, null, 5);
+  expect(
+    lines(tab(swept, "Controls"), "AVL control deflection").series.map(seriesLegend),
+  ).toEqual(["avl (beta=0)"]);
+  const upright = aeroTabs(raws, null, null);
+  expect(
+    lines(tab(upright, "Controls"), "AVL control deflection").series.map(seriesLegend),
+  ).toEqual(["avl"]);
+});
+
+it("keeps the Tornado control keys unqualified, because Tornado flies the sideslip", () => {
+  const raws: SolverRaws = {
+    datcom: { high_lift: [{ delta: 15, dcl: 0.2, dcm: 0 }] },
+    tornado: { CL_d: [[0.5, 0.6]] },
+  };
+  const swept = aeroTabs(raws, null, null, 5);
+  const increments = figure(tab(swept, "Controls").figures, "Control increments") as ControlBars;
+  const labels = controlBarCategories(increments).flatMap((cat) =>
+    cat.slots.map((slot) => barLegend([cat]).find((item) => item.key === slot.key)?.label),
+  );
+  expect(labels).toContain("CL_d");
+  expect(labels.some((label) => label?.includes("(beta=0)"))).toBe(false);
+});
+
+// R31 leftovers: the Sections "Other coefficients" table names its solver in the group
+// header, so those headers are solver labels too and get the same treatment.
+
+it("marks the DATCOM and AVL leftover-table group headers at a sideslip", () => {
+  const raws: SolverRaws = {
+    datcom: { high_lift: [{ delta: 15, dcl: 0.2, dcm: 0 }] },
+    tornado: { L: [1.25, 2] },
+    avl: { bonus: 2.5 },
+  };
+  const swept = aeroTabs(raws, null, null, 5);
+  const headers = table(tab(swept, "Sections"), "Other coefficients")
+    .rows.filter((row) => row.header)
+    .map((row) => row.cells[0]);
+  expect(headers).toEqual(["DATCOM high-lift (beta=0)", "Tornado", "AVL (beta=0)"]);
+  const upright = aeroTabs(raws, null, null);
+  expect(
+    table(tab(upright, "Sections"), "Other coefficients")
+      .rows.filter((row) => row.header)
+      .map((row) => row.cells[0]),
+  ).toEqual(["DATCOM high-lift", "Tornado", "AVL"]);
 });

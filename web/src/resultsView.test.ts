@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, expect, it } from "vitest";
 import type { HandshakePayload } from "./payload";
-import { Results } from "./Results";
+import { flownBeta, Results } from "./Results";
 import store from "./store";
 
 const snapshot = store.getState();
@@ -114,4 +114,71 @@ it("shows only the selected tab, including spanwise names and section table alig
   expect(sections).toContain("text-right");
   expect(sections).toContain(">0.1<");
   expect(sections).not.toContain("Spanwise lift");
+});
+
+// The `(beta=0)` mark is a provenance claim about the plotted numbers, so it must
+// follow the run that produced them. These four cases pin that from both sides:
+// an editor-only sideslip must not relabel a β=0 run, and a flown sideslip must
+// still be disclosed when the editor has been put back to zero.
+function sideslipPayload(solver: string, beta: number): HandshakePayload {
+  return {
+    source: "aid",
+    solver,
+    axes: { mach: [0.2], alpha: [-2, 0, 4], beta: [beta] },
+    tables: { cl: [[0.0, 0.2, 0.6]], cd: [[0.02, 0.02, 0.04]], cm: [[0.0, -0.01, -0.03]] },
+    ref: {},
+  };
+}
+
+function withSideslipInEditor(beta: number): void {
+  store.setState({
+    ...store.getState(),
+    aircraft: { AERO: { ALSCHD: [-2, 0, 4], BETA: beta } } as never,
+  });
+}
+
+it("labels from the run, not from a Beta edited after the run", () => {
+  const datcom = sideslipPayload("datcom", 0);
+  store.setState({
+    raws: { datcom: { alpha: [-2, 0, 4], cl: [0.0, 0.2, 0.6], cd: [0.02, 0.02, 0.04] } },
+    handbook: null,
+    lastStability: { alpha: 4, summary: [] },
+    lastPayload: datcom,
+    payloads: { datcom },
+  });
+
+  // A run at beta = 0 stays unlabelled even once the editor claims a sideslip.
+  withSideslipInEditor(5);
+  expect(markup("forces")).not.toContain("(beta=0)");
+
+  // ... and a run that really flew a sideslip is still disclosed when the
+  // editor has been put back to zero, which is the same defect the other way.
+  const flown = sideslipPayload("tornado", 5);
+  store.setState({
+    ...store.getState(),
+    raws: { datcom: { alpha: [-2, 0, 4], cl: [0.0, 0.2, 0.6] } },
+    payloads: { datcom, tornado: flown },
+    lastPayload: flown,
+  });
+  withSideslipInEditor(0);
+  expect(markup("forces")).toContain("(beta=0)");
+});
+
+it("flownBeta reads the run's payload and nothing else", () => {
+  expect(flownBeta([])).toBe(0);
+  expect(flownBeta([sideslipPayload("datcom", 0), sideslipPayload("avl", 0)])).toBe(0);
+  expect(flownBeta([sideslipPayload("datcom", 0), sideslipPayload("tornado", 5)])).toBe(5);
+  // flow5 is the other sideslip-capable solver; the value is whatever the run flew.
+  expect(flownBeta([sideship0(), sideslipPayload("flow5", -3)])).toBe(-3);
+  // Non-numeric or missing beta is not a sideslip.
+  const broken = sideslipPayload("tornado", 5);
+  broken.axes.beta = [];
+  expect(flownBeta([broken])).toBe(0);
+  const nan = sideslipPayload("tornado", 5);
+  nan.axes.beta = [Number.NaN];
+  expect(flownBeta([nan])).toBe(0);
+
+  function sideship0(): HandshakePayload {
+    return sideslipPayload("datcom", 0);
+  }
 });

@@ -6,6 +6,7 @@ from pathlib import Path
 import numpy as np
 
 from aid.aircraft import Aircraft
+from aid.axes import to_frd
 from aid.avl_parse import parse_run_case_header, parse_st
 from aid.paths import avl_bin
 from aid.tornado_io import tornado_io
@@ -320,7 +321,11 @@ def stack_avl_cases(paths: list[Path]) -> dict:
     }
     for key in (*_SWEEP_TOTALS, *_SWEEP_DERIVS):
         out[key] = [float(case[key]) for case in cases]
-    return out
+    # AVL prints "Standard axis orientation, X fwd, Z down" and is natively
+    # Forward-Right-Down, so its map is empty and this call is the identity. It
+    # stays here so that AVL's frame is a stated fact at the boundary rather than
+    # an assumption, and so a future native-frame change has one place to break.
+    return to_frd("avl", out)
 
 
 def run_avl(run_dir: Path, *, timeout: float = 120) -> None:

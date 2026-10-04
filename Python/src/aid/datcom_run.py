@@ -6,6 +6,7 @@ import subprocess
 from pathlib import Path
 
 from aid.aircraft import Aircraft
+from aid.axes import to_frd
 from aid.datcom_io import write_for005
 from aid.datcom_parse import parse_for006
 from aid.paths import datcom_wrapper
@@ -22,7 +23,10 @@ def run_datcom(ac: Aircraft, workdir: Path) -> dict:
             out = dumped
     if out.is_file():
         try:
-            return parse_for006(out.read_text())
+            # DATCOM's UPPERCASE CN/CA are forces, aft- and up-positive; this is
+            # the boundary where they become Forward-Right-Down. parse_for006
+            # itself stays raw so it can be diffed against gold key for key.
+            return to_frd("datcom", parse_for006(out.read_text()))
         except ValueError:
             if proc.returncode:
                 proc.check_returncode()

@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from aid.aircraft import Aircraft
+from aid.aircraft import Aircraft, aero_beta
 from aid.alpha_schedule import apply_alpha_default
 from aid.control_report import control_report
 from aid.avl_io import run_avl_full
@@ -315,11 +315,17 @@ class MainWindow(QMainWindow):
         if st is None:
             st = self.stability_for_display()
         if self._plot_mode == "Stability":
-            self.results_panel.plot_stability(st, self.last_results)
+            self.results_panel.plot_stability(
+                st, self.last_results, beta=aero_beta(self.aircraft)
+            )
         elif self._plot_mode == "Aerodynamics":
             self.results_panel.plot_drag(st)
             self.compare_tabs.plot(
-                st, self.last_results, self.aircraft, angle=self.settings.angle
+                st,
+                self.last_results,
+                self.aircraft,
+                angle=self.settings.angle,
+                beta=aero_beta(self.aircraft),
             )
             nj = max(8, round(self.settings.plot_res[1] / 4))
             ov = lift_overlay(self.aircraft, nj, angle=self.settings.angle)
@@ -554,6 +560,8 @@ class MainWindow(QMainWindow):
         if mesh is None:
             return
         # AID.m Analyze Tornado: handbook trim alpha, moments about 25% MAC
+        # AERO.BETA needs no argument here: the sync above has put the field into
+        # the aircraft and tornado_io reads it, converting degrees to radians once.
         st = self.stability_for_display()
         geo, state = tornado_io(self.aircraft, mesh)
         state = dict(state)
@@ -680,7 +688,7 @@ class MainWindow(QMainWindow):
             return
         workdir = self._analysis_workdir("flow5")
         try:
-            coeffs = run_flow5(self.aircraft, mesh)
+            coeffs = run_flow5(self.aircraft, mesh, beta=aero_beta(self.aircraft))
         except (FileNotFoundError, OSError):
             QMessageBox.critical(
                 self,

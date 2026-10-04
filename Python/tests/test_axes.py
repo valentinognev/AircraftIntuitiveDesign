@@ -163,10 +163,20 @@ def test_tornado_wind_axis_channels_are_never_flipped():
 def test_no_other_solver_needs_a_pitch_rate_entry():
     """``CX_Q``-shaped entries are a tornado-only need; the other maps are complete.
 
-    flow5 emits p and r rate derivatives but no q ones at all -- its twelve
-    ``StabDerivatives`` are ``CXa, CZa, CYb, CYp, CYr, Clb, Clp, Clr, Cnb, Cnp,
-    Cnr, XNP`` (``FLOW5/run/flow5_run.cpp``'s ``stab_derivative_fields``) and
-    ``computeAngularDerivatives`` never writes a ``CYq``/``Clq``/``Cmq``/``Cnq``.
+    flow5 emits p and r rate derivatives but no q ones: the twelve names in
+    ``FLOW5/run/flow5_run.cpp``'s ``stab_derivative_fields()`` (:304-321) are
+    ``CXa, CZa, CYb, CYp, CYr, Clb, Clp, Clr, Cnb, Cnp, Cnr, XNP``, and not one of
+    them is a q-derivative. The library *does* have them -- ``StabDerivatives``
+    declares ``CXq``, ``CZq`` and ``Cmq`` (``FLOW5/flow5-lib/api/
+    stabderivatives.h:70``) and computes them from the dimensional ``Xq``/``Zq``/
+    ``Mq`` (``stabderivatives.cpp:123-125``) -- the helper just does not forward
+    them, and there is no ``CYq``/``Clq``/``Cnq`` in the library at all. Were the
+    three ever forwarded they would need no entry, and not because of any axis
+    arithmetic: each is projected onto the same stability axis as a derivative that
+    is already forwarded and already entry-free -- ``SD.Xq`` and ``SD.Zq`` on ``is``
+    and ``ks`` (``panelanalysis.cpp:1057-1058``) against ``CXa``/``CZa`` on the same
+    two (``:880-881``), and ``SD.Mq`` on ``js`` (``:1059``) against the ``Cm`` channel.
+    So the map would not have to grow; only ``stab_derivative_fields()`` would.
     datcom's parser extracts no rate derivatives at all: ``_COEF_NAMES`` in
     ``datcom_parse.py`` is the alpha/beta set plus ``ca``/``cn``. avl is natively
     F-R-D, so its map is empty by measurement.

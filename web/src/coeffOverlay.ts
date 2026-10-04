@@ -47,7 +47,7 @@ const NO_SIDESLIP: ReadonlySet<SolverName> = new Set<SolverName>(["datcom", "avl
  * byte-identical at beta = 0, +5 and -5.
  *
  * `CLa` and `Cma` are deliberately absent. Those are the polar's OLS slopes
- * (FLOW5/run/flow5_run.cpp:526-527), not StabDerivatives, and they do move with the
+ * (FLOW5/run/flow5_run.cpp:556-557), not StabDerivatives, and they do move with the
  * sideslip — CLa is 5.5402333786223235 at beta = 0 against 5.500374829746751 at +5.
  */
 const FLOW5_BETA_FLAT_DERIVATIVES: ReadonlySet<string> = new Set([

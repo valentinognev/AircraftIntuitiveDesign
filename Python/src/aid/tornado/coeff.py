@@ -224,10 +224,24 @@ def coeff_create(results: dict, lattice: dict, state: dict, ref: dict, geo: dict
         out["Cm_d"] = dcm[6:]
         out["Cn_d"] = dcn[6:]
 
-    # Tornado's body frame is x aft, y right, z up, so CX/CZ and Cl/Cn -- and the
-    # alpha, beta and control derivatives that inherit their channel's frame --
-    # come out mirrored. The wind-axis CL/CD/CC/Cm, the p/q/r rate derivatives
-    # (already standard) and the raw solver vectors are not in the map. `cp` is
-    # built from FORCE before this point, so FORCE staying raw is what makes it
-    # reproducible.
+    # Tornado's body frame is x aft, y right, z up, so F-R-D is a 180 deg rotation
+    # about y: x and z reverse, y does not. A component along axis i takes s_i and
+    # a body rate about axis j takes s_j as well, so dC_i/d(omega_j) -> s_i * s_j,
+    # while alpha, beta and control deflections rotate the flow rather than the body
+    # axes and contribute +1 -- which is why the alpha/beta/control derivatives just
+    # inherit their channel's frame and CX/CZ/Cl/Cn and all three of theirs take -1.
+    #
+    # The rate derivatives then split by the rate axis. p and r are about x and z,
+    # the two reversing axes, so for the four s_i = -1 channels the two signs cancel
+    # and CX_P/CZ_P/Cl_P/Cn_P/CX_R/CZ_R/Cl_R/Cn_R take no entry at all. CY and Cm are
+    # the two s_i = +1 channels (Cm is the body-y moment at :108, not a wind-axis
+    # one), so for them nothing cancels and CY_P/CY_R/Cm_P/Cm_R each take a -1. q is
+    # about y, the axis the two frames share, so s_q = +1 and every q-derivative
+    # keeps its channel's own sign: CX_Q/CZ_Q/Cl_Q/Cn_Q take a -1 while CY_Q and
+    # Cm_Q take none.
+    #
+    # The wind-axis CL/CD/CC and their derivatives are built from the b2w rotation
+    # at :81-97 rather than being body components, so no key of theirs is mapped. The
+    # raw solver vectors are not mapped either; `cp` is built from FORCE before this
+    # point, so FORCE staying raw is what makes it reproducible.
     return to_frd("tornado", out)

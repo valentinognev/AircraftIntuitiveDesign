@@ -140,13 +140,33 @@ def test_flow5_rejects_a_beta_key_that_is_not_beta_deg(base_deck, tmp_path):
     # R14: the helper has no deck whitelist, so an unknown key is silently
     # ignored -- which would let a typo'd beta key masquerade as beta = 0. The
     # guard is deliberately one purpose, not a general whitelist.
+    #
+    # The three range cases are the same defect one step on: a beta_deg of the right
+    # *type* that is not a sideslip. Nothing downstream bounds it -- PlaneTask::run
+    # reads betaSpec() and rotates the mesh by it (planetask.cpp:605, :748) with no
+    # range check, so 1e9 deg would come back as a plausible-looking wrong answer
+    # rather than an error. The PySide GUI clamps AERO.BETA to +/-89
+    # (aid_gui/tabs.py clamp_value, "deg" kind, error_check_data[1] = 89); the API
+    # and a hand-edited deck did not, and now hit the same ceiling.
+    #
+    # The last two are rejected at the deck-parse step rather than by read_beta_spec,
+    # so they name the deck and not the key -- which is why each case carries the
+    # substring it must produce. A literal too large for a double additionally used
+    # to abort the process: the lexer's number-overflow throw is a
+    # detail::out_of_range, not a json::parse_error, so main's narrower catch missed
+    # it (rc = -6, SIGABRT). Hence the rc > 0 assertion below.
     cases = (
-        ("beta_deg", "5"),  # present but not a number -> json_number() would
-        ("beta_deg", None),  # silently fall back to 0.0
-        ("beta_degg", 5.0),  # near-miss typo
-        ("BETA_DEG", 5.0),
+        ("beta_deg", "5", "beta"),  # present but not a number -> json_number() would
+        ("beta_deg", None, "beta"),  # silently fall back to 0.0
+        ("beta_degg", 5.0, "beta"),  # near-miss typo
+        ("BETA_DEG", 5.0, "beta"),
+        ("beta_deg", 1e9, "beta_deg"),
+        ("beta_deg", -1e9, "beta_deg"),
+        ("beta_deg", 89.0001, "beta_deg"),
+        ("beta_deg", float("nan"), "json deck"),
+        ("beta_deg", float("inf"), "json deck"),
     )
-    for i, (polar_key, value) in enumerate(cases):
+    for i, (polar_key, value, expected) in enumerate(cases):
         deck = dict(base_deck)
         deck["polar"] = {**base_deck["polar"], polar_key: value}
         path = tmp_path / f"deck_{i}.json"
@@ -158,8 +178,18 @@ def test_flow5_rejects_a_beta_key_that_is_not_beta_deg(base_deck, tmp_path):
             timeout=180,
         )
         assert r.returncode != 0, f"{polar_key}={value!r} was accepted: {r.stdout}"
+        assert r.returncode > 0, f"{polar_key}={value!r} crashed: rc={r.returncode}"
         assert r.stdout.strip() == "", f"{polar_key}={value!r} emitted JSON anyway"
-        assert "beta" in r.stderr.lower(), r.stderr
+        assert expected in r.stderr.lower(), r.stderr
+
+
+def test_flow5_accepts_beta_deg_at_the_clamps_limit(base_deck):
+    # The rejection above is a bound, not a ban: the PySide clamp permits exactly
+    # +/-89, so 89.0 must still run.
+    out = run_flow5_native(
+        {**base_deck, "polar": {**base_deck["polar"], "beta_deg": 89.0}}
+    )
+    assert np.allclose(out["beta"], 89.0)
 
 
 def test_flow5_omitted_beta_deg_still_runs_at_beta_zero(base_deck):

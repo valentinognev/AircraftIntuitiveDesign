@@ -35,7 +35,7 @@ BETA_ZERO_SUFFIX = " (beta=0)"
 # later measured. They are kept, and now on the measurement.
 #
 # The two slopes are NOT in this set: CLa and Cma are ordinary least squares over the
-# polar's own alpha sweep (FLOW5/run/flow5_run.cpp:526-527), and the polar is flown at
+# polar's own alpha sweep (FLOW5/run/flow5_run.cpp:556-557), and the polar is flown at
 # the deck's beta, so they move (Cessna 172: 5.5402333786223235 at beta 0,
 # 5.500374829746751 at +5, 5.500374817599451 at -5; the +5/-5 equality is the polar's
 # own symmetry).

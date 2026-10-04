@@ -241,6 +241,19 @@ bool build_plane(const json& deck, PlaneXfl*& pPlaneOut, std::string& err)
 // That is why this checks the beta keys specifically rather than adding a
 // general whitelist -- json_number() would also turn a non-numeric beta_deg
 // into 0.0 without a word.
+//
+// A value that is the right type but not a sideslip is the same defect one step
+// further on, so it is rejected in the same shape. This build's parser already
+// refuses a bare NaN/Infinity literal and a literal that overflows a double (see
+// the catch in main), so std::isfinite() is the residual guard for a parser that
+// admits one; the range check is the one that bites in practice, because
+// PlaneTask::run has no bound of its own and would rotate the mesh by 1e9 deg and
+// return a plausible-looking wrong answer. The limit is the PySide GUI's own
+// clamp on AERO.BETA (tabs.py clamp_value, the "deg" kind against
+// error_check_data[1] = 89), so the API and a hand-edited deck get the same
+// ceiling the GUI has always applied.
+constexpr double kBetaDegMax = 89.0;
+
 bool read_beta_spec(const json& polar_json, double& beta_deg, std::string& err)
 {
     beta_deg = 0.0;
@@ -261,6 +274,16 @@ bool read_beta_spec(const json& polar_json, double& beta_deg, std::string& err)
             return false;
         }
         beta_deg = item.value().get<double>();
+        if (!std::isfinite(beta_deg)) {
+            err = "polar beta_deg must be finite, got "
+                + std::to_string(beta_deg);
+            return false;
+        }
+        if (std::abs(beta_deg) > kBetaDegMax) {
+            err = "polar beta_deg " + std::to_string(beta_deg)
+                + " is outside +/-" + std::to_string(kBetaDegMax) + " deg";
+            return false;
+        }
     }
     return true;
 }
@@ -422,6 +445,18 @@ bool build_polar_and_run(
     return true;
 }
 
+// A deck with no foils or no wings has no geometry to solve, so nothing is
+// computed here. The per-alpha arrays are the documented shape of this path (a
+// zero skeleton of the right length, UPDATES 1.16.0/1.17.0) and are kept.
+//
+// The derivatives are NOT seeded, and that is deliberate: the real path treats a
+// missing or non-finite derivative as a hard failure rather than a 0.0 (see
+// dump_reference_derivatives), because a silent zero reads as a physical claim --
+// Cnb = 0.0 in particular is "perfectly stable in yaw", indistinguishable at a
+// glance from a computed value. This path computed nothing at all, so it omits
+// every key instead, and a consumer sees an absent derivative rather than a
+// perfectly stable aircraft. CLa and Cma are omitted on the same grounds: both
+// are OLS slopes of the arrays above, so a 0 here is likewise fabricated.
 json skeleton_output(const json& alpha_deg)
 {
     const std::size_t n = alpha_deg.size();
@@ -436,11 +471,6 @@ json skeleton_output(const json& alpha_deg)
                                 "CY", "Cl", "Cn", "Cx", "Cz"}) {
             out[key].push_back(0.0);
         }
-    }
-    out["CLa"] = 0;
-    out["Cma"] = 0;
-    for (const StabDerivativeField& field : stab_derivative_fields()) {
-        out[field.name] = 0.0;
     }
     return out;
 }
@@ -547,7 +577,13 @@ int main(int argc, char* argv[])
     json deck;
     try {
         in >> deck;
-    } catch (const json::parse_error&) {
+        // json::exception, not just parse_error: a numeric literal that overflows a
+        // double ("beta_deg": 1e400) makes the lexer throw detail::out_of_range,
+        // which is not a parse_error, so the narrower catch let it escape and
+        // terminate the process with SIGABRT. A deck too big to represent is a bad
+        // deck, and it has to land here and exit 1 with stdout empty, like every
+        // other rejection.
+    } catch (const json::exception&) {
         std::cerr << "invalid JSON deck\n";
         return 1;
     }

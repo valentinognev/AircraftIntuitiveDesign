@@ -13,7 +13,7 @@ spikes settled against a more obvious guess:
   who wants the mechanism, not as a number this file could check. See
   ``test_flow5_cza_is_not_flipped`` below for why the identity itself is not
   asserted here.
-* ``Cdvis``/``CDind`` say nothing about viscous drag here. ``flow5_run.cpp:301``
+* ``Cdvis``/``CDind`` say nothing about viscous drag here. ``flow5_run.cpp:396``
   calls ``setViscous(false)``, so ``CDvis`` is identically 0.0 and ``CDind`` is
   identically ``CD``. That is an honest exposure of a locked setup, not a result,
   and nothing here reads a physical conclusion out of it.

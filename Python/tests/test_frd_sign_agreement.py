@@ -188,13 +188,15 @@ def test_beta_is_zero(sweep, at_axial):
     *aircraft file*, not of this file.
 
     **So the sideslip is a property of the aircraft file, not of this test.**
-    Cessna 172 does declare ``AERO["BETA"] = 0.0`` explicitly, so the assertions
-    above are satisfied by a stated zero rather than by the key's absence -- but
-    the comparisons below would silently start mixing three solvers flown at
-    different conditions the moment someone gave that model a sideslip, which is
-    the failure this file exists to separate from a sign error. So the
-    precondition is asserted rather than assumed, against the *value*, so that
-    change fails loudly and names itself.
+    No shipped model declares ``AERO["BETA"]`` at all -- ``grep -rl BETA
+    Python/models/`` finds nothing, and ``aircraft.py:13-15`` says so outright
+    ("no .mat and no shipped .jsonc has them"; they are Python-only defaults).
+    ``aero_beta`` resolves the absent key to 0.0 through ``AERO_DEFAULTS``, so
+    that default -- and not any declared zero -- is what satisfies the assertions
+    above, which is why the precondition is asserted against the *value* rather
+    than assumed: the key is one hand-edit from existing, and the comparisons
+    below would silently start mixing three solvers flown at different conditions
+    the moment it did. So a change fails loudly and names itself.
 
     When the model does gain a sideslip, the fix is not to relax the assertion. It
     is to sweep all three solvers at that beta and keep the comparisons

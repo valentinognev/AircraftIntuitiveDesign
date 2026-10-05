@@ -37,10 +37,10 @@ def test_run_datcom_stores_forward_right_down_coefficients(monkeypatch, tmp_path
     the raw dict instead and the C_N and C_A compare panels plot DATCOM mirrored
     against Tornado and AVL, which are normalized at their own boundaries.
 
-    Only the solver process is stubbed: DATCOM's own frame is what is under test,
-    so the recorded for006 stands in for the run the wrapper would have made.
-    ``results_dir`` is redirected because the canned for006 must not land in the
-    shared Results tree as if a real solve had produced it.
+    Only the solver process and ``results_dir`` are stubbed: DATCOM's own frame is
+    what is under test, so the recorded for006 stands in for the run the wrapper
+    would have made. ``results_dir`` is redirected because the canned for006 must
+    not land in the shared Results tree as if a real solve had produced it.
     """
     def fake_run(cmd, **kwargs):
         (Path(kwargs["cwd"]) / "for006.dat").write_text(_FOR006)

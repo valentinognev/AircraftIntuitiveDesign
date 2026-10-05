@@ -10,6 +10,7 @@ from aid.aircraft import load_jsonc
 from aid.axes import to_frd
 from aid.datcom_parse import parse_for006
 from aid.paths import models_dir
+from aid_gui.compare_tabs import _SKIP_LEFTOVER
 from aid_gui.main_window import MainWindow
 from tests.test_datcom_parse_tables import _FOR006
 
@@ -359,14 +360,14 @@ def test_sections_leftover_groups_by_solver():
     assert all(not key.startswith("Tornado ") for key in leftover)
 
 
-def test_sections_leftover_keeps_avl_rate_derivatives():
-    """A short AVL sweep must still list its rate derivatives as leftovers.
+def test_sections_leftover_still_hides_avl_rate_derivatives():
+    """A short AVL sweep hides its rate derivatives, as it always has.
 
-    ``_leftover_groups`` only ever walks the Tornado and AVL result dicts, so a
-    key in ``_SKIP_LEFTOVER`` that belongs to some *other* solver hides nothing --
-    but the same key spelled the way AVL spells it hides exactly this. Whether
-    these four belong in the table at all is a product question; hiding them is
-    not an answer to it.
+    ``_leftover_groups`` only ever walks the Tornado and AVL result dicts, so
+    four names that flow5 happens to share with AVL suppress exactly the rows
+    AVL's own ``Clp``/``Cmq``/``Cnr``/``CLp``/``CLq``/``CLr`` entries suppress.
+    ``CDff`` is in the same dict and is not named, so the table is demonstrably
+    populated rather than silently empty.
     """
     app = QApplication.instance() or QApplication([])
     w = MainWindow()
@@ -378,8 +379,25 @@ def test_sections_leftover_keeps_avl_rate_derivatives():
     w.set_plot_mode("Aerodynamics")
     app.processEvents()
     leftover = _leftover_map(w.compare_tabs.leftover_table)
+    assert "CDff" in leftover, "the table has to be populated for this to prove anything"
     for key in ("CYp", "CYr", "Clr", "Cnp"):
-        assert key in leftover, key
+        assert key not in leftover, key
+    for key in ("Clp", "Cmq", "Cnr", "CLp", "CLq", "CLr"):
+        assert key not in leftover, key
+
+
+def test_skip_leftover_keeps_only_the_flow5_names_avl_also_spells():
+    """A flow5 channel name belongs in the skip list only under AVL's spelling.
+
+    ``_leftover_groups`` walks the Tornado and AVL dicts, so the flow5-only
+    names could never match anything and read as if the walk reached flow5.
+    ``Cnr`` belongs with the AVL spelling: its own block already named it, which
+    is what made flow5's copy of it redundant.
+    """
+    for key in ("beta", "Cx", "Cz", "CXa", "CZa", "XNP"):
+        assert key not in _SKIP_LEFTOVER, key
+    for key in ("CYp", "CYr", "Clr", "Cnp", "Cnr"):
+        assert key in _SKIP_LEFTOVER, key
 
 
 def test_sections_leftover_zeroes_tiny_values():

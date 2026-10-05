@@ -37,9 +37,9 @@ from aid.paths import flow5_bin, models_dir
 FLOW5_BIN = flow5_bin()
 MESH = ("10", "10")
 
-# Per-test rather than module-level so the key-list tests below, which need no
-# solver, keep running where flow5_run is not built; each test that shells out to
-# flow5_run carries this instead.
+# Per-test rather than module-level: every test here reads a real flow5 solve
+# through the fixtures below, so a test that needs no solver is the only reason
+# to keep the gate off the module.
 needs_flow5 = pytest.mark.skipif(
     not FLOW5_BIN.is_file(), reason="flow5 helper not built"
 )
@@ -52,7 +52,8 @@ FLIPPED = ("Cx", "Cz", "Cl", "Cn")
 # below, which is what keeps it honest -- that is the one place a channel added
 # later shows up as a failure. It is deliberately not cross-checked against
 # compare_tabs._SKIP_LEFTOVER: _leftover_groups only ever walks the Tornado and
-# AVL result dicts, so a flow5 key named there could not suppress anything.
+# AVL result dicts, so a name is only worth listing there where AVL spells its
+# own channel the same way.
 FLOW5_KEYS = frozenset(
     {
         "alpha", "beta", "CL", "CD", "CDvis", "CDind", "Cm",

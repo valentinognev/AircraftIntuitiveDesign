@@ -17,6 +17,7 @@ import {
   type BarCategory,
 } from "./aeroChart";
 import { aeroTabs, type AeroFigure, type BarFigure, type ControlBars, type HingeBars, type LineFigure, type TableFigure } from "./aeroFigures";
+import { handshakeSolverLabel } from "./coeffOverlay";
 import {
   axisTicks,
   chartLayout,
@@ -645,7 +646,7 @@ export function Results({ initialTab = "forces" }: { initialTab?: string }) {
             {series.map((s) => (
               <li key={s.solver} className="flex items-center gap-1">
                 <span className="inline-block h-0.5 w-4" style={{ background: swatch(s.stroke) }} />
-                {s.solver}
+                {handshakeSolverLabel(s.solver, beta) ?? s.solver}
               </li>
             ))}
           </ul>

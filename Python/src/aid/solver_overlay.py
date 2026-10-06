@@ -40,14 +40,20 @@ BETA_ZERO_SUFFIX = " (beta=0)"
 # 5.500374829746751 at +5, 5.500374817599451 at -5; the +5/-5 equality is the polar's
 # own symmetry).
 #
+# Nor are the three per-polar force channels CY, Cz and Cx, for the same reason by a
+# different route: those are samples of the solved polar, i.e. read off the deck that
+# was written at the deck's beta, so each one *did* fly the flight condition's sideslip
+# and must not be labelled "(beta=0)". They are not StabDerivatives at all, so the
+# C++ literal scan below never sees them -- but the Forces panel does hand them to
+# overlay_vs_alpha as flow5 keys, which is exactly the case the twelve-entry set has
+# to answer "no" to. beta is excluded for the same reason (it is the polar's own beta
+# vector) and is likewise not a derivative.
+#
 # Note on names: Clq, Cmp and Cmr are AVL spellings (aid/avl_parse.py). flow5 has no
 # such channels -- its rate derivatives are CYp, CYr, Clp, Clr, Cnp and Cnr -- so a
 # mirror listing Clq/Cmp/Cmr is reading the wrong solver's namespace.
 FLOW5_BETA_FLAT = frozenset(
     {
-        "CY",
-        "Cz",
-        "Cx",
         "CXa",
         "CZa",
         "CYb",

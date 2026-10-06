@@ -1,13 +1,17 @@
 import os
+import subprocess
 from pathlib import Path
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+import numpy as np
 import pytest
 from PySide6.QtWidgets import QApplication, QMessageBox
 
 from aid.aircraft import load_jsonc
+from aid.datcom_parse import parse_for006
 from aid.paths import models_dir
 from aid_gui.main_window import MainWindow
+from tests.test_datcom_parse_tables import _FOR006
 
 
 def test_run_datcom_populates_cl():
@@ -23,6 +27,41 @@ def test_run_datcom_populates_cl():
     assert datcom.get("high_lift"), "DATCOM high-lift table missing (SYMFLP/ASYFLP not written?)"
     assert "epslon" in datcom
     assert datcom.get("sections")
+
+
+def test_run_datcom_stores_forward_right_down_coefficients(monkeypatch, tmp_path):
+    """What the GUI stores is the F-R-D normalization of the file DATCOM wrote.
+
+    ``parse_for006`` stays raw so the MATLAB gold diff still sees DATCOM's own
+    keys, which puts the conversion on the boundary that stores the result. Store
+    the raw dict instead and the C_N and C_A compare panels plot DATCOM mirrored
+    against Tornado and AVL, which are normalized at their own boundaries.
+
+    Only the solver process and ``results_dir`` are stubbed: DATCOM's own frame is
+    what is under test, so the recorded for006 stands in for the run the wrapper
+    would have made. ``results_dir`` is redirected because the canned for006 must
+    not land in the shared Results tree as if a real solve had produced it.
+    """
+    def fake_run(cmd, **kwargs):
+        (Path(kwargs["cwd"]) / "for006.dat").write_text(_FOR006)
+        return subprocess.CompletedProcess(cmd, 0)
+
+    monkeypatch.setattr("aid_gui.main_window.subprocess.run", fake_run)
+    monkeypatch.setattr("aid_gui.main_window.results_dir", lambda: tmp_path)
+    app = QApplication.instance() or QApplication([])
+    w = MainWindow()
+    w.load_aircraft(load_jsonc(models_dir() / "Cessna 172.jsonc"))
+    w.run_datcom()
+    raw = parse_for006(_FOR006)
+    stored = w.last_results["datcom"]
+    for key in ("cn", "ca"):
+        assert np.allclose(
+            np.nan_to_num(stored[key]), np.nan_to_num(-raw[key])
+        ), f"{key} is not the F-R-D sign"
+    for key in ("alpha", "cd", "cl", "cm", "xcp"):
+        assert np.allclose(
+            np.nan_to_num(stored[key]), np.nan_to_num(raw[key])
+        ), f"{key} must pass through unmirrored"
 
 
 def test_run_datcom_f16_clamps_mach_and_returns_cl(monkeypatch):

@@ -1,7 +1,4 @@
-import ast
-import inspect
 from dataclasses import fields, replace
-from textwrap import dedent
 
 from fastapi.testclient import TestClient
 from aid.aircraft import Aircraft, load_jsonc
@@ -27,6 +24,32 @@ RESULTS = {
 
 def _cessna():
     return load_jsonc(resolve_model("Cessna 172"))
+
+
+def _payload() -> dict:
+    """One Aircraft field per key, each value distinct from every other field's.
+
+    A distinct value per field is what makes the round trip a real check: a field
+    wired to its neighbour, defaulted, or dropped all fail it, while a field
+    carrying its own value back cannot.
+    """
+    return {
+        "WG": {"CHRDR": 1.0},
+        "HT": {"CHRDR": 2.0},
+        "VT": {"CHRDR": 3.0},
+        "F": {"CHRDFI": 4.0},
+        "A": {"CHRDFI": 5.0},
+        "E": {"CHRDFI": 6.0},
+        "R": {"CHRDR": 7.0},
+        "BD": {"CHRDR": 8.0},
+        "NP": [{"name": "nacelle", "x": 9.0}],
+        "NB": [{"name": "body", "x": 10.0}],
+        "AERO": {"VINF": 11.0, "BETA": 5.0},
+        "plot_cmp": ["wing", "htail"],
+        "unit": "m",
+        "cg_data": [{"name": "wing", "x": 12.0, "y": 0.0, "z": -0.1}],
+        "results": RESULTS,
+    }
 
 
 def test_list_includes_cessna():
@@ -104,7 +127,20 @@ def test_validate_accepts_aircraft_with_results():
     assert r.json()["ok"] is True
 
 
-def test_aircraft_from_json_supplies_every_dataclass_field():
-    tree = ast.parse(dedent(inspect.getsource(aircraft_from_json)))
-    call = next(n for n in ast.walk(tree) if isinstance(n, ast.Call) and getattr(n.func, "id", None) == "Aircraft")
-    assert {kw.arg for kw in call.keywords} == {f.name for f in fields(Aircraft)}
+def test_validate_accepts_a_payload_carrying_every_field():
+    """The HTTP path builds the aircraft from the posted body and nothing else.
+
+    ``aircraft_from_json`` reads each field by name, so a field the dataclass has
+    and the payload lacks -- or the other way round -- is a 400 here rather than a
+    silently dropped key.
+    """
+    r = TestClient(app).post("/models/validate", json={"aircraft": _payload()})
+    assert r.json() == {"ok": True}
+
+
+def test_aircraft_from_json_carries_every_field_it_was_given():
+    payload = _payload()
+    assert set(payload) == {f.name for f in fields(Aircraft)}
+    ac = aircraft_from_json(payload)
+    for f in fields(Aircraft):
+        assert getattr(ac, f.name) == payload[f.name], f.name

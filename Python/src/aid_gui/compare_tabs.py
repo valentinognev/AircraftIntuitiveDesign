@@ -623,6 +623,10 @@ _SKIP_LEFTOVER = frozenset(
         "Clp",
         "Cmq",
         "Cnr",
+        "CYp",
+        "CYr",
+        "Clr",
+        "Cnp",
         "CLp",
         "CLq",
         "CLr",
@@ -632,22 +636,6 @@ _SKIP_LEFTOVER = frozenset(
         "NP",
         "CL0",
         "Cm0",
-        # flow5 returns exactly these and nothing else (aid/flow5_io.py), so the
-        # whole key set is named here. The eight scalars would otherwise surface
-        # as raw leftovers; the 17-sample arrays (beta, Cx, Cz) are already
-        # excluded by the 0 < size <= 8 filter in _leftover_groups, but naming
-        # them keeps that filter from being load-bearing for correctness.
-        "beta",
-        "Cx",
-        "Cz",
-        "CXa",
-        "CZa",
-        "CYp",
-        "CYr",
-        "Clr",
-        "Cnp",
-        "Cnr",
-        "XNP",
     }
 )
 

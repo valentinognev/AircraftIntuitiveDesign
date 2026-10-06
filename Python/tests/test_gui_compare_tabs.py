@@ -7,8 +7,10 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QTableWidget
 
 from aid.aircraft import load_jsonc
+from aid.axes import to_frd
 from aid.datcom_parse import parse_for006
 from aid.paths import models_dir
+from aid_gui.compare_tabs import _SKIP_LEFTOVER
 from aid_gui.main_window import MainWindow
 from tests.test_datcom_parse_tables import _FOR006
 
@@ -46,7 +48,7 @@ def test_forces_tab_plots_datcom_when_analyzed():
     w = MainWindow()
     w.show()
     w.load_aircraft(load_jsonc(models_dir() / "Cessna 172.jsonc"))
-    w.last_results["datcom"] = parse_for006(_FOR006)
+    w.last_results["datcom"] = to_frd("datcom", parse_for006(_FOR006))
     w.set_plot_mode("Aerodynamics")
     app.processEvents()
     fig = w.compare_tabs.figure("Forces")
@@ -61,7 +63,7 @@ def test_forces_axes_fill_tab_canvas():
     w.show()
     w.resize(960, 700)
     w.load_aircraft(load_jsonc(models_dir() / "Cessna 172.jsonc"))
-    w.last_results["datcom"] = parse_for006(_FOR006)
+    w.last_results["datcom"] = to_frd("datcom", parse_for006(_FOR006))
     w.set_plot_mode("Aerodynamics")
     w.compare_tabs.setCurrentIndex(0)
     app.processEvents()
@@ -207,7 +209,7 @@ def test_controls_plots_datcom_high_lift():
     w = MainWindow()
     w.show()
     w.load_aircraft(load_jsonc(models_dir() / "Cessna 172.jsonc"))
-    w.last_results["datcom"] = parse_for006(_FOR006)
+    w.last_results["datcom"] = to_frd("datcom", parse_for006(_FOR006))
     w.set_plot_mode("Aerodynamics")
     app.processEvents()
     fig = w.compare_tabs.figure("Controls")
@@ -223,7 +225,7 @@ def test_all_solver_outputs_appear_on_compare_tabs():
     w = MainWindow()
     w.show()
     w.load_aircraft(load_jsonc(models_dir() / "Cessna 172.jsonc"))
-    w.last_results["datcom"] = parse_for006(_FOR006)
+    w.last_results["datcom"] = to_frd("datcom", parse_for006(_FOR006))
     w.last_results["tornado"] = _tornado_sample()
     w.last_results["avl"] = _avl_sample()
     w.set_plot_mode("Aerodynamics")
@@ -263,7 +265,7 @@ def test_derivative_cyb_uses_full_alpha_range():
     w = MainWindow()
     w.show()
     w.load_aircraft(load_jsonc(models_dir() / "Cessna 172.jsonc"))
-    w.last_results["datcom"] = parse_for006(_FOR006)
+    w.last_results["datcom"] = to_frd("datcom", parse_for006(_FOR006))
     w.set_plot_mode("Aerodynamics")
     w.compare_tabs.setCurrentIndex(2)
     app.processEvents()
@@ -358,6 +360,46 @@ def test_sections_leftover_groups_by_solver():
     assert all(not key.startswith("Tornado ") for key in leftover)
 
 
+def test_sections_leftover_still_hides_avl_rate_derivatives():
+    """A short AVL sweep hides its rate derivatives, as it always has.
+
+    ``_leftover_groups`` only ever walks the Tornado and AVL result dicts, so
+    four names that flow5 happens to share with AVL suppress exactly the rows
+    AVL's own ``Clp``/``Cmq``/``Cnr``/``CLp``/``CLq``/``CLr`` entries suppress.
+    ``CDff`` is in the same dict and is not named, so the table is demonstrably
+    populated rather than silently empty.
+    """
+    app = QApplication.instance() or QApplication([])
+    w = MainWindow()
+    w.show()
+    w.load_aircraft(load_jsonc(models_dir() / "Cessna 172.jsonc"))
+    avl = _avl_sample()
+    avl.update({"CYp": -0.18, "CYr": 0.43, "Clr": 0.01, "Cnp": -0.06})
+    w.last_results["avl"] = avl
+    w.set_plot_mode("Aerodynamics")
+    app.processEvents()
+    leftover = _leftover_map(w.compare_tabs.leftover_table)
+    assert "CDff" in leftover, "the table has to be populated for this to prove anything"
+    for key in ("CYp", "CYr", "Clr", "Cnp"):
+        assert key not in leftover, key
+    for key in ("Clp", "Cmq", "Cnr", "CLp", "CLq", "CLr"):
+        assert key not in leftover, key
+
+
+def test_skip_leftover_keeps_only_the_flow5_names_avl_also_spells():
+    """A flow5 channel name belongs in the skip list only under AVL's spelling.
+
+    ``_leftover_groups`` walks the Tornado and AVL dicts, so the flow5-only
+    names could never match anything and read as if the walk reached flow5.
+    ``Cnr`` belongs with the AVL spelling: its own block already named it, which
+    is what made flow5's copy of it redundant.
+    """
+    for key in ("beta", "Cx", "Cz", "CXa", "CZa", "XNP"):
+        assert key not in _SKIP_LEFTOVER, key
+    for key in ("CYp", "CYr", "Clr", "Cnp", "Cnr"):
+        assert key in _SKIP_LEFTOVER, key
+
+
 def test_sections_leftover_zeroes_tiny_values():
     app = QApplication.instance() or QApplication([])
     w = MainWindow()
@@ -411,7 +453,7 @@ def test_sections_headers_are_readable():
     w = MainWindow()
     w.show()
     w.load_aircraft(load_jsonc(models_dir() / "Cessna 172.jsonc"))
-    w.last_results["datcom"] = parse_for006(_FOR006)
+    w.last_results["datcom"] = to_frd("datcom", parse_for006(_FOR006))
     w.last_results["tornado"] = _tornado_sample()
     w.last_results["avl"] = _avl_sample()
     w.set_plot_mode("Aerodynamics")
@@ -425,7 +467,7 @@ def test_sections_datcom_defs_is_qt_table():
     w = MainWindow()
     w.show()
     w.load_aircraft(load_jsonc(models_dir() / "Cessna 172.jsonc"))
-    w.last_results["datcom"] = parse_for006(_FOR006)
+    w.last_results["datcom"] = to_frd("datcom", parse_for006(_FOR006))
     w.set_plot_mode("Aerodynamics")
     w.compare_tabs.setCurrentIndex(list(_TABS).index("Sections"))
     app.processEvents()

@@ -130,9 +130,18 @@ def test_validate_accepts_aircraft_with_results():
 def test_validate_accepts_a_payload_carrying_every_field():
     """The HTTP path builds the aircraft from the posted body and nothing else.
 
-    ``aircraft_from_json`` reads each field by name, so a field the dataclass has
-    and the payload lacks -- or the other way round -- is a 400 here rather than a
-    silently dropped key.
+    ``aircraft_from_json`` reads each field the dataclass knows by name, so a
+    mismatch between payload and dataclass resolves quietly in both directions
+    rather than raising a 400. A required key the payload omits raises
+    ``KeyError`` inside the handler, which catches it and answers 200 with
+    ``{"ok": false, ...}`` -- see ``test_validate_empty_aircraft_fails``. A key
+    the dataclass has no field for is never read, so it is dropped in silence
+    and the endpoint answers ``{"ok": True}``.
+
+    So this test pins only the fully-populated happy path; it does not pin
+    either mismatch. The unknown-key direction is checked where it can actually
+    fail, by ``test_aircraft_from_json_carries_every_field_it_was_given``, which
+    holds the payload to exactly the dataclass's field names.
     """
     r = TestClient(app).post("/models/validate", json={"aircraft": _payload()})
     assert r.json() == {"ok": True}

@@ -1,6 +1,6 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { aircraftForRequest } from "./api";
-import { chartRows, type ControlChartSeries, type ControlDerivPayload } from "./controlDeriv";
+import { chartRows, controlLegendText, type ControlChartSeries, type ControlDerivPayload } from "./controlDeriv";
 import {
   barFill,
   barLegend,
@@ -74,7 +74,7 @@ function controlDomain(series: ControlChartSeries[]) {
   );
 }
 
-function ControlDerivChart({ series }: { series: ControlChartSeries[] }) {
+export function ControlDerivChart({ series }: { series: ControlChartSeries[] }) {
   const domain = controlDomain(series);
   const { width, height, plot } = LAYOUT;
   return (
@@ -114,7 +114,7 @@ function ControlDerivChart({ series }: { series: ControlChartSeries[] }) {
               className="inline-block h-0.5 w-4"
               style={{ background: swatch(controlStroke(i)) }}
             />
-            {s.id}
+            {controlLegendText(s)}
           </li>
         ))}
       </ul>

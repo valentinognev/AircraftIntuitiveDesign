@@ -543,6 +543,13 @@ def _plot_force_extras(ax, results: dict, *, beta: float = 0.0) -> None:
     _style_ax(ax)
 
 
+# Keys already drawn on the other tabs, so the Sections leftover table would only
+# repeat them: the rule the web states in `aeroFigures.ts` and applies in its own
+# `SKIP_LEFTOVER`. Whether a key belongs is decided by the rate panels, which are
+# `RATE_GROUPS` on the web and `_plot_rate_bars` here -- both the same six,
+# Clp/Cmq/Cnr/CLp/CLq/CLr. Nothing draws CYp/CYr/Clr/Cnp, so those four stay out of
+# this set and the table carries them; matching the web is what makes the two tables
+# the same table.
 _SKIP_LEFTOVER = frozenset(
     {
         "cp",
@@ -623,10 +630,6 @@ _SKIP_LEFTOVER = frozenset(
         "Clp",
         "Cmq",
         "Cnr",
-        "CYp",
-        "CYr",
-        "Clr",
-        "Cnp",
         "CLp",
         "CLq",
         "CLr",

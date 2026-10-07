@@ -139,8 +139,9 @@ it("prefers an explicit series label over the solver name", () => {
   expect(seriesLegend({ solver: "avl", label: "" })).toBe("avl");
 });
 
-// R31: the bar figures name their solver in the legend, and AVL's bars are AVL data
-// at beta = 0 whatever the Aero tab says.
+// R31: the bar figures name their solver in the legend, and a bar whose data was
+// computed at beta = 0 whatever the Aero tab asked for is marked -- which is every
+// DATCOM bar and AVL's, since neither has a sideslip capability at all.
 
 it("marks the AVL bar legend beta=0 at a sideslip and leaves Tornado alone", () => {
   const categories = groupedBarCategories([{ label: "Clp", tornado: -0.4, avl: -0.3 }]);
@@ -159,10 +160,22 @@ it("defaults the bar legend's beta to zero", () => {
   expect(barLegend(categories)).toEqual(barLegend(categories, 0));
 });
 
-it("never marks a quantity-named bar legend", () => {
+// README.md:44 is the rule, and it is about provenance, not naming: "any series that
+// was not computed at that sideslip gets ` (beta=0)` appended ... DATCOM and AVL are
+// marked everywhere, having no sideslip capability at all." The hinge bars are DATCOM
+// `high_lift` blocks under names that describe the quantity rather than the solver,
+// which is what the old test here took as an exemption. Naming is not the rule, and
+// these are the same blocks as the ΔCDi curve this file already marks.
+it("marks the DATCOM hinge bars, whose names describe the quantity and not the solver", () => {
   const categories = hingeBarCategories({
     title: "hinge",
     groups: [{ label: "d1", cha: 0.3, chd: 0.4, dclMax: 1.2 }],
   });
-  expect(barLegend(categories, 5).map((item) => item.label)).toEqual(["cha", "chd", "dclMax"]);
+  expect(barLegend(categories, 5).map((item) => item.label)).toEqual([
+    "cha (beta=0)",
+    "chd (beta=0)",
+    "dclMax (beta=0)",
+  ]);
+  // README.md:44 also requires every label at BETA == 0 to be byte-identical.
+  expect(barLegend(categories, 0).map((item) => item.label)).toEqual(["cha", "chd", "dclMax"]);
 });

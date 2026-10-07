@@ -218,12 +218,30 @@ const BAR_LEGEND: Record<string, string> = {
 };
 
 /**
- * Bar legends name their solver for the paired figures and a quantity for the rest.
- * Only AVL's slot is a solver that cannot fly a sideslip — DATCOM's dcl/dcm and the
- * hinge quantities are named after what they measure, so they take no suffix — and
- * Tornado's bars really are at the requested sideslip.
+ * The bar slots whose data is computed at beta = 0 whatever sideslip was requested, so
+ * they take the `(beta=0)` mark.
+ *
+ * README.md:44 is the rule: "any series that was not computed at that sideslip gets
+ * ` (beta=0)` appended ... DATCOM and AVL are marked everywhere, having no sideslip
+ * capability at all." DATCOM's `$FLTCON` and AVL's run-case menu have no beta at all, so
+ * `avl` and the five DATCOM slots -- `dcl`, `dcm`, `cha`, `chd`, `dclMax` -- are every bar
+ * that cannot fly one. Tornado's slots read `AERO["BETA"]` and stay unmarked.
+ *
+ * The previous comment here excused the DATCOM slots because they are "named after what
+ * they measure, so they take no suffix". That is naming, and naming is not what the rule
+ * is about: these are the same `high_lift` blocks as the Controls-tab ΔCDi curve and the
+ * Sections leftover group header, and this file already marks both of those. What the
+ * quantity-named slots do not carry is the solver's *name*, not its provenance, and the
+ * PySide Controls tab marks the same coefficients for the same reason.
  */
-const BAR_LEGEND_BETA_FLAT = new Set(["avl"]);
+const BAR_LEGEND_BETA_FLAT: ReadonlySet<string> = new Set([
+  "avl",
+  "dcl",
+  "dcm",
+  "cha",
+  "chd",
+  "dclMax",
+]);
 
 export function barLegend(
   categories: BarCategory[],

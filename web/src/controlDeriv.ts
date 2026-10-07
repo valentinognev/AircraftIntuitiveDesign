@@ -28,26 +28,17 @@ export type ControlChartSeries = {
 };
 
 /**
- * The solvers whose control curves really are at the flight condition's sideslip.
- *
- * Mirrors `BETA_CAPABLE_CONTROL_SOLVERS` in `aid/solver_overlay.py`: Tornado reads it
- * through `tornado_io`'s `betha` and flow5 through the deck's polar beta, while
- * DATCOM, AVL and the handbook have no sideslip capability at all. This is the same
- * list as `aid_web.analyze.BETA_CAPABLE_SOLVERS`, which answers the same question for
- * the handshake payloads.
- */
-const BETA_CAPABLE_SOLVERS = new Set(["tornado", "flow5"]);
-
-/**
  * Finite coefficients grouped by surface and name. Null and unavailable rows are omitted.
  *
  * `beta` is the flight condition's sideslip in degrees. README.md:44 is the rule:
  * "any series that was not computed at that sideslip gets ` (beta=0)` appended, and at
- * `BETA == 0` every label is byte-identical to the pre-feature text" -- so a solver
- * outside :data:`BETA_CAPABLE_SOLVERS` gets the mark and nothing else changes.
+ * `BETA == 0` every label is byte-identical to the pre-feature text". The handbook's
+ * `$FLTCON`/panel data has no sideslip input at all, so its curves are at zero whatever
+ * the run asked for -- the trivial direction of the rule, and the only one this chart
+ * can reach.
  */
 export function chartRows(payload: ControlDerivPayload, beta = 0): ControlChartSeries[] {
-  const mark = beta !== 0 && !BETA_CAPABLE_SOLVERS.has(payload.solver);
+  const mark = beta !== 0 && payload.solver === "handbook";
   const grouped = new Map<string, ControlChartSeries>();
   for (const row of payload.rows) {
     if (row.available === false) continue;

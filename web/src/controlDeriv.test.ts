@@ -13,9 +13,8 @@ const HANDBOOK = {
 
 // README.md:44: "any series that was not computed at that sideslip gets ` (beta=0)`
 // appended, and at `BETA == 0` every label is byte-identical to the pre-feature text."
-// The handbook has no sideslip capability, so its curves are at beta = 0 whatever the
-// run asked for -- the trivial direction of the rule, and the one PySide's
-// `control_probe_label` already applies via `BETA_CAPABLE_CONTROL_SOLVERS`.
+// The Controls chart is handbook-only and the handbook has no sideslip input, so its
+// curves are at beta = 0 whatever the run asked for.
 test("marks the handbook control curves at a sideslip and not at zero", () => {
   const swept = chartRows(HANDBOOK, 5);
   const flapCL = swept.find((s) => s.id === "handbook-flap-CL");
@@ -27,12 +26,6 @@ test("marks the handbook control curves at a sideslip and not at zero", () => {
   const upright = chartRows(HANDBOOK, 0);
   expect(upright.every((s) => s.label === undefined)).toBe(true);
   expect(controlLegendText(upright[0])).toBe("handbook-flap-CL");
-
-  // Tornado and flow5 read AERO["BETA"], so their curves keep the bare id.
-  for (const solver of ["tornado", "flow5"]) {
-    const rows = chartRows({ ...HANDBOOK, solver }, 5);
-    expect(rows.every((s) => s.label === undefined)).toBe(true);
-  }
 });
 
 test("zero and five degree probes survive null coefficients", () => {

@@ -36,8 +36,3 @@ test("the control-chart legend is unmarked at zero sideslip", () => {
   expect(markup).not.toContain("(beta=0)");
   expect(markup).toContain("handbook-flap-CL");
 });
-
-test("a beta-capable solver's control curves stay unmarked at a sideslip", () => {
-  expect(render({ ...HANDBOOK, solver: "tornado" }, 5)).not.toContain("(beta=0)");
-  expect(render({ ...HANDBOOK, solver: "flow5" }, 5)).not.toContain("(beta=0)");
-});

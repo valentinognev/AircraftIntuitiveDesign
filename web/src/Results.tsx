@@ -1,6 +1,6 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { aircraftForRequest } from "./api";
-import { chartRows, type ControlChartSeries, type ControlDerivPayload } from "./controlDeriv";
+import { chartRows, controlLegendText, type ControlChartSeries, type ControlDerivPayload } from "./controlDeriv";
 import {
   barFill,
   barLegend,
@@ -17,6 +17,7 @@ import {
   type BarCategory,
 } from "./aeroChart";
 import { aeroTabs, type AeroFigure, type BarFigure, type ControlBars, type HingeBars, type LineFigure, type TableFigure } from "./aeroFigures";
+import { handshakeSolverLabel } from "./coeffOverlay";
 import {
   axisTicks,
   chartLayout,
@@ -73,7 +74,7 @@ function controlDomain(series: ControlChartSeries[]) {
   );
 }
 
-function ControlDerivChart({ series }: { series: ControlChartSeries[] }) {
+export function ControlDerivChart({ series }: { series: ControlChartSeries[] }) {
   const domain = controlDomain(series);
   const { width, height, plot } = LAYOUT;
   return (
@@ -113,7 +114,7 @@ function ControlDerivChart({ series }: { series: ControlChartSeries[] }) {
               className="inline-block h-0.5 w-4"
               style={{ background: swatch(controlStroke(i)) }}
             />
-            {s.id}
+            {controlLegendText(s)}
           </li>
         ))}
       </ul>
@@ -645,7 +646,7 @@ export function Results({ initialTab = "forces" }: { initialTab?: string }) {
             {series.map((s) => (
               <li key={s.solver} className="flex items-center gap-1">
                 <span className="inline-block h-0.5 w-4" style={{ background: swatch(s.stroke) }} />
-                {s.solver}
+                {handshakeSolverLabel(s.solver, beta) ?? s.solver}
               </li>
             ))}
           </ul>

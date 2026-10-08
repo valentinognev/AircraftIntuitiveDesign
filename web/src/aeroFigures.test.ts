@@ -9,7 +9,7 @@ import {
   type LineFigure,
   type TableFigure,
 } from "./aeroFigures";
-import { barLegend, controlBarCategories, seriesLegend } from "./aeroChart";
+import { barLegend, controlBarCategories, hingeBarCategories, seriesLegend } from "./aeroChart";
 import type { OverlayPointSeries, SolverRaws } from "./coeffOverlay";
 
 const PER_RAD = 180 / Math.PI;
@@ -669,6 +669,23 @@ it("lists Tornado L in other coefficients and skips CL", () => {
   expect(leftover.rows.some((row) => row.cells.includes("7"))).toBe(false);
 });
 
+it("carries an AVL rate derivative that no other panel draws", () => {
+  // The rule behind SKIP_LEFTOVER is "keys already drawn on the other tabs". The
+  // rate panels are RATE_GROUPS -- Clp/Cmq/Cnr/CLp/CLq/CLr -- on both UIs, and
+  // nothing plots CYp/CYr/Clr/Cnp, so the leftover table is the only place those
+  // four appear and must carry them. This is the mirror of the PySide assertion in
+  // `test_gui_compare_tabs.py::test_sections_leftover_shows_a_rate_derivative_no_other_panel_plots`;
+  // only the web side was pinned before, which is how the two tables drifted apart.
+  const tabs = aeroTabs(
+    { avl: { CYp: -0.18, CYr: 0.43, Clr: 0.01, Cnp: -0.06, Clp: -0.5, Cnr: -0.2 } },
+    null,
+    null,
+  );
+  const quantities = table(tab(tabs, "Sections"), "Other coefficients").rows.map((row) => row.cells[0]);
+  for (const drawn of ["Clp", "Cnr"]) expect(quantities).not.toContain(drawn);
+  for (const undrawn of ["CYp", "CYr", "Clr", "Cnp"]) expect(quantities).toContain(undrawn);
+});
+
 it("uses a Value column when every leftover row has one number", () => {
   const tabs = aeroTabs({ tornado: { L: [1.25], CL: [0.9] } }, null, null);
   const leftover = table(tab(tabs, "Sections"), "Other coefficients");
@@ -866,6 +883,62 @@ it("marks the AVL control-deflection curve on the Controls tab", () => {
   expect(
     lines(tab(upright, "Controls"), "AVL control deflection").series.map(seriesLegend),
   ).toEqual(["avl"]);
+});
+
+// README.md:44 is normative: "any series that was not computed at that sideslip gets
+// ` (beta=0)` appended ... DATCOM and AVL are marked everywhere, having no sideslip
+// capability at all." The bar slots named after a quantity rather than a solver
+// (`dcl`, `dcm`, `cha`, `chd`, `dclMax`) are still DATCOM data from the same
+// `high_lift` blocks as the ΔCDi curve and the leftover group header, both of which
+// the same file already marks -- naming is not what the rule is about.
+it("marks the DATCOM control and hinge bars at a sideslip, and leaves Tornado's alone", () => {
+  const raws: SolverRaws = {
+    datcom: {
+      high_lift: [
+        {
+          delta: 15,
+          dcl: 0.2,
+          dcm: 0.01,
+          cha: 0.3,
+          chd: 0.4,
+          dcl_max: 0.5,
+          dcdi_alpha: [],
+          dcdi: [],
+        },
+      ],
+    },
+    tornado: { CL_d: [[0.5, 0.6]] },
+  };
+
+  const swept = aeroTabs(raws, null, null, 5);
+  const increments = figure(tab(swept, "Controls").figures, "Control increments") as ControlBars;
+  const hinge = figure(tab(swept, "Controls").figures, "DATCOM hinge / max-lift") as HingeBars;
+  const legendOf = (figure: ControlBars | HingeBars) => {
+    const categories =
+      figure.kind === "control-bars" ? controlBarCategories(figure) : hingeBarCategories(figure);
+    return categories.flatMap((cat) =>
+      barLegend([cat], 5).map((item) => item.label),
+    );
+  };
+  for (const slot of ["dcl", "dcm", "cha", "chd", "dclMax"]) {
+    expect(legendOf(increments).concat(legendOf(hinge))).toContain(`${slot} (beta=0)`);
+  }
+  // Tornado reads AERO["BETA"], so its bars are at the requested sideslip.
+  expect(legendOf(increments)).toContain("CL_d");
+  expect(legendOf(increments)).not.toContain("CL_d (beta=0)");
+
+  // README:44 also requires every label byte-identical at beta == 0.
+  const upright = aeroTabs(raws, null, null);
+  const upIncrements = figure(
+    tab(upright, "Controls").figures,
+    "Control increments",
+  ) as ControlBars;
+  const upHinge = figure(tab(upright, "Controls").figures, "DATCOM hinge / max-lift") as HingeBars;
+  const upLabels = controlBarCategories(upIncrements)
+    .flatMap((cat) => barLegend([cat]).map((item) => item.label))
+    .concat(hingeBarCategories(upHinge).flatMap((cat) => barLegend([cat]).map((i) => i.label)));
+  expect(upLabels).toContain("dcl");
+  expect(upLabels.some((label) => label.includes("(beta=0)"))).toBe(false);
 });
 
 it("keeps the Tornado control keys unqualified, because Tornado flies the sideslip", () => {

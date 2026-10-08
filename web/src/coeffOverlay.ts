@@ -36,7 +36,26 @@ type SolverName = OverlayPointSeries["solver"];
  * flow5 is *not* in this set, because it is not a property of the solver but of the
  * channel — see FLOW5_BETA_FLAT_DERIVATIVES.
  */
-const NO_SIDESLIP: ReadonlySet<SolverName> = new Set<SolverName>(["datcom", "avl"]);
+const NO_SIDESLIP: ReadonlySet<string> = new Set<SolverName>(["datcom", "avl"]);
+
+/**
+ * The `(beta=0)` mark for a series drawn straight from a handshake payload, which is
+ * the shape `Results` falls back to when no solver raw survived.
+ *
+ * A handshake payload carries no channel names, so its three charts (CL, CD, Cm) can
+ * only be labelled by solver — and that is all the rule needs, because `analyze.py`'s
+ * `_flown_beta` reports 0 for `datcom` and `avl` *whatever was requested*. A payload
+ * alone therefore cannot distinguish "flown upright" from "pinned at zero", and the
+ * block's own `flownBeta` is what says whether the flight carried a sideslip. Tornado
+ * and flow5 really flew it, so they keep their bare names.
+ *
+ * This is the same `pinnedLabel` the tabbed path uses, reached through
+ * `NO_SIDESLIP` alone; the per-channel `FLOW5_BETA_FLAT_DERIVATIVES` half cannot
+ * apply to a payload, which has no derivative channels at all.
+ */
+export function handshakeSolverLabel(solver: string, beta: number): string | undefined {
+  return pinnedLabel(solver, beta, NO_SIDESLIP);
+}
 
 /**
  * The twelve flow5 `StabDerivatives` keys that are frozen at beta = 0: they are built
@@ -174,9 +193,9 @@ function series(
  * the per-channel exceptions among the solvers that otherwise would.
  */
 function pinnedLabel(
-  solver: SolverName,
+  solver: string,
   beta: number,
-  pinned: ReadonlySet<SolverName>,
+  pinned: ReadonlySet<string>,
   betaFlatKeys: ReadonlySet<string> = new Set(),
   key?: string,
 ): string | undefined {

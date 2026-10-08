@@ -360,14 +360,21 @@ def test_sections_leftover_groups_by_solver():
     assert all(not key.startswith("Tornado ") for key in leftover)
 
 
-def test_sections_leftover_still_hides_avl_rate_derivatives():
-    """A short AVL sweep hides its rate derivatives, as it always has.
+def test_sections_leftover_shows_a_rate_derivative_no_other_panel_plots():
+    """A coefficient no other panel draws belongs in the leftover table.
 
-    ``_leftover_groups`` only ever walks the Tornado and AVL result dicts, so
-    four names that flow5 happens to share with AVL suppress exactly the rows
-    AVL's own ``Clp``/``Cmq``/``Cnr``/``CLp``/``CLq``/``CLr`` entries suppress.
-    ``CDff`` is in the same dict and is not named, so the table is demonstrably
-    populated rather than silently empty.
+    The skip list holds "keys already drawn on the other tabs"
+    (``web/src/aeroFigures.ts:83``, and ``UPDATES.md`` on the Sections tab:
+    leftover Tornado/AVL scalars "that are not on the vs-alpha axes"). Which
+    coefficients those are follows the rate panels, and both are the same six:
+    ``Clp``/``Cmq``/``Cnr``/``CLp``/``CLq``/``CLr`` in ``RATE_GROUPS``
+    (``aeroFigures.ts``) and ``_plot_rate_bars`` (``compare_tabs.py``). Nothing
+    plots ``CYp``, ``CYr``, ``Clr`` or ``Cnp`` -- so by the criterion the repo
+    documents, hiding them suppressed rows no other panel draws.
+
+    ``Clp`` and ``Cnr`` stay in the list because the rate bars really do draw
+    them; the four asserted here are the ones nothing else draws, and that
+    difference is the whole assertion.
     """
     app = QApplication.instance() or QApplication([])
     w = MainWindow()
@@ -380,8 +387,9 @@ def test_sections_leftover_still_hides_avl_rate_derivatives():
     app.processEvents()
     leftover = _leftover_map(w.compare_tabs.leftover_table)
     assert "CDff" in leftover, "the table has to be populated for this to prove anything"
-    for key in ("CYp", "CYr", "Clr", "Cnp"):
-        assert key not in leftover, key
+    for key, expected in (("CYp", "-0.18"), ("CYr", "0.43"), ("Clr", "0.01"), ("Cnp", "-0.06")):
+        assert leftover.get(key, [None])[0] == expected, key
+    # The six the rate bars do draw are still suppressed, on both UIs' spelling.
     for key in ("Clp", "Cmq", "Cnr", "CLp", "CLq", "CLr"):
         assert key not in leftover, key
 
@@ -396,8 +404,12 @@ def test_skip_leftover_keeps_only_the_flow5_names_avl_also_spells():
     """
     for key in ("beta", "Cx", "Cz", "CXa", "CZa", "XNP"):
         assert key not in _SKIP_LEFTOVER, key
-    for key in ("CYp", "CYr", "Clr", "Cnp", "Cnr"):
+    # ``Cnr`` is drawn by the rate bars on both sides. ``CYp``/``CYr``/``Clr``/
+    # ``Cnp`` are not: nothing plots them, so the leftover table must carry them.
+    for key in ("Cnr",):
         assert key in _SKIP_LEFTOVER, key
+    for key in ("CYp", "CYr", "Clr", "Cnp"):
+        assert key not in _SKIP_LEFTOVER, key
 
 
 def test_sections_leftover_zeroes_tiny_values():

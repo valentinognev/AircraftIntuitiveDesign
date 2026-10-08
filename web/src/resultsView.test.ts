@@ -164,6 +164,41 @@ it("labels from the run, not from a Beta edited after the run", () => {
   expect(markup("forces")).toContain("(beta=0)");
 });
 
+// The three handshake charts are the only place in this component that can draw a
+// series without a raw to name its channel, so they are also the only place the
+// `(beta=0)` mark could go missing: they are reached when `raws` is empty (a saved
+// `results` block written with a payload but no raw), which `1.36.0` deferred as
+// "needs a response-schema change" — a change that same release landed, since every
+// payload now carries its own `axes.beta` from `_flown_beta`. A DATCOM or AVL curve
+// drawn here from a run flown at a sideslip is the exact false-provenance claim the
+// mark exists to prevent, and the tabbed path beside it already makes the claim.
+it("marks the handshake charts for a solver that could not fly the run's sideslip", () => {
+  const datcom = sideslipPayload("datcom", 0);
+  const flown = sideslipPayload("tornado", 5);
+  store.setState({
+    raws: {},
+    handbook: null,
+    lastStability: null,
+    payloads: { datcom, tornado: flown },
+    lastPayload: flown,
+  });
+  const html = markup();
+  expect(html).toContain("datcom (beta=0)");
+  expect(html).toContain(">tornado<");
+  expect(html).not.toContain("tornado (beta=0)");
+
+  // The other pinned solver, and the byte-identical result at beta = 0.
+  const avl = sideslipPayload("avl", 0);
+  store.setState({ ...store.getState(), payloads: { datcom, avl, tornado: flown }, lastPayload: flown });
+  expect(markup()).toContain("avl (beta=0)");
+  store.setState({
+    ...store.getState(),
+    payloads: { datcom: sideslipPayload("datcom", 0), avl },
+    lastPayload: avl,
+  });
+  expect(markup()).not.toContain("(beta=0)");
+});
+
 it("flownBeta reads the run's payload and nothing else", () => {
   expect(flownBeta([])).toBe(0);
   expect(flownBeta([sideslipPayload("datcom", 0), sideslipPayload("avl", 0)])).toBe(0);
